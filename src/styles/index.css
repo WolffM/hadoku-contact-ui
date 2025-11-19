@@ -18,7 +18,6 @@
  */
 
 .contact-ui-container {
-  /* REQUIRED: Use theme CSS variables, NOT hardcoded colors */
   min-height: 100vh;
   background-color: var(--theme-background, #ffffff);
   color: var(--theme-text, #000000);
