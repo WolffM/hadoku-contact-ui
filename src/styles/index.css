@@ -1,0 +1,181 @@
+/**
+ * REQUIRED: @wolffm/themes integration
+ *
+ * IMPORTANT: You MUST use @wolffm/themes CSS variables for all colors!
+ *
+ * How to use:
+ * 1. Import '@wolffm/themes/themes.css' in entry.tsx (REQUIRED - already done)
+ * 2. Set data-theme and data-dark-theme attributes on container (REQUIRED - see App.tsx)
+ * 3. Use CSS variables for all colors: var(--theme-*)
+ *
+ * Available theme variables:
+ * - var(--theme-background)  - Main background color
+ * - var(--theme-text)         - Main text color
+ * - var(--theme-primary)      - Primary/accent color
+ * - var(--theme-secondary)    - Secondary color
+ * - var(--theme-border)       - Border color
+ * - And more... (see @wolffm/themes documentation)
+ */
+
+.contact-ui-container {
+  /* REQUIRED: Use theme CSS variables, NOT hardcoded colors */
+  min-height: 100vh;
+  background-color: var(--theme-background, #ffffff);
+  color: var(--theme-text, #000000);
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.contact-ui {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+/* Contact Form Styles */
+.contact-container {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 2rem;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
+}
+
+.contact-header {
+  margin-bottom: 2rem;
+}
+
+.contact-title {
+  font-size: 2.5rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+  color: var(--theme-text, #1a1a1a);
+}
+
+.contact-subtitle {
+  font-size: 1.125rem;
+  color: var(--theme-text-muted, #666);
+  opacity: 0.8;
+}
+
+/* Alert Styles */
+.contact-alert {
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: 0.375rem;
+  border-width: 1px;
+  border-style: solid;
+}
+
+.contact-alert--success {
+  background-color: var(--theme-success-bg, #d4edda);
+  border-color: var(--theme-success-border, #c3e6cb);
+  color: var(--theme-success-text, #155724);
+}
+
+.contact-alert--error {
+  background-color: var(--theme-error-bg, #f8d7da);
+  border-color: var(--theme-error-border, #f5c6cb);
+  color: var(--theme-error-text, #721c24);
+}
+
+/* Form Styles */
+.contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.contact-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.contact-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: var(--theme-text, #333);
+}
+
+.contact-input,
+.contact-textarea {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  border: 1px solid var(--theme-border, #ddd);
+  border-radius: 0.375rem;
+  outline: none;
+  transition: border-color 0.2s;
+  background-color: var(--theme-input-bg, #ffffff);
+  color: var(--theme-text, #000000);
+}
+
+.contact-input:focus,
+.contact-textarea:focus {
+  border-color: var(--theme-primary, #4a90e2);
+  box-shadow: 0 0 0 3px var(--theme-primary-alpha, rgba(74, 144, 226, 0.1));
+}
+
+.contact-textarea {
+  resize: vertical;
+  font-family: inherit;
+}
+
+.contact-input--error {
+  border-color: var(--theme-error, #dc3545);
+  border-width: 2px;
+}
+
+.contact-error-text {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: var(--theme-error-text, #dc3545);
+}
+
+/* Honeypot (hidden from humans) */
+.contact-honeypot {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+/* Submit Button */
+.contact-button {
+  padding: 0.875rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--theme-button-text, #fff);
+  background-color: var(--theme-primary, #4a90e2);
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition:
+    background-color 0.2s,
+    opacity 0.2s;
+}
+
+.contact-button:hover:not(:disabled) {
+  background-color: var(--theme-primary-hover, #357abd);
+}
+
+.contact-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Dark theme adjustments */
+[data-dark-theme='true'] .contact-ui-container {
+  /* Additional dark theme overrides if needed */
+}
+
+[data-dark-theme='true'] .contact-input,
+[data-dark-theme='true'] .contact-textarea {
+  background-color: var(--theme-input-bg, rgba(255, 255, 255, 0.05));
+}
