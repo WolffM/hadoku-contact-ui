@@ -7,8 +7,6 @@ import './styles/index.css'
 // Props interface for configuration from parent app
 export interface ContactUIProps {
   theme?: string // Theme passed from parent (e.g., 'default', 'ocean', 'forest')
-  userType?: 'public' | 'friend' | 'admin'
-  sessionId?: string
 }
 
 // Extend HTMLElement to include __root property
