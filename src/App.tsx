@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ContactUIProps } from './entry'
 import ContactForm from './ContactForm'
 
@@ -25,13 +25,9 @@ export default function App(props: ContactUIProps = {}) {
     return () => mediaQuery.removeEventListener('change', handler)
   }, [])
 
-  // REQUIRED: Apply theme attributes for @wolffm/themes integration
-  // These attributes are REQUIRED for theming to work correctly
   useEffect(() => {
     if (containerRef.current) {
-      // REQUIRED: data-theme attribute (e.g., 'default', 'ocean', 'forest')
       containerRef.current.setAttribute('data-theme', theme)
-      // REQUIRED: data-dark-theme attribute ('true' or 'false')
       containerRef.current.setAttribute('data-dark-theme', isDarkTheme ? 'true' : 'false')
     }
   }, [theme, isDarkTheme])
