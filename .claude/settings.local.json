@@ -12,7 +12,10 @@
       "Bash(pnpm list:*)",
       "Bash(pnpm dev)",
       "Bash(pnpm add:*)",
-      "Bash(nul)"
+      "Bash(nul)",
+      "Bash(pnpm remove:*)",
+      "Bash(git check-ignore:*)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []

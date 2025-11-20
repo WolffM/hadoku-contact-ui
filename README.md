@@ -17,10 +17,28 @@ A React-based contact form component that integrates with the hadoku parent site
 
 ## Development
 
-```bash
-# Install dependencies
-pnpm install
+### Setup
 
+1. **Configure GitHub Package Registry Authentication**:
+
+   ```bash
+   # Copy the template
+   cp .npmrc.template .npmrc
+
+   # Replace ${HADOKU_SITE_TOKEN} with your actual GitHub token
+   # Or set the HADOKU_SITE_TOKEN environment variable
+   ```
+
+   Note: The `.npmrc` file is gitignored and contains your personal access token.
+
+2. **Install dependencies**:
+   ```bash
+   pnpm install
+   ```
+
+### Development Commands
+
+```bash
 # Start dev server
 pnpm dev
 

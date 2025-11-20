@@ -1,6 +1,6 @@
 {
   "name": "@wolffm/contact-ui",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "Contact form micro-frontend for hadoku.me",
   "type": "module",
   "repository": {
@@ -30,21 +30,20 @@
     "prepare": "husky"
   },
   "peerDependencies": {
-    "@wolffm/task-ui-components": ">=1.0.0",
-    "@wolffm/themes": ">=1.0.0",
+    "@wolffm/task-ui-components": "*",
+    "@wolffm/themes": "*",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
-    "@types/react": "^19.2.2",
-    "@types/react-calendar": "^4.1.0",
-    "@types/react-dom": "^19.2.2",
-    "@typescript-eslint/eslint-plugin": "^8.46.4",
-    "@typescript-eslint/parser": "^8.46.4",
-    "@vitejs/plugin-react": "^5.1.0",
+    "@types/react": "^19.2.6",
+    "@types/react-dom": "^19.2.3",
+    "@typescript-eslint/eslint-plugin": "^8.47.0",
+    "@typescript-eslint/parser": "^8.47.0",
+    "@vitejs/plugin-react": "^5.1.1",
     "@wolffm/task-ui-components": "^1.2.4",
-    "@wolffm/themes": "^1.1.11",
+    "@wolffm/themes": "^1.1.12",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
@@ -53,8 +52,8 @@
     "prettier": "^3.6.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "typescript": "^5.6.3",
-    "vite": "^7.1.12"
+    "typescript": "^5.9.3",
+    "vite": "^7.2.4"
   },
   "dependencies": {
     "date-fns": "^4.1.0",
