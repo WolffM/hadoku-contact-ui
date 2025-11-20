@@ -1,7 +1,6 @@
 import { createRoot, type Root } from 'react-dom/client'
 import App from './App'
-// REQUIRED: Import @wolffm/themes CSS - DO NOT REMOVE
-import '@wolffm/themes/themes.css'
+import '@wolffm/themes/style.css'
 import './styles/index.css'
 
 // Props interface for configuration from parent app

@@ -4,7 +4,7 @@
  * IMPORTANT: You MUST use @wolffm/themes CSS variables for all colors!
  *
  * How to use:
- * 1. Import '@wolffm/themes/themes.css' in entry.tsx (REQUIRED - already done)
+ * 1. Import '@wolffm/themes/style.css' in entry.tsx (REQUIRED - already done)
  * 2. Set data-theme and data-dark-theme attributes on container (REQUIRED - see App.tsx)
  * 3. Use CSS variables for all colors: var(--theme-*)
  *

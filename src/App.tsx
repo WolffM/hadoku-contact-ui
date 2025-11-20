@@ -25,15 +25,13 @@ export default function App(props: ContactUIProps = {}) {
     return () => mediaQuery.removeEventListener('change', handler)
   }, [])
 
-  useEffect(() => {
-    if (containerRef.current) {
-      containerRef.current.setAttribute('data-theme', theme)
-      containerRef.current.setAttribute('data-dark-theme', isDarkTheme ? 'true' : 'false')
-    }
-  }, [theme, isDarkTheme])
-
   return (
-    <div ref={containerRef} className="contact-ui-container">
+    <div
+      ref={containerRef}
+      className="contact-ui-container"
+      data-theme={theme}
+      data-dark-theme={isDarkTheme ? 'true' : 'false'}
+    >
       <div className="contact-ui">
         <ContactForm />
       </div>
