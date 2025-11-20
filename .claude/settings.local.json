@@ -1,6 +1,14 @@
 {
   "permissions": {
-    "allow": ["Bash(pnpm build:*)"],
+    "allow": [
+      "Bash(pnpm build:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(git add:*)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm run lint)",
+      "Bash(cat:*)"
+    ],
     "deny": [],
     "ask": []
   }

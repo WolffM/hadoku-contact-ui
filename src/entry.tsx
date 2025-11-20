@@ -1,6 +1,7 @@
 import { createRoot, type Root } from 'react-dom/client'
 import App from './App'
 import '@wolffm/themes/style.css'
+import '@wolffm/task-ui-components/theme-picker.css'
 import './styles/index.css'
 
 // Props interface for configuration from parent app
