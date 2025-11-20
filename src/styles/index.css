@@ -18,7 +18,8 @@
  */
 
 .contact-ui-container {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background-color: var(--color-bg);
   color: var(--color-text);
   transition:
@@ -28,8 +29,10 @@
 
 .contact-ui {
   max-width: 1200px;
+  height: 100%;
   margin: 0 auto;
   padding: 2rem;
+  overflow-y: auto;
 }
 
 .contact-ui__header-bar {
