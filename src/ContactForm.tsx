@@ -1,8 +1,9 @@
-import { useState, FormEvent, ChangeEvent } from 'react'
+import { useState, FormEvent, ChangeEvent, ReactNode } from 'react'
 
 interface ContactFormProps {
   basename?: string
   environment?: string
+  themePicker?: ReactNode
 }
 
 interface FormData {
@@ -20,7 +21,11 @@ interface FormErrors {
 
 type SubmitStatus = 'idle' | 'submitting' | 'success' | 'error'
 
-export default function ContactForm({ basename: _basename = '/contact' }: ContactFormProps) {
+export default function ContactForm({
+  basename: _basename = '/contact',
+  themePicker
+}: ContactFormProps) {
+  console.log('[ContactForm] Rendering with themePicker:', themePicker)
   const [formData, setFormData] = useState<FormData>({
     name: '',
     email: '',
@@ -104,7 +109,10 @@ export default function ContactForm({ basename: _basename = '/contact' }: Contac
     <div className="contact-container">
       {/* Header */}
       <div className="contact-header">
-        <h1 className="contact-title">Get in Touch</h1>
+        <div className="contact-header__title-row">
+          <h1 className="contact-title">Get in Touch</h1>
+          {themePicker && <div className="contact-header__theme-picker">{themePicker}</div>}
+        </div>
         <p className="contact-subtitle">
           Have a question or want to work together? Send me a message!
         </p>

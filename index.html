@@ -26,14 +26,12 @@
 
     // Get params from URL
     const params = new URLSearchParams(window.location.search)
-    const theme = params.get('theme') || 'default'
+    const theme = params.get('theme') // Don't provide default, let App.tsx handle it
 
     console.log('[mount] Mounting contact-ui with:', { theme })
 
-    // Mount the app
-    mount(document.getElementById('app'), {
-      theme
-    })
+    // Mount the app - only pass theme if explicitly set in URL
+    mount(document.getElementById('app'), theme ? { theme } : {})
   </script>
 </body>
 </html>

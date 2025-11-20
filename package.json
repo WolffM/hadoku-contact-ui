@@ -1,6 +1,6 @@
 {
   "name": "@wolffm/contact-ui",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Contact form micro-frontend for hadoku.me",
   "type": "module",
   "repository": {
@@ -42,7 +42,7 @@
     "@typescript-eslint/eslint-plugin": "^8.46.4",
     "@typescript-eslint/parser": "^8.46.4",
     "@vitejs/plugin-react": "^5.1.0",
-    "@wolffm/task-ui-components": "^1.0.5",
+    "@wolffm/task-ui-components": "^1.2.4",
     "@wolffm/themes": "^1.1.11",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",

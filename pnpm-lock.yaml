@@ -27,11 +27,11 @@ importers:
         specifier: ^5.1.0
         version: 5.1.1(vite@7.2.2)
       '@wolffm/task-ui-components':
-        specifier: ^1.0.5
-        version: 1.0.5(react@19.2.0)
+        specifier: ^1.2.4
+        version: 1.2.4(react@19.2.0)
       '@wolffm/themes':
         specifier: ^1.1.11
-        version: 1.1.11(@wolffm/task-ui-components@1.0.5(react@19.2.0))(react@19.2.0)
+        version: 1.1.11(@wolffm/task-ui-components@1.2.4(react@19.2.0))(react@19.2.0)
       eslint:
         specifier: ^9.39.1
         version: 9.39.1
@@ -590,8 +590,8 @@ packages:
     peerDependencies:
       vite: ^4.2.0 || ^5.0.0 || ^6.0.0 || ^7.0.0
 
-  '@wolffm/task-ui-components@1.0.5':
-    resolution: {integrity: sha512-3wRZBxj3qoQwfU1sykeMxs6zY9hVgdWzkOtYj3bYD1RgfTYX+Db0VStH8tCNRyotCPh4TQFaCtngX6cq5kv75A==, tarball: https://npm.pkg.github.com/download/@wolffm/task-ui-components/1.0.5/b1a7ec24abf03fb9bed6e4d2bc6dbb6bd3e5decf}
+  '@wolffm/task-ui-components@1.2.4':
+    resolution: {integrity: sha512-Fe5WiwOasr0fXkSBwQAqVZC7krzNSHwVfDgrka9BoevcUf3j6NuZU7brpNr5CEqF6JeKkc41xYjtP8ypgrzO9g==, tarball: https://npm.pkg.github.com/download/@wolffm/task-ui-components/1.2.4/02f65e82f3fe7bafeafad08bc6e3be88d26a4e0c}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
 
@@ -2087,13 +2087,13 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@wolffm/task-ui-components@1.0.5(react@19.2.0)':
+  '@wolffm/task-ui-components@1.2.4(react@19.2.0)':
     dependencies:
       react: 19.2.0
 
-  '@wolffm/themes@1.1.11(@wolffm/task-ui-components@1.0.5(react@19.2.0))(react@19.2.0)':
+  '@wolffm/themes@1.1.11(@wolffm/task-ui-components@1.2.4(react@19.2.0))(react@19.2.0)':
     dependencies:
-      '@wolffm/task-ui-components': 1.0.5(react@19.2.0)
+      '@wolffm/task-ui-components': 1.2.4(react@19.2.0)
       react: 19.2.0
 
   acorn-jsx@5.3.2(acorn@8.15.0):
