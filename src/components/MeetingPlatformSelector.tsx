@@ -15,7 +15,7 @@ const PLATFORMS: {
   { value: 'jitsi', label: 'Jitsi Meet', Icon: JitsiIcon },
   { value: 'discord', label: 'Discord', Icon: DiscordIcon },
   { value: 'google', label: 'Google Meet', Icon: GoogleMeetIcon },
-  { value: 'teams', label: 'Microsoft Teams', Icon: MicrosoftTeamsIcon }
+  { value: 'teams', label: 'Teams', Icon: MicrosoftTeamsIcon }
 ]
 
 export default function MeetingPlatformSelector({
