@@ -123,6 +123,7 @@ export default function App(props: ContactUIProps = {}) {
 
   const [isPickerOpen, setIsPickerOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const hasInitializedFromProps = useRef(false)
 
   console.log('[App] Current render - theme:', theme, 'isPickerOpen:', isPickerOpen)
 
@@ -157,11 +158,12 @@ export default function App(props: ContactUIProps = {}) {
     }
   }, [])
 
-  // Sync theme with props changes (only if props.theme is explicitly provided)
+  // Apply props.theme only on first mount if provided
   useEffect(() => {
-    if (props.theme && props.theme !== theme) {
-      console.log('[App] Syncing theme to prop theme:', props.theme)
+    if (props.theme && !hasInitializedFromProps.current) {
+      console.log('[App] First mount - applying props.theme:', props.theme)
       setTheme(props.theme)
+      hasInitializedFromProps.current = true
     }
   }, [props.theme])
 
