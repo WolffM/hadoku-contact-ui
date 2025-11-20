@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
-import type { ContactUIProps } from './entry'
+import type { ContactUIProps } from './types'
 import ContactForm from './ContactForm'
 import {
   ThemePicker,
@@ -12,6 +12,7 @@ import {
   ZapIcon,
   FlowerIcon,
   CoffeeIcon,
+  logger,
   type ThemeFamily
 } from '@wolffm/task-ui-components'
 
@@ -94,12 +95,15 @@ const THEME_ICON_MAP: Record<string, () => ReactElement> = {
 }
 
 export default function App(props: ContactUIProps = {}) {
-  console.log('[App] Rendering with props:', props)
-  console.log('[App] props.theme value:', props.theme, 'type:', typeof props.theme)
+  logger.component('update', 'App', {
+    props,
+    propsTheme: props.theme,
+    themeType: typeof props.theme
+  })
 
   // Initialize theme state - only runs once on mount
   const [theme, setTheme] = useState(() => {
-    console.log('[App] Initializing theme state')
+    logger.debug('[App] Initializing theme state')
 
     // Detect browser's color scheme preference
     const browserPrefersDark =
@@ -107,17 +111,16 @@ export default function App(props: ContactUIProps = {}) {
         ? window.matchMedia('(prefers-color-scheme: dark)').matches
         : false
 
-    console.log('[App] Browser prefers dark mode:', browserPrefersDark)
-    console.log('[App] props.theme:', props.theme)
+    logger.debug('[App] Browser prefers dark mode', { browserPrefersDark, propsTheme: props.theme })
 
     // If theme is provided in props, use it; otherwise use browser preference
     if (props.theme) {
-      console.log('[App] Using props.theme:', props.theme)
+      logger.debug('[App] Using props.theme', { theme: props.theme })
       return props.theme
     }
 
     const autoTheme = browserPrefersDark ? 'dark' : 'light'
-    console.log('[App] No props.theme, using auto theme:', autoTheme)
+    logger.debug('[App] No props.theme, using auto theme', { autoTheme })
     return autoTheme
   })
 
@@ -125,7 +128,7 @@ export default function App(props: ContactUIProps = {}) {
   const containerRef = useRef<HTMLDivElement>(null)
   const hasInitializedFromProps = useRef(false)
 
-  console.log('[App] Current render - theme:', theme, 'isPickerOpen:', isPickerOpen)
+  logger.debug('[App] Current render state', { theme, isPickerOpen })
 
   // Track if browser prefers dark mode
   const [isDarkTheme, setIsDarkTheme] = useState(() => {
@@ -135,25 +138,26 @@ export default function App(props: ContactUIProps = {}) {
     return false
   })
 
-  console.log('[App] isDarkTheme:', isDarkTheme)
+  logger.debug('[App] isDarkTheme state', { isDarkTheme })
 
   // Listen for browser theme changes
   useEffect(() => {
-    console.log('[App] Setting up media query listener')
+    logger.debug('[App] Setting up media query listener')
     if (typeof window === 'undefined' || !window.matchMedia) {
-      console.log('[App] No matchMedia support in useEffect')
+      logger.debug('[App] No matchMedia support in useEffect')
       return
     }
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
     const handler = (e: MediaQueryListEvent) => {
-      console.log('[App] Browser theme changed to:', e.matches ? 'dark' : 'light')
+      const newTheme = e.matches ? 'dark' : 'light'
+      logger.preference('browser-color-scheme', newTheme)
       setIsDarkTheme(e.matches)
     }
 
     mediaQuery.addEventListener('change', handler)
     return () => {
-      console.log('[App] Cleaning up media query listener')
+      logger.debug('[App] Cleaning up media query listener')
       mediaQuery.removeEventListener('change', handler)
     }
   }, [])
@@ -161,37 +165,27 @@ export default function App(props: ContactUIProps = {}) {
   // Apply props.theme only on first mount if provided
   useEffect(() => {
     if (props.theme && !hasInitializedFromProps.current) {
-      console.log('[App] First mount - applying props.theme:', props.theme)
+      logger.debug('[App] First mount - applying props.theme', { theme: props.theme })
       setTheme(props.theme)
       hasInitializedFromProps.current = true
     }
   }, [props.theme])
 
   const handleThemeChange = (newTheme: string) => {
-    console.log('[App] handleThemeChange called with:', newTheme)
-    console.log('[App] Current theme before change:', theme)
+    logger.theme(newTheme, { previousTheme: theme })
     setTheme(newTheme)
-    console.log('[App] setTheme called with:', newTheme)
   }
 
   const handleToggle = () => {
-    console.log('[App] ThemePicker toggle clicked, current isPickerOpen:', isPickerOpen)
+    logger.debug('[App] ThemePicker toggle clicked', { currentIsPickerOpen: isPickerOpen })
     setIsPickerOpen(!isPickerOpen)
   }
 
-  console.log(
-    '[App] About to render - theme:',
-    theme,
-    'isPickerOpen:',
-    isPickerOpen,
-    'isDarkTheme:',
-    isDarkTheme
-  )
-  console.log('[App] Rendering ThemePicker with:', {
+  logger.debug('[App] About to render', { theme, isPickerOpen, isDarkTheme })
+  logger.debug('[App] Rendering ThemePicker with', {
     currentTheme: theme,
     isOpen: isPickerOpen,
-    themeFamiliesCount: THEME_FAMILIES.length,
-    className: 'theme-picker'
+    themeFamiliesCount: THEME_FAMILIES.length
   })
 
   return (
@@ -212,7 +206,7 @@ export default function App(props: ContactUIProps = {}) {
               onToggle={handleToggle}
               getThemeIcon={(t: string) => {
                 const icon = THEME_ICON_MAP[t]?.() || null
-                console.log('[App] getThemeIcon called for theme:', t, 'returning icon:', icon)
+                logger.debug('[App] getThemeIcon called', { theme: t, hasIcon: !!icon })
                 return icon
               }}
               className="theme-picker"

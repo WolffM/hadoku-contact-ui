@@ -17,9 +17,16 @@
  * See @wolffm/themes/style.css for complete list
  */
 
+/* Reset body/html margins for full viewport rendering */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
 .contact-ui-container {
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
   background-color: var(--color-bg);
   color: var(--color-text);
   transition:
@@ -29,10 +36,8 @@
 
 .contact-ui {
   max-width: 1200px;
-  height: 100%;
   margin: 0 auto;
-  padding: 2rem;
-  overflow-y: auto;
+  padding: 2rem 2rem 0 2rem;
 }
 
 .contact-ui__header-bar {
@@ -44,13 +49,41 @@
 
 /* Contact Form Styles */
 .contact-container {
-  max-width: 600px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 2rem;
   font-family:
     system-ui,
     -apple-system,
     sans-serif;
+}
+
+.contact-content {
+  display: flex;
+  gap: 3rem;
+  align-items: flex-start;
+}
+
+.contact-form-section {
+  flex: 0 0 40%;
+  min-width: 0;
+}
+
+.contact-appointment-section {
+  flex: 0 0 60%;
+  min-width: 0;
+}
+
+/* Mobile: Stack vertically */
+@media (max-width: 768px) {
+  .contact-content {
+    flex-direction: column;
+  }
+
+  .contact-form-section,
+  .contact-appointment-section {
+    flex: 1 1 100%;
+  }
 }
 
 .contact-header {
@@ -92,9 +125,9 @@
 }
 
 .contact-alert--success {
-  background-color: var(--color-primary-bg);
+  background-color: var(--color-success-light);
   border-color: var(--color-success);
-  color: var(--color-success-text);
+  color: var(--color-success-dark);
 }
 
 .contact-alert--error {
@@ -159,6 +192,15 @@
   font-weight: var(--font-weight-semibold);
 }
 
+.contact-field-hint {
+  display: block;
+  margin-top: 0.375rem;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-style: italic;
+  opacity: 0.8;
+}
+
 /* Honeypot (hidden from humans) */
 .contact-honeypot {
   position: absolute;
@@ -170,6 +212,8 @@
 
 /* Submit Button */
 .contact-button {
+  display: block;
+  margin: 0 auto;
   padding: 0.875rem 2rem;
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-bold);
@@ -193,3 +237,597 @@
 }
 
 /* Dark theme adjustments - no longer needed as themes handle this automatically */
+
+/* ========================================
+   APPOINTMENT PICKER STYLES
+   ======================================== */
+
+/* Appointment Picker Container */
+.appointment-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  background-color: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.appointment-picker__header {
+  margin-bottom: 0.5rem;
+}
+
+.appointment-picker__title {
+  font-size: 1.5rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  margin: 0 0 0.5rem 0;
+}
+
+.appointment-picker__subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.appointment-picker__content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.appointment-picker__calendar {
+  width: 100%;
+}
+
+.appointment-picker__selectors {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+}
+
+.appointment-picker__selector-item {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .appointment-picker__selectors {
+    flex-direction: column;
+  }
+}
+
+.appointment-picker__slots {
+  width: 100%;
+}
+
+.appointment-picker__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  background-color: var(--color-primary-bg);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--border-radius);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+}
+
+.appointment-picker__summary-text {
+  flex: 1;
+}
+
+.appointment-picker__clear-btn {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  color: var(--color-text-secondary);
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.appointment-picker__clear-btn:hover:not(:disabled) {
+  background-color: var(--color-danger-light);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.appointment-picker__clear-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ========================================
+   DURATION SELECTOR
+   ======================================== */
+
+.duration-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.duration-selector__label {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.duration-selector__pills {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.duration-pill {
+  padding: 0.5rem 1.25rem;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg);
+  border: 2px solid var(--color-border);
+  border-radius: 9999px;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.duration-pill:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  transform: translateY(-1px);
+}
+
+.duration-pill--selected {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-bg);
+  font-weight: var(--font-weight-bold);
+}
+
+.duration-pill--selected:hover:not(:disabled) {
+  color: var(--color-bg);
+  background-color: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+}
+
+.duration-pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ========================================
+   CALENDAR STYLES (react-calendar theming)
+   ======================================== */
+
+.appointment-calendar {
+  width: 100%;
+}
+
+/* Override react-calendar default styles with theme variables */
+.calendar,
+.react-calendar {
+  width: 100%;
+  border: none !important;
+  border-radius: 0;
+  background-color: var(--color-bg-card) !important;
+  font-family: inherit;
+  line-height: 1.5;
+}
+
+.calendar button,
+.react-calendar button {
+  color: var(--color-text) !important;
+  background-color: transparent !important;
+  border: none;
+  cursor: pointer;
+}
+
+.calendar__navigation,
+.react-calendar__navigation {
+  display: flex;
+  background-color: var(--color-bg-card) !important;
+  border-bottom: 1px solid var(--color-text-secondary) !important;
+  padding: 0.5rem;
+}
+
+.calendar__navigation button,
+.react-calendar__navigation button {
+  min-width: 2.5rem;
+  background-color: transparent !important;
+  color: var(--color-text) !important;
+  font-weight: var(--font-weight-semibold);
+}
+
+.calendar__navigation button:enabled,
+.react-calendar__navigation button:enabled {
+  color: var(--color-text) !important;
+}
+
+.calendar__navigation button:hover:not(:disabled),
+.react-calendar__navigation button:hover:not(:disabled) {
+  background-color: var(--color-primary-hover) !important;
+  border-radius: var(--border-radius);
+  color: var(--color-text) !important;
+}
+
+.calendar__navigation button:disabled,
+.react-calendar__navigation button:disabled {
+  opacity: 0.3 !important;
+  cursor: not-allowed !important;
+  color: var(--color-text-secondary) !important;
+  background-color: transparent !important;
+}
+
+.calendar__navigation__label,
+.react-calendar__navigation__label {
+  color: var(--color-text) !important;
+}
+
+.calendar__navigation__arrow,
+.react-calendar__navigation__arrow {
+  color: var(--color-text) !important;
+}
+
+.calendar__month-view__weekdays,
+.react-calendar__month-view__weekdays {
+  text-align: center;
+  font-weight: var(--font-weight-bold);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary) !important;
+  text-transform: uppercase;
+}
+
+.calendar__month-view__weekdays__weekday,
+.react-calendar__month-view__weekdays__weekday {
+  padding: 0.75rem 0.5rem;
+}
+
+.calendar__month-view__weekdays__weekday abbr,
+.react-calendar__month-view__weekdays__weekday abbr {
+  text-decoration: none;
+  color: var(--color-text-secondary) !important;
+}
+
+.calendar__month-view__days__day,
+.react-calendar__month-view__days__day,
+.react-calendar__tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.375rem 0.25rem;
+  margin: 2px;
+  border-radius: var(--border-radius);
+  color: var(--color-text) !important;
+  background-color: transparent !important;
+  min-height: 2rem;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.calendar__month-view__days__day:enabled,
+.react-calendar__month-view__days__day:enabled,
+.react-calendar__tile:enabled {
+  color: var(--color-text) !important;
+}
+
+.calendar__month-view__days__day:hover:not(:disabled),
+.react-calendar__month-view__days__day:hover:not(:disabled),
+.react-calendar__tile:hover:not(:disabled):not(.react-calendar__tile--active) {
+  background-color: var(--color-primary-hover) !important;
+  color: var(--color-text) !important;
+}
+
+.calendar__month-view__days__day--neighboringMonth {
+  opacity: 0.4;
+}
+
+.calendar .react-calendar__tile--active,
+.calendar .react-calendar__tile--active:enabled,
+.calendar .react-calendar__tile--active:enabled:hover,
+.calendar .react-calendar__tile--active:enabled:focus,
+.react-calendar .react-calendar__tile--active,
+.react-calendar .react-calendar__tile--active:enabled,
+.react-calendar .react-calendar__tile--active:enabled:hover,
+.react-calendar .react-calendar__tile--active:enabled:focus,
+.calendar .react-calendar__tile--hasActive,
+.calendar .react-calendar__tile--hasActive:enabled:hover,
+.calendar .react-calendar__tile--hasActive:enabled:focus,
+.react-calendar .react-calendar__tile--hasActive,
+.react-calendar .react-calendar__tile--hasActive:enabled:hover,
+.react-calendar .react-calendar__tile--hasActive:enabled:focus,
+button.react-calendar__tile--active,
+button.react-calendar__tile--active:enabled,
+button.react-calendar__tile--active:hover {
+  background-color: var(--color-primary) !important;
+  color: var(--color-bg) !important;
+  font-weight: var(--font-weight-bold) !important;
+}
+
+.calendar__tile--now,
+.react-calendar__tile--now {
+  background-color: var(--color-primary-light) !important;
+  color: var(--color-text) !important;
+  font-weight: var(--font-weight-semibold);
+}
+
+.calendar__tile--now:enabled:hover,
+.react-calendar__tile--now:enabled:hover {
+  background-color: var(--color-primary-light) !important;
+  color: var(--color-text) !important;
+}
+
+.calendar-tile--has-slots {
+  position: relative;
+}
+
+.calendar-tile--has-slots::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: var(--color-success);
+}
+
+/* Disabled dates - force theme colors */
+.calendar__tile:disabled,
+.calendar__tile:disabled:hover,
+.calendar__month-view__days__day:disabled,
+.calendar__month-view__days__day:disabled:hover,
+.react-calendar__tile:disabled,
+.react-calendar__tile:disabled:hover,
+.react-calendar__month-view__days__day:disabled,
+.react-calendar__month-view__days__day:disabled:hover {
+  cursor: not-allowed !important;
+  color: var(--color-text-secondary) !important;
+  background-color: var(--color-bg) !important;
+  opacity: 0.5 !important;
+  border-radius: 0 !important;
+}
+
+/* ========================================
+   TIME SLOT PICKER
+   ======================================== */
+
+.time-slot-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.time-slot-picker__label {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.time-slot-picker__loading,
+.time-slot-picker__error,
+.time-slot-picker__empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--color-text-secondary);
+  background-color: var(--color-bg);
+  border-radius: var(--border-radius);
+  font-size: var(--font-size-sm);
+}
+
+.time-slot-picker__error {
+  color: var(--color-danger);
+  background-color: var(--color-danger-light);
+  border: 1px solid var(--color-danger);
+}
+
+.time-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: 0.75rem;
+}
+
+@media (max-width: 768px) {
+  .time-slot-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .time-slot-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.time-slot {
+  padding: 0.75rem 0.5rem;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  text-align: center;
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  border: 2px solid var(--color-border);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.time-slot:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-light);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.time-slot--selected {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-bg);
+  font-weight: var(--font-weight-bold);
+}
+
+.time-slot--selected:hover:not(:disabled) {
+  background-color: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+  color: var(--color-bg);
+}
+
+.time-slot--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background-color: var(--color-bg-card);
+  color: var(--color-text-tertiary);
+}
+
+.time-slot--disabled:hover {
+  transform: none;
+  box-shadow: none;
+  border-color: var(--color-border);
+  background-color: var(--color-bg-card);
+}
+
+/* ========================================
+   CONFLICT ERROR STYLES
+   ======================================== */
+
+.contact-alert--conflict {
+  animation: pulse 2s ease-in-out;
+}
+
+.contact-alert__refreshing {
+  display: inline-block;
+  margin-left: 0.5rem;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.contact-field-error {
+  padding: 0.75rem;
+  background-color: var(--color-danger-light);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--border-radius);
+  margin-bottom: 1rem;
+}
+
+/* ========================================
+   MEETING PLATFORM SELECTOR
+   ======================================== */
+
+.meeting-platform-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.meeting-platform-selector__label {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+}
+
+.meeting-platform-selector__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+@media (max-width: 480px) {
+  .meeting-platform-selector__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.platform-button {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: var(--color-bg);
+  border: 2px solid var(--color-border);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    transform var(--transition-fast);
+  min-height: 2.5rem;
+}
+
+.platform-button:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary-light);
+  transform: translateY(-1px);
+}
+
+.platform-button--selected {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-bg);
+  font-weight: var(--font-weight-bold);
+}
+
+.platform-button--selected:hover:not(:disabled) {
+  background-color: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+  color: var(--color-bg) !important;
+}
+
+.platform-button--selected .platform-button__label {
+  color: var(--color-bg);
+}
+
+.platform-button--selected .platform-button__icon {
+  color: var(--color-bg);
+}
+
+.platform-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.platform-button__icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+  color: var(--color-text);
+}
+
+.platform-button__label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text);
+  white-space: nowrap;
+}

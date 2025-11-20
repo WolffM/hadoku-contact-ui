@@ -40,6 +40,8 @@ export default [
         localStorage: 'readonly',
         sessionStorage: 'readonly',
         fetch: 'readonly',
+        setTimeout: 'readonly',
+        URLSearchParams: 'readonly',
         // Browser types
         HTMLElement: 'readonly',
         HTMLDivElement: 'readonly',

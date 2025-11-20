@@ -10,7 +10,9 @@
       "Bash(cat:*)",
       "Bash(pnpm update:*)",
       "Bash(pnpm list:*)",
-      "Bash(pnpm dev)"
+      "Bash(pnpm dev)",
+      "Bash(pnpm add:*)",
+      "Bash(nul)"
     ],
     "deny": [],
     "ask": []

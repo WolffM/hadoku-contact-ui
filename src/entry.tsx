@@ -1,13 +1,27 @@
 import { createRoot, type Root } from 'react-dom/client'
+import { logger } from '@wolffm/task-ui-components'
 import App from './App'
+import type { ContactUIProps } from './types'
 import '@wolffm/themes/style.css'
 import '@wolffm/task-ui-components/theme-picker.css'
 import './styles/index.css'
 
-// Props interface for configuration from parent app
-export interface ContactUIProps {
-  theme?: string // Theme passed from parent (e.g., 'default', 'ocean', 'forest')
-}
+// Re-export all types
+export type {
+  FormData,
+  FormErrors,
+  SubmitStatus,
+  TimeSlotDuration,
+  MeetingPlatform,
+  AppointmentSlot,
+  AppointmentSelection,
+  FetchSlotsRequest,
+  FetchSlotsResponse,
+  SubmitContactRequest,
+  SubmitContactResponse,
+  AppointmentError,
+  ContactUIProps
+} from './types'
 
 // Extend HTMLElement to include __root property
 interface ContactUIElement extends HTMLElement {
@@ -16,24 +30,27 @@ interface ContactUIElement extends HTMLElement {
 
 // Mount function - called by parent to initialize Contact UI
 export function mount(el: HTMLElement, props: ContactUIProps = {}) {
-  console.log('[entry] mount() called with element:', el, 'props:', props)
-  console.log('[entry] Element dimensions:', {
-    width: el.offsetWidth,
-    height: el.offsetHeight,
-    clientWidth: el.clientWidth,
-    clientHeight: el.clientHeight
+  logger.component('mount', 'ContactUI', {
+    element: el.tagName,
+    props,
+    dimensions: {
+      width: el.offsetWidth,
+      height: el.offsetHeight,
+      clientWidth: el.clientWidth,
+      clientHeight: el.clientHeight
+    }
   })
 
   const root = createRoot(el)
-  console.log('[entry] React root created, rendering App...')
+  logger.debug('[entry] React root created, rendering App')
   root.render(<App {...props} />)
   ;(el as ContactUIElement).__root = root
-  console.log('[entry] App rendered and root stored on element')
+  logger.debug('[entry] App rendered and root stored on element')
 }
 
 // Unmount function - called by parent to cleanup Contact UI
 export function unmount(el: HTMLElement) {
-  console.log('[entry] unmount() called for element:', el)
+  logger.component('unmount', 'ContactUI', { element: el.tagName })
   ;(el as ContactUIElement).__root?.unmount()
-  console.log('[entry] React root unmounted')
+  logger.debug('[entry] React root unmounted')
 }
