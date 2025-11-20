@@ -163,7 +163,7 @@ export default function App(props: ContactUIProps = {}) {
       console.log('[App] Syncing theme to prop theme:', props.theme)
       setTheme(props.theme)
     }
-  }, [props.theme, theme])
+  }, [props.theme])
 
   const handleThemeChange = (newTheme: string) => {
     console.log('[App] handleThemeChange called with:', newTheme)
