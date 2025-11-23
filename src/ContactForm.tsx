@@ -30,6 +30,12 @@ export default function ContactForm({ themePicker }: ContactFormProps) {
     meetingPlatform: null
   })
   const [conflictError, setConflictError] = useState(false)
+  const [bookedAppointment, setBookedAppointment] = useState<{
+    date: Date
+    startTime: string
+    duration: number
+    platform: string
+  } | null>(null)
 
   // Field validators
   const validators = {
@@ -112,13 +118,30 @@ export default function ContactForm({ themePicker }: ContactFormProps) {
 
       if (response.success) {
         setStatus('success')
-        setFormData({ name: '', email: '', message: '', website: '' })
-        setAppointmentSelection({
-          date: null,
-          duration: 15,
-          selectedSlot: null,
-          meetingPlatform: null
-        })
+        // Store booked appointment details before clearing
+        if (
+          appointmentSelection.selectedSlot &&
+          appointmentSelection.date &&
+          appointmentSelection.meetingPlatform
+        ) {
+          setBookedAppointment({
+            date: appointmentSelection.date,
+            startTime: appointmentSelection.selectedSlot.startTime,
+            duration: appointmentSelection.duration,
+            platform: appointmentSelection.meetingPlatform
+          })
+        } else {
+          setBookedAppointment(null)
+        }
+        // Keep name and email, clear only message
+        setFormData(prev => ({ ...prev, message: '' }))
+        // Clear selected slot but keep the date and platform preferences
+        setAppointmentSelection(prev => ({
+          ...prev,
+          selectedSlot: null
+        }))
+        // Refresh available slots
+        appointmentPickerRef.current?.refreshSlots()
       } else {
         setStatus('error')
         setErrorMessage(response.message || response.error || 'Failed to send message')
@@ -210,8 +233,20 @@ export default function ContactForm({ themePicker }: ContactFormProps) {
             <div className="contact-alert contact-alert--success">
               <strong>Success! </strong>
               Your message has been sent
-              {appointmentSelection.selectedSlot && ' and your appointment has been booked'}. I'll
-              get back to you soon!
+              {bookedAppointment && (
+                <>
+                  {' '}
+                  and your meeting has been scheduled for{' '}
+                  <strong>
+                    {format(bookedAppointment.date, 'EEEE, MMMM d, yyyy')} at{' '}
+                    {format(new Date(bookedAppointment.startTime), 'h:mm a')} (
+                    {bookedAppointment.duration} minutes) via{' '}
+                    {bookedAppointment.platform.charAt(0).toUpperCase() +
+                      bookedAppointment.platform.slice(1)}
+                  </strong>
+                </>
+              )}
+              . I'll get back to you soon!
             </div>
           )}
 
