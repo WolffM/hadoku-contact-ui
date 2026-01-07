@@ -51,7 +51,7 @@ import {
 
 **Request Example**:
 
-```
+```http
 GET /contact/api/appointments/slots?date=2025-11-21&duration=30
 ```
 
@@ -139,7 +139,7 @@ interface AppointmentSlot {
 
 **Request Headers**:
 
-```
+```http
 Content-Type: application/json
 ```
 
