@@ -551,5 +551,5 @@ async function createTeamsMeeting(appointment: Appointment) {
 
 For questions or issues with the Contact UI integration:
 
-- GitHub: https://github.com/wolffm/contact-ui
+- GitHub: <https://github.com/wolffm/contact-ui>
 - Documentation: See other files in `/docs` directory
