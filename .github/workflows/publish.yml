@@ -64,7 +64,9 @@ jobs:
           echo "Current version: $current_version"
 
           # Check if this version already exists in the registry
-          if pnpm view "${package_name}@${current_version}" version 2>/dev/null; then
+          # Use npm view with explicit registry and ignore errors
+          echo "Checking if version $current_version exists in registry..."
+          if npm view "${package_name}@${current_version}" version --registry=https://npm.pkg.github.com 2>/dev/null; then
             echo "⚠️  Version $current_version already published, bumping version..."
 
             # Parse version
