@@ -3,8 +3,7 @@ echo "🔍 Running pre-commit checks..."
 
 # Auto-fix linting and formatting issues
 echo "📋 Running ESLint auto-fix..."
-pnpm run lint:fix
-if [ $? -ne 0 ]; then
+if ! pnpm run lint:fix; then
   echo "❌ ESLint found errors that could not be auto-fixed."
   echo "💡 Please fix the errors manually before committing."
   exit 1
