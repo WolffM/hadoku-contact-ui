@@ -63,11 +63,10 @@ jobs:
           current_version=$(node -p "require('./package.json').version")
           echo "Current version: $current_version"
 
-          # Check if this version already exists in the registry
-          # Use npm view with explicit registry and ignore errors
-          echo "Checking if version $current_version exists in registry..."
-          if npm view "${package_name}@${current_version}" version --registry=https://npm.pkg.github.com 2>/dev/null; then
-            echo "⚠️  Version $current_version already published, bumping version..."
+          # Function to bump version
+          bump_version() {
+            local reason="$1"
+            echo "$reason"
 
             # Parse version
             major=$(echo $current_version | cut -d. -f1)
@@ -92,8 +91,53 @@ jobs:
 
             # Update lock file
             pnpm install --lockfile-only
+          }
+
+          # Check if version was bumped in the last commit
+          previous_version=$(git show HEAD~1:package.json 2>/dev/null | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8')).version" 2>/dev/null || echo "")
+
+          if [ -n "$previous_version" ] && [ "$previous_version" != "$current_version" ]; then
+            echo "✓ Version was already bumped in last commit: $previous_version → $current_version"
+            version_was_bumped=true
           else
-            echo "✓ Version $current_version is not published yet"
+            echo "ℹ️  Version was not bumped in last commit"
+            version_was_bumped=false
+          fi
+
+          # Check if files that require version bump were changed in last commit
+          # (matching pre-commit hook logic: src/, package.json, vite.config., tsconfig.)
+          echo "Checking if version-bump-triggering files changed in last commit..."
+          if git diff --name-only HEAD~1 HEAD | grep -q -E "^(src/|vite\.config\.|tsconfig\.)"; then
+            echo "⚠️  Code or build config changes detected in last commit"
+            code_changed=true
+          else
+            echo "ℹ️  No code or build config changes in last commit"
+            code_changed=false
+          fi
+
+          # Determine if we need to bump
+          should_bump=false
+
+          # Case 1: Code changed but version wasn't bumped (pre-commit hook was bypassed)
+          if [ "$code_changed" = true ] && [ "$version_was_bumped" = false ]; then
+            should_bump=true
+            bump_reason="⚠️  Code changed but version was not bumped (pre-commit hook bypassed), bumping now..."
+          fi
+
+          # Case 2: Current version already exists in registry
+          if [ "$should_bump" = false ]; then
+            echo "Checking if version $current_version exists in registry..."
+            if npm view "${package_name}@${current_version}" version --registry=https://npm.pkg.github.com 2>/dev/null; then
+              should_bump=true
+              bump_reason="⚠️  Version $current_version already published, bumping version..."
+            else
+              echo "✓ Version $current_version is not published yet"
+            fi
+          fi
+
+          # Perform the bump if needed
+          if [ "$should_bump" = true ]; then
+            bump_version "$bump_reason"
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.HADOKU_SITE_TOKEN }}
