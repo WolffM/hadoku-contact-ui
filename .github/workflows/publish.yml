@@ -102,17 +102,15 @@ jobs:
             # Add safety limit to prevent infinite loops
             local max_attempts=50
             local attempts=0
-            echo "Checking if version $new_version exists in registry..."
             while version_exists "$new_version"; do
+              echo "⚠️  Version $new_version already exists, trying next version..."
               attempts=$((attempts + 1))
               if [ $attempts -ge $max_attempts ]; then
                 echo "❌ Error: Reached maximum version bump attempts ($max_attempts)"
                 echo "This suggests a systematic issue. Last tried: $new_version"
                 exit 1
               fi
-              echo "⚠️  Version $new_version already exists, trying next version..."
               new_version=$(calculate_next_version "$new_version")
-              echo "Checking if version $new_version exists in registry..."
             done
 
             echo "✓ Version $new_version is available"
