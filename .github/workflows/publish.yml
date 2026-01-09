@@ -63,34 +63,61 @@ jobs:
           current_version=$(node -p "require('./package.json').version")
           echo "Current version: $current_version"
 
-          # Function to bump version
+          # Function to calculate next version from a given version
+          calculate_next_version() {
+            local version="$1"
+            major=$(echo "$version" | cut -d. -f1)
+            minor=$(echo "$version" | cut -d. -f2)
+            patch=$(echo "$version" | cut -d. -f3)
+
+            # Rollover at .20 to keep patch numbers manageable (matching pre-commit hook)
+            if [ "$patch" -eq 20 ]; then
+              new_minor=$((minor + 1))
+              echo "$major.$new_minor.0"
+            else
+              new_patch=$((patch + 1))
+              echo "$major.$minor.$new_patch"
+            fi
+          }
+
+          # Function to check if a version exists in the registry
+          version_exists() {
+            local version="$1"
+            if npm view "${package_name}@${version}" version --registry=https://npm.pkg.github.com 2>/dev/null; then
+              return 0  # exists
+            else
+              return 1  # doesn't exist
+            fi
+          }
+
+          # Function to bump version, ensuring the new version doesn't exist
           bump_version() {
             local reason="$1"
             echo "$reason"
 
-            # Parse version
-            major=$(echo $current_version | cut -d. -f1)
-            minor=$(echo $current_version | cut -d. -f2)
-            patch=$(echo $current_version | cut -d. -f3)
+            local original_version="$current_version"
+            new_version=$(calculate_next_version "$current_version")
 
-            # Rollover at .20 to keep patch numbers manageable (matching pre-commit hook)
-            if [ $patch -eq 20 ]; then
-              new_minor=$((minor + 1))
-              new_version="$major.$new_minor.0"
-              echo "🚀 Rolling over to minor version"
-            else
-              new_patch=$((patch + 1))
-              new_version="$major.$minor.$new_patch"
-              echo "📈 Incrementing patch version"
-            fi
+            # Keep bumping until we find a version that doesn't exist
+            echo "Checking if version $new_version exists in registry..."
+            while version_exists "$new_version"; do
+              echo "⚠️  Version $new_version already exists, trying next version..."
+              new_version=$(calculate_next_version "$new_version")
+              echo "Checking if version $new_version exists in registry..."
+            done
+
+            echo "✓ Version $new_version is available"
 
             # Update package.json with new version
             node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); pkg.version = process.argv[1]; fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');" "$new_version"
 
-            echo "✅ Version bumped: $current_version → $new_version"
+            echo "✅ Version bumped: $original_version → $new_version"
 
             # Update lock file
             pnpm install --lockfile-only
+
+            # Update current_version for any subsequent checks
+            current_version="$new_version"
           }
 
           # Check if version was bumped in the last commit
@@ -127,7 +154,7 @@ jobs:
           # Case 2: Current version already exists in registry
           if [ "$should_bump" = false ]; then
             echo "Checking if version $current_version exists in registry..."
-            if npm view "${package_name}@${current_version}" version --registry=https://npm.pkg.github.com 2>/dev/null; then
+            if version_exists "$current_version"; then
               should_bump=true
               bump_reason="⚠️  Version $current_version already published, bumping version..."
             else
