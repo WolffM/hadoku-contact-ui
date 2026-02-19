@@ -24,14 +24,7 @@ export interface AppointmentPickerRef {
 
 const AppointmentPicker = forwardRef<AppointmentPickerRef, AppointmentPickerProps>(
   ({ onAppointmentChange, disabled = false, initialSelection }, ref) => {
-    const [selectedDate, setSelectedDate] = useState<Date | null>(() => {
-      if (initialSelection?.date) return initialSelection.date
-      // Auto-select tomorrow by default
-      const tomorrow = new Date()
-      tomorrow.setDate(tomorrow.getDate() + 1)
-      tomorrow.setHours(0, 0, 0, 0)
-      return tomorrow
-    })
+    const [selectedDate, setSelectedDate] = useState<Date | null>(initialSelection?.date || null)
     const [duration, setDuration] = useState<TimeSlotDuration>(initialSelection?.duration || 15)
     const [availableSlots, setAvailableSlots] = useState<AppointmentSlot[]>([])
     const [selectedSlot, setSelectedSlot] = useState<AppointmentSlot | null>(
