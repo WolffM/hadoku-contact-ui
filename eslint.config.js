@@ -77,6 +77,30 @@ export default [
     }
   },
 
+  // Cloudflare Workers API files — add Workers globals, disable React rules
+  {
+    files: ['api/**/*.ts', 'vitest.config.api.ts'],
+    languageOptions: {
+      globals: {
+        // Cloudflare Workers runtime
+        D1Database: 'readonly',
+        KVNamespace: 'readonly',
+        AnalyticsEngineDataset: 'readonly',
+        Request: 'readonly',
+        Response: 'readonly',
+        URL: 'readonly',
+        RequestInit: 'readonly',
+        // Node.js
+        __dirname: 'readonly'
+      }
+    },
+    rules: {
+      'react/react-in-jsx-scope': 'off',
+      'react-hooks/rules-of-hooks': 'off',
+      'react-hooks/exhaustive-deps': 'off'
+    }
+  },
+
   // Prettier config (must be last)
   prettierConfig
 ]

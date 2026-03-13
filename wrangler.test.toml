@@ -1,0 +1,17 @@
+name = "contact-api-test"
+main = "api/test-entry.ts"
+compatibility_date = "2025-01-11"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "contact-test"
+database_id = "test-db-id"
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT_KV"
+id = "test-rate-limit-kv"
+
+[[kv_namespaces]]
+binding = "TEMPLATES_KV"
+id = "test-templates-kv"

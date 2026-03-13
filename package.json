@@ -1,6 +1,6 @@
 {
   "name": "@wolffm/contact-ui",
-  "version": "1.0.20",
+  "version": "1.1.0",
   "description": "Contact form micro-frontend for hadoku.me",
   "type": "module",
   "repository": {
@@ -18,11 +18,18 @@
       "types": "./dist/entry.d.ts",
       "default": "./dist/index.js"
     },
-    "./style.css": "./dist/style.css"
+    "./style.css": "./dist/style.css",
+    "./api": {
+      "types": "./dist/api/index.d.ts",
+      "import": "./dist/api/index.js"
+    }
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build && tsc -p tsconfig.build.json",
+    "build": "pnpm build:ui && pnpm build:api",
+    "build:ui": "vite build && tsc -p tsconfig.build.json",
+    "build:api": "tsup",
+    "test:api": "vitest run --config vitest.config.api.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
@@ -36,6 +43,8 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.8.34",
+    "@cloudflare/workers-types": "^4.20250312.0",
     "@eslint/js": "^9.39.1",
     "@types/react": "^19.2.6",
     "@types/react-dom": "^19.2.3",
@@ -52,11 +61,22 @@
     "prettier": "^3.6.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "tsup": "^8.4.0",
     "typescript": "^5.9.3",
-    "vite": "^7.2.4"
+    "vite": "^7.2.4",
+    "vitest": "^3.1.4",
+    "wrangler": "^4.14.4"
   },
   "dependencies": {
     "date-fns": "^4.1.0",
+    "hono": "^4.7.10",
     "react-calendar": "^6.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "workerd",
+      "sharp"
+    ]
   }
 }

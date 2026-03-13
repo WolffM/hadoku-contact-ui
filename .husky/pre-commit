@@ -17,7 +17,7 @@ echo "✅ Linting and formatting complete!"
 # Bump version if src/, package.json, or build config changed
 echo "📦 Checking if version bump is needed..."
 
-if git diff --cached --name-only | grep -q -E "^(src/|package\.json|vite\.config\.|tsconfig\.)"; then
+if git diff --cached --name-only | grep -q -E "^(src/|api/|package\.json|vite\.config\.|tsconfig\.|tsup\.config\.)"; then
   echo "🔄 Code or build config changes detected, bumping version..."
 
 # Read current version from package.json
@@ -28,11 +28,11 @@ patch=$(echo "${current_version}" | cut -d. -f3)
 
 # Rollover at .20 to keep patch numbers manageable
 if [ "${patch}" -eq 20 ]; then
-  new_minor=$(("${minor}" + 1))
+  new_minor=$((minor + 1))
   new_version="${major}.${new_minor}.0"
   echo "🚀 Rolling over to minor version"
 else
-  new_patch=$(("${patch}" + 1))
+  new_patch=$((patch + 1))
   new_version="${major}.${minor}.${new_patch}"
   echo "📈 Incrementing patch version"
 fi
