@@ -30,6 +30,7 @@ import {
   prepareAppointmentTemplateData
 } from '../email/templates'
 import { EMAIL_CONFIG, APPOINTMENT_CONFIG, RATE_LIMIT_CONFIG } from '../constants'
+import type { HadokuAuthContext } from '../types'
 import {
   logRateLimitHit,
   logRateLimitWarning,
@@ -70,7 +71,7 @@ export function createSubmitRoutes(rateLimitOverrides?: {
   maxSubmissionsPerHour?: number
   windowDurationSeconds?: number
 }) {
-  const app = new Hono<{ Bindings: Env }>()
+  const app = new Hono<{ Bindings: Env; Variables: { authContext: HadokuAuthContext } }>()
 
   app.post('/submit', async c => {
     const db = c.env.DB
@@ -102,7 +103,13 @@ export function createSubmitRoutes(rateLimitOverrides?: {
         return c.json({ success: false, message: 'Could not identify client' }, 400)
       }
 
-      const rateLimitResult = await checkRateLimit(kv, ipAddress, rateLimitOverrides)
+      // Admin requests bypass rate limiting (for testing and operational use)
+      const auth = c.get('authContext')
+      const isAdmin = auth?.userType === 'admin'
+
+      const rateLimitResult = isAdmin
+        ? { allowed: true, remaining: 999, resetAt: 0 }
+        : await checkRateLimit(kv, ipAddress, rateLimitOverrides)
       if (!rateLimitResult.allowed) {
         logRateLimitHit(c.env, hashIP(ipAddress), rateLimitResult.remaining, '/submit')
 
@@ -159,7 +166,9 @@ export function createSubmitRoutes(rateLimitOverrides?: {
         referrer
       })
 
-      await recordSubmission(kv, ipAddress, rateLimitOverrides)
+      if (!isAdmin) {
+        await recordSubmission(kv, ipAddress, rateLimitOverrides)
+      }
 
       logSubmissionCreated(c.env, sanitized.recipient || 'default')
 
