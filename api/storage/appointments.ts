@@ -114,6 +114,13 @@ export async function createAppointment(
   const id = (globalThis.crypto as { randomUUID: () => string }).randomUUID()
   const now = Date.now()
 
+  // Remove any cancelled appointment occupying this slot so the UNIQUE constraint
+  // on slot_id doesn't block rebooking a previously-cancelled slot.
+  await db
+    .prepare(`DELETE FROM appointments WHERE slot_id = ? AND status != 'confirmed'`)
+    .bind(params.slot_id)
+    .run()
+
   await db
     .prepare(
       `INSERT INTO appointments
