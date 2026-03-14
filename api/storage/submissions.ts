@@ -16,6 +16,7 @@ export interface StoredSubmission {
   user_agent: string | null
   referrer: string | null
   recipient: string | null
+  direction: 'inbound' | 'outbound'
 }
 
 export interface CreateSubmissionParams {
@@ -26,6 +27,7 @@ export interface CreateSubmissionParams {
   user_agent: string | null
   referrer: string | null
   recipient?: string | null
+  direction?: 'inbound' | 'outbound'
 }
 
 export interface SubmissionStats {
@@ -43,22 +45,27 @@ export async function createSubmission(
   const id = (globalThis.crypto as { randomUUID: () => string }).randomUUID()
   const created_at = Date.now()
 
+  const direction = params.direction ?? 'inbound'
+  const status = direction === 'outbound' ? 'read' : 'unread'
+
   await db
     .prepare(
       `INSERT INTO contact_submissions
-			(id, name, email, message, status, created_at, ip_address, user_agent, referrer, recipient)
-			VALUES (?, ?, ?, ?, 'unread', ?, ?, ?, ?, ?)`
+			(id, name, email, message, status, created_at, ip_address, user_agent, referrer, recipient, direction)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       id,
       params.name,
       params.email,
       params.message,
+      status,
       created_at,
       params.ip_address,
       params.user_agent,
       params.referrer,
-      params.recipient ?? null
+      params.recipient ?? null,
+      direction
     )
     .run()
 
@@ -67,13 +74,14 @@ export async function createSubmission(
     name: params.name,
     email: params.email,
     message: params.message,
-    status: 'unread',
+    status,
     created_at,
     ip_address: params.ip_address,
     user_agent: params.user_agent,
     referrer: params.referrer,
     recipient: params.recipient ?? null,
-    deleted_at: null
+    deleted_at: null,
+    direction
   }
 
   return result

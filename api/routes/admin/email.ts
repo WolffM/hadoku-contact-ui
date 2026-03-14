@@ -6,7 +6,12 @@
 
 import { Hono } from 'hono'
 import { badRequest, notFound, serverError } from '../../utils/responses'
-import { addToWhitelist, getAllWhitelistedEmails, removeFromWhitelist } from '../../storage'
+import {
+  addToWhitelist,
+  getAllWhitelistedEmails,
+  removeFromWhitelist,
+  createSubmission
+} from '../../storage'
 import { createEmailProvider } from '../../email'
 import { EMAIL_CONFIG, VALIDATION_CONSTRAINTS } from '../../constants'
 import { adminOk } from './index'
@@ -75,11 +80,24 @@ export function createEmailRoutes() {
         'Auto-whitelisted after admin reply'
       )
 
+      // Record outbound email as a submission so it appears in admin mail
+      const submission = await createSubmission(c.env.DB, {
+        name: body.subject,
+        email: body.to,
+        message: body.text,
+        recipient: body.from,
+        ip_address: null,
+        user_agent: null,
+        referrer: null,
+        direction: 'outbound'
+      })
+
       return adminOk(c, {
         success: true,
         message: 'Email sent successfully',
         messageId: result.messageId,
-        whitelisted: true
+        whitelisted: true,
+        submissionId: submission.id
       })
     } catch (error) {
       console.error('Error sending email:', error)

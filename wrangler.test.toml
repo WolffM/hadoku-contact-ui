@@ -1,7 +1,7 @@
 name = "contact-api-test"
 main = "api/test-entry.ts"
 compatibility_date = "2025-01-11"
-compatibility_flags = ["nodejs_compat"]
+compatibility_flags = ["nodejs_compat", "export_commonjs_default"]
 
 [[d1_databases]]
 binding = "DB"

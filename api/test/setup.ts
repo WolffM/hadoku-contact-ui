@@ -16,6 +16,8 @@ import migration0003 from '../migrations/0003_create_email_whitelist.sql'
 import migration0004 from '../migrations/0004_create_appointments_tables.sql'
 // @ts-expect-error — .sql imports handled by vite plugin
 import migration0005 from '../migrations/0005_create_templates_tables.sql'
+// @ts-expect-error — .sql imports handled by vite plugin
+import migration0006 from '../migrations/0006_add_direction_column.sql'
 
 /** Split SQL into individual statements, strip comments */
 async function applyMigration(db: D1Database, sql: string) {
@@ -35,8 +37,23 @@ const existing = await env.DB.prepare(
 ).first()
 
 if (!existing) {
-  const migrations = [migration0001, migration0002, migration0003, migration0004, migration0005]
+  const migrations = [
+    migration0001,
+    migration0002,
+    migration0003,
+    migration0004,
+    migration0005,
+    migration0006
+  ]
   for (const sql of migrations) {
     await applyMigration(env.DB, sql)
+  }
+} else {
+  // Apply incremental migrations for existing databases
+  const hasDirection = await env.DB.prepare(
+    "SELECT 1 FROM pragma_table_info('contact_submissions') WHERE name='direction'"
+  ).first()
+  if (!hasDirection) {
+    await applyMigration(env.DB, migration0006)
   }
 }
