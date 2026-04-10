@@ -86,4 +86,4 @@ Pushes to `main` automatically:
 
 ## Documentation
 
-See [TEMPLATE.md](./TEMPLATE.md) for complete setup and integration instructions.
+See the [source code](./src/) and [API implementation](./api/) for details.
