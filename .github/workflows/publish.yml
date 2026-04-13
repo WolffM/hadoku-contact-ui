@@ -182,6 +182,22 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.HADOKU_SITE_TOKEN }}
 
+      - name: Verify publish appeared on registry
+        if: steps.package_changed.outputs.changed == 'true'
+        run: |
+          # Defense in depth: pnpm publish does not fail loudly on
+          # duplicate-version no-ops in pnpm 9+. Verify the version actually
+          # landed on the registry.
+          package_name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          if ! npm view "${package_name}@${version}" version --registry=https://npm.pkg.github.com 2>/dev/null | grep -q "$version"; then
+            echo "❌ ERROR: ${package_name}@${version} did not appear on the registry after publish"
+            exit 1
+          fi
+          echo "✓ Verified ${package_name}@${version} on registry"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.HADOKU_SITE_TOKEN }}
+
       # Notify parent app to update dependencies
       - name: Notify parent about package update
         if: steps.package_changed.outputs.changed == 'true'
