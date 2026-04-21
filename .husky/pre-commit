@@ -60,3 +60,10 @@ fi
 git add -u
 
 echo "✅ All pre-commit checks passed!"
+
+# TS gate — prevents commits that break tsc (resilience plan track 1)
+echo "🔎 Running typecheck..."
+if ! pnpm run typecheck; then
+  echo "❌ TypeScript errors — fix before committing (or `--no-verify` to bypass)."
+  exit 1
+fi
