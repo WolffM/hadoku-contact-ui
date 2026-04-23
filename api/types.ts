@@ -12,6 +12,9 @@ export interface ContactEnv {
   EMAIL_PROVIDER?: string
   RESEND_API_KEY?: string
   RESEND_WEBHOOK_SECRET?: string
+  // Inbound forwarding — scraper (pickleball waitlist trigger, etc.)
+  SCRAPER_API_URL?: string
+  SCRAPER_API_KEY?: string
 }
 
 export interface ContactHandlerOptions {

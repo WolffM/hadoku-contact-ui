@@ -7,6 +7,7 @@ import { ok, badRequest } from '../utils/responses'
 import { isEmailWhitelisted, createSubmission } from '../storage'
 import { EMAIL_CONFIG } from '../constants'
 import type { AppContext } from '../types'
+import { maybeForwardInboundEmail } from './inbound-forwarders'
 
 interface ResendWebhookEvent {
   type: 'email.received'
@@ -66,30 +67,6 @@ export function createInboundRoutes() {
       const recipient = event.data.to[0]?.toLowerCase() ?? null
       console.log(`Email to: ${recipient}`)
 
-      const isPublicRecipient =
-        recipient &&
-        EMAIL_CONFIG.PUBLIC_RECIPIENTS.includes(
-          recipient as (typeof EMAIL_CONFIG.PUBLIC_RECIPIENTS)[number]
-        )
-
-      const isWhitelisted = await isEmailWhitelisted(db, cleanEmail)
-
-      if (!isWhitelisted && !isPublicRecipient) {
-        console.log(
-          `Rejecting email from non-whitelisted sender: ${cleanEmail} to non-public recipient: ${recipient}`
-        )
-
-        return ok(c, {
-          success: false,
-          message: 'Sender not whitelisted',
-          processed: false
-        })
-      }
-
-      console.log(
-        `Processing email - whitelisted: ${isWhitelisted}, public recipient: ${isPublicRecipient}`
-      )
-
       const resendApiKey = c.env.RESEND_API_KEY
       if (!resendApiKey) {
         console.error('RESEND_API_KEY not configured')
@@ -116,8 +93,56 @@ export function createInboundRoutes() {
       }
 
       const emailDetails = await emailResponse.json<ResendEmailDetails>()
+      const messageBody = emailDetails.text ?? emailDetails.html ?? null
 
-      const message = emailDetails.text ?? emailDetails.html ?? '(No message body)'
+      // Recipient-based forwarders (pickleball waitlist, etc.) bypass the
+      // whitelist — they are trusted routes keyed on the destination
+      // mailbox. If no forwarder claims the recipient, fall through to the
+      // normal contact-submission flow.
+      const forwardResult = await maybeForwardInboundEmail(c.env, {
+        recipient,
+        senderEmail: cleanEmail,
+        subject: event.data.subject,
+        body: messageBody,
+        emailId
+      })
+
+      if (forwardResult.handled) {
+        return ok(c, {
+          success: forwardResult.ok ?? false,
+          message: `Forwarded to ${forwardResult.label}`,
+          emailId,
+          processed: forwardResult.ok ?? false,
+          forwardStatus: forwardResult.status ?? null,
+          forwardError: forwardResult.error ?? null
+        })
+      }
+
+      const isPublicRecipient =
+        recipient &&
+        EMAIL_CONFIG.PUBLIC_RECIPIENTS.includes(
+          recipient as (typeof EMAIL_CONFIG.PUBLIC_RECIPIENTS)[number]
+        )
+
+      const isWhitelisted = await isEmailWhitelisted(db, cleanEmail)
+
+      if (!isWhitelisted && !isPublicRecipient) {
+        console.log(
+          `Rejecting email from non-whitelisted sender: ${cleanEmail} to non-public recipient: ${recipient}`
+        )
+
+        return ok(c, {
+          success: false,
+          message: 'Sender not whitelisted',
+          processed: false
+        })
+      }
+
+      console.log(
+        `Processing email - whitelisted: ${isWhitelisted}, public recipient: ${isPublicRecipient}`
+      )
+
+      const message = messageBody ?? '(No message body)'
 
       const submission = await createSubmission(db, {
         name: cleanEmail.split('@')[0],

@@ -13,6 +13,20 @@ export const EMAIL_CONFIG = {
   NO_REPLY_ADDRESS: 'no-reply@hadoku.me'
 } as const
 
+// Inbound email routing — recipients whose mail is forwarded to external
+// services instead of being stored as a contact submission. Each entry
+// maps to the env binding that holds the destination URL + auth key.
+export const FORWARD_RECIPIENTS = {
+  'pickleball-waitlist@hadoku.me': {
+    urlEnv: 'SCRAPER_API_URL',
+    keyEnv: 'SCRAPER_API_KEY',
+    path: '/api/v1/pickleball/waitlist-trigger',
+    label: 'pickleball-waitlist'
+  }
+} as const
+
+export type ForwardRecipient = keyof typeof FORWARD_RECIPIENTS
+
 // Site configuration
 export const SITE_CONFIG = {
   ALLOWED_REFERRER_DOMAINS: ['hadoku.me']
