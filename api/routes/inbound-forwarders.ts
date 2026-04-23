@@ -110,16 +110,51 @@ function buildForwardPayload(
   }
 
   if (recipient === 'pickleball-waitlist@hadoku.me') {
+    const parsed = parsePickleballWaitlistSubject(input.subject ?? '')
     return {
       ...base,
-      event_url: extractEventUrl(input.body ?? '', input.subject ?? '')
+      event_url: extractEventUrl(input.body ?? '', input.subject ?? ''),
+      event_name_hint: parsed.eventName,
+      weekday_hint: parsed.weekday,
+      date_hint: parsed.dateText
     }
   }
 
   return base
 }
 
+/**
+ * Parses Pickleball Kingdom waitlist-trigger subject lines.
+ *
+ * Samples (both 2025-2026):
+ *   "Open Play - Social / Low Intermediate (Tuesday, January 20) has a new open spot!"
+ *   "Open Play - Intermediate - RED (Wednesday, December 17) has a new open spot!"
+ *
+ * Returns null fields when the pattern doesn't match — the scraper falls
+ * back to single-active-row matching in that case.
+ */
+export function parsePickleballWaitlistSubject(subject: string): {
+  eventName: string | null
+  weekday: string | null
+  dateText: string | null
+} {
+  const match = subject.match(
+    /^\s*(.+?)\s*\((Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s*([^)]+)\)\s*has\s+a\s+new\s+open\s+spot/i
+  )
+  if (!match) {
+    return { eventName: null, weekday: null, dateText: null }
+  }
+  return {
+    eventName: match[1].trim(),
+    weekday: match[2],
+    dateText: match[3].trim()
+  }
+}
+
 function extractEventUrl(body: string, subject: string): string | null {
+  // Defensive fallback — Pickleball Kingdom currently sends SIGN UP as a
+  // SendGrid click-tracker (u*.ct.sendgrid.net/...) so this usually returns
+  // null on real emails. Kept in case the template ever links directly.
   const haystack = `${subject}\n${body}`
   const match = haystack.match(
     /https?:\/\/[^\s<>"']*podplay[^\s<>"']*\/community\/events\/[a-zA-Z0-9-]+/i

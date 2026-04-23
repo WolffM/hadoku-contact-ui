@@ -1,5 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
-import { maybeForwardInboundEmail } from '../../routes/inbound-forwarders'
+import {
+  maybeForwardInboundEmail,
+  parsePickleballWaitlistSubject
+} from '../../routes/inbound-forwarders'
 import type { ContactEnv } from '../../types'
 
 function makeEnv(overrides: Partial<ContactEnv> = {}): ContactEnv {
@@ -134,5 +137,62 @@ describe('maybeForwardInboundEmail', () => {
     const init = fetchMock.mock.calls[0][1] as RequestInit
     const body = JSON.parse(init.body as string) as Record<string, unknown>
     expect(body.event_url).toBeNull()
+  })
+
+  it('parses event name + weekday from real waitlist subject and posts as hints', async () => {
+    const env = makeEnv()
+    const fetchMock = vi.fn().mockResolvedValue(new Response('{}', { status: 202 }))
+    await maybeForwardInboundEmail(
+      env,
+      {
+        recipient: 'pickleball-waitlist@hadoku.me',
+        senderEmail: 'info@podplay.app',
+        subject: 'Open Play - Social / Low Intermediate (Tuesday, January 20) has a new open spot!',
+        body: 'We\u2019re notifying you since you joined the waitlist.',
+        emailId: 'e7'
+      },
+      fetchMock as unknown as typeof fetch
+    )
+    const init = fetchMock.mock.calls[0][1] as RequestInit
+    const body = JSON.parse(init.body as string) as Record<string, unknown>
+    expect(body.event_name_hint).toBe('Open Play - Social / Low Intermediate')
+    expect(body.weekday_hint).toBe('Tuesday')
+    expect(body.date_hint).toBe('January 20')
+    expect(body.event_url).toBeNull()
+  })
+})
+
+describe('parsePickleballWaitlistSubject', () => {
+  it('parses the Social / Low Intermediate sample', () => {
+    const parsed = parsePickleballWaitlistSubject(
+      'Open Play - Social / Low Intermediate (Tuesday, January 20) has a new open spot!'
+    )
+    expect(parsed.eventName).toBe('Open Play - Social / Low Intermediate')
+    expect(parsed.weekday).toBe('Tuesday')
+    expect(parsed.dateText).toBe('January 20')
+  })
+
+  it('parses the Intermediate - RED sample', () => {
+    const parsed = parsePickleballWaitlistSubject(
+      'Open Play - Intermediate - RED (Wednesday, December 17) has a new open spot!'
+    )
+    expect(parsed.eventName).toBe('Open Play - Intermediate - RED')
+    expect(parsed.weekday).toBe('Wednesday')
+    expect(parsed.dateText).toBe('December 17')
+  })
+
+  it('is tolerant of missing exclamation point', () => {
+    const parsed = parsePickleballWaitlistSubject(
+      'Open Play - Beginners (Friday, March 5) has a new open spot'
+    )
+    expect(parsed.eventName).toBe('Open Play - Beginners')
+    expect(parsed.weekday).toBe('Friday')
+  })
+
+  it('returns null fields for unrelated subjects', () => {
+    const parsed = parsePickleballWaitlistSubject('Your Pickleball Kingdom receipt')
+    expect(parsed.eventName).toBeNull()
+    expect(parsed.weekday).toBeNull()
+    expect(parsed.dateText).toBeNull()
   })
 })
