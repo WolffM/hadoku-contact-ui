@@ -337,6 +337,88 @@ describe('Admin Operations Integration', () => {
       expect(data.appointments).toHaveLength(2)
     })
 
+    it('POST - should create admin event without going through booking flow', async () => {
+      const response = await adminRequest('/contact/api/admin/appointments', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'Personal Event',
+          email: 'matthaeus@hadoku.me',
+          date: '2030-06-15',
+          start_time: '2030-06-15T14:00:00.000Z',
+          end_time: '2030-06-15T15:00:00.000Z',
+          duration: 60,
+          timezone: 'America/Los_Angeles',
+          platform: 'jitsi',
+          message: 'Dentist appointment'
+        })
+      })
+      expect(response.status).toBe(201)
+      const result = (await response.json()) as {
+        success: boolean
+        data: { appointment: { id: string; name: string; submission_id: string | null } }
+      }
+      expect(result.success).toBe(true)
+      expect(result.data.appointment.name).toBe('Personal Event')
+      expect(result.data.appointment.submission_id).toBeNull()
+    })
+
+    it('POST - should reject malformed body with 400', async () => {
+      const response = await adminRequest('/contact/api/admin/appointments', {
+        method: 'POST',
+        body: JSON.stringify({ name: 'Bad', email: 'not-an-email' })
+      })
+      expect(response.status).toBe(400)
+    })
+
+    it('POST - should require admin auth', async () => {
+      const response = await SELF.fetch('https://test.com/contact/api/admin/appointments', {
+        method: 'POST',
+        headers: NO_AUTH_HEADERS,
+        body: JSON.stringify({ name: 'X' })
+      })
+      expect(response.status).toBe(403)
+    })
+
+    it('POST - should 409 when slot is already booked', async () => {
+      const slotId = 'admin-2030-07-01-2030-07-01T10:00:00.000Z'
+      await env.DB.prepare(
+        `INSERT INTO appointments (id, name, email, slot_id, date, start_time, end_time, duration, timezone, platform, status, created_at, updated_at)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+        .bind(
+          'apt-existing',
+          'Existing',
+          'someone@example.com',
+          slotId,
+          '2030-07-01',
+          '2030-07-01T10:00:00.000Z',
+          '2030-07-01T11:00:00.000Z',
+          60,
+          'UTC',
+          'jitsi',
+          'confirmed',
+          Date.now(),
+          Date.now()
+        )
+        .run()
+
+      const response = await adminRequest('/contact/api/admin/appointments', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'Clash',
+          email: 'admin@hadoku.me',
+          date: '2030-07-01',
+          start_time: '2030-07-01T10:00:00.000Z',
+          end_time: '2030-07-01T11:00:00.000Z',
+          duration: 60,
+          timezone: 'UTC',
+          platform: 'jitsi',
+          slot_id: slotId
+        })
+      })
+      expect(response.status).toBe(409)
+    })
+
     it('PATCH status - should update appointment status in D1', async () => {
       const response = await adminRequest('/contact/api/admin/appointments/apt-1/status', {
         method: 'PATCH',

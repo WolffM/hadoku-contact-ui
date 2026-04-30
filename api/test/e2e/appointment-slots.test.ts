@@ -222,20 +222,32 @@ describe('Appointment Slots Integration', () => {
       expect(data.message).toContain('day of the week')
     })
 
-    it('should generate slots within business hours only', async () => {
+    it('should generate slots within business hours only (in configured timezone)', async () => {
       const date = getNextWeekday(3).toISOString().split('T')[0]
       const response = await fetchSlots(date, 30)
 
       expect(response.status).toBe(200)
       const data = (await response.json()) as SlotsResponse
 
+      // Config in beforeEach is America/New_York 09:00–17:00 — assert slots
+      // fall in that range as wall-clock New York time, not UTC.
+      const fmtHour = new Intl.DateTimeFormat('en-US', {
+        hour: 'numeric',
+        hour12: false,
+        timeZone: 'America/New_York'
+      })
+      const fmtMin = new Intl.DateTimeFormat('en-US', {
+        minute: 'numeric',
+        timeZone: 'America/New_York'
+      })
+
       for (const slot of data.slots) {
-        const start = new Date(slot.startTime)
-        const end = new Date(slot.endTime)
-        expect(start.getUTCHours()).toBeGreaterThanOrEqual(9)
-        expect(end.getUTCHours()).toBeLessThanOrEqual(17)
-        if (end.getUTCHours() === 17) {
-          expect(end.getUTCMinutes()).toBe(0)
+        const startHour = parseInt(fmtHour.format(new Date(slot.startTime)))
+        const endHour = parseInt(fmtHour.format(new Date(slot.endTime)))
+        expect(startHour).toBeGreaterThanOrEqual(9)
+        expect(endHour).toBeLessThanOrEqual(17)
+        if (endHour === 17) {
+          expect(parseInt(fmtMin.format(new Date(slot.endTime)))).toBe(0)
         }
       }
     })

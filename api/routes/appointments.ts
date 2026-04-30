@@ -5,6 +5,7 @@
 import { Hono } from 'hono'
 import { validateSlotFetchRequest } from '../validation'
 import { getAppointmentConfig, getAppointmentsByDate } from '../storage'
+import { zonedDateToUtc, dayOfWeekInZone } from '../utils/timezone'
 
 interface Env {
   DB: D1Database
@@ -61,8 +62,7 @@ export function createAppointmentsRoutes() {
       const minAllowedTime = new Date(now.getTime() + minAdvanceMs)
 
       const [startHour, startMinute] = config.business_hours_start.split(':').map(Number)
-      const firstSlotTime = new Date(`${requestDate}T00:00:00.000Z`)
-      firstSlotTime.setUTCHours(startHour, startMinute, 0, 0)
+      const firstSlotTime = zonedDateToUtc(requestDate, startHour, startMinute, config.timezone)
 
       if (firstSlotTime < minAllowedTime) {
         return c.json(
@@ -85,7 +85,7 @@ export function createAppointmentsRoutes() {
         )
       }
 
-      const dayOfWeek = firstSlotTime.getUTCDay()
+      const dayOfWeek = dayOfWeekInZone(requestDate, config.timezone)
       if (!availableDays.includes(dayOfWeek)) {
         return c.json(
           {
@@ -125,7 +125,7 @@ async function generateTimeSlots(
   duration: number,
   businessHoursStart: string,
   businessHoursEnd: string,
-  _timezone: string
+  timezone: string
 ): Promise<{ id: string; startTime: string; endTime: string; available: boolean }[]> {
   const existingAppointments = await getAppointmentsByDate(db, date)
   const bookedSlotIds = new Set(existingAppointments.map(apt => apt.slot_id))
@@ -133,14 +133,9 @@ async function generateTimeSlots(
   const [startHour, startMinute] = businessHoursStart.split(':').map(Number)
   const [endHour, endMinute] = businessHoursEnd.split(':').map(Number)
 
-  const dateObj = new Date(`${date}T00:00:00.000Z`)
+  let currentTime = zonedDateToUtc(date, startHour, startMinute, timezone)
+  const endTime = zonedDateToUtc(date, endHour, endMinute, timezone)
   const slots = []
-
-  let currentTime = new Date(dateObj)
-  currentTime.setUTCHours(startHour, startMinute, 0, 0)
-
-  const endTime = new Date(dateObj)
-  endTime.setUTCHours(endHour, endMinute, 0, 0)
 
   while (currentTime < endTime) {
     const slotStart = new Date(currentTime)

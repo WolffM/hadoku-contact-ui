@@ -5,7 +5,7 @@
  * Split into domain-specific modules.
  */
 
-import { Hono, type Context, type Next } from 'hono'
+import { Hono, type Context, type ContentfulStatusCode, type Next } from 'hono'
 import { createSubmissionRoutes } from './submissions'
 import { createEmailRoutes } from './email'
 import { createAppointmentAdminRoutes } from './appointments'
@@ -16,8 +16,8 @@ import type { AppContext } from '../../types'
  * Admin API response helper - matches contact-admin client expectations
  * Returns { success: true, data: T } instead of { data: T, timestamp: string }
  */
-export function adminOk<T>(c: Context, data: T): Response {
-  return c.json({ success: true, data }, 200)
+export function adminOk<T>(c: Context, data: T, status: ContentfulStatusCode = 200): Response {
+  return c.json({ success: true, data }, status)
 }
 
 function requireAdmin() {
