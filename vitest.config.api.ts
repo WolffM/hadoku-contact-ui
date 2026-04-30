@@ -10,7 +10,7 @@ export default defineWorkersConfig({
         main: './api/test-entry.ts',
         miniflare: {
           compatibilityDate: '2025-01-11',
-          compatibilityFlags: ['nodejs_compat', 'export_commonjs_default'],
+          compatibilityFlags: ['nodejs_compat'],
           d1Databases: ['DB'],
           kvNamespaces: ['RATE_LIMIT_KV', 'TEMPLATES_KV'],
           bindings: {

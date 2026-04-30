@@ -1,6 +1,6 @@
 {
   "name": "@wolffm/contact-ui",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "Contact form micro-frontend for hadoku.me",
   "type": "module",
   "repository": {
@@ -25,11 +25,13 @@
     }
   },
   "scripts": {
-    "dev": "vite",
+    "dev": "node ../hadoku_site/scripts/secrets/dev-vault.mjs -- vite",
     "build": "pnpm build:ui && pnpm build:api",
     "build:ui": "vite build && tsc -p tsconfig.build.json",
     "build:api": "tsup",
     "test:api": "vitest run --config vitest.config.api.ts",
+    "test:ui": "vitest run --config vitest.config.ui.ts",
+    "test": "pnpm test:api && pnpm test:ui",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
