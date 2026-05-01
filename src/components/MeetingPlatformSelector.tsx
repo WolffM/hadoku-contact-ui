@@ -1,5 +1,5 @@
 import type { MeetingPlatform } from '../types'
-import { DiscordIcon, JitsiIcon } from './PlatformIcons'
+import { DiscordIcon, GoogleMeetIcon, JitsiIcon } from './PlatformIcons'
 
 interface MeetingPlatformSelectorProps {
   selectedPlatform: MeetingPlatform | null
@@ -7,15 +7,16 @@ interface MeetingPlatformSelectorProps {
   disabled?: boolean
 }
 
-// Google Meet and Teams require paid plans (Workspace / M365) plus app-registration
-// flows; not implemented. Type union keeps them for stored historical bookings.
+// Microsoft Teams is intentionally excluded (paid M365 + Entra ID required).
+// Google Meet works via Google Calendar API + hangoutsMeet conferenceData.
 const PLATFORMS: {
   value: MeetingPlatform
   label: string
   Icon: React.ComponentType<{ className?: string }>
 }[] = [
   { value: 'jitsi', label: 'Jitsi Meet', Icon: JitsiIcon },
-  { value: 'discord', label: 'Discord', Icon: DiscordIcon }
+  { value: 'discord', label: 'Discord', Icon: DiscordIcon },
+  { value: 'google', label: 'Google Meet', Icon: GoogleMeetIcon }
 ]
 
 export default function MeetingPlatformSelector({

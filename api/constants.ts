@@ -54,9 +54,21 @@ export const RATE_LIMIT_CONFIG = {
 } as const
 
 // Appointment configuration
+//
+// VALID_PLATFORMS = those bookable through the API today. Discord uses a
+// static invite; Jitsi constructs a meet.jit.si URL; Google Meet creates a
+// link via Google Calendar API (requires GOOGLE_OAUTH_REFRESH_TOKEN +
+// GOOGLE_OAUTH_CLIENT_ID/SECRET — falls back to error if not configured).
+//
+// Microsoft Teams is intentionally excluded — requires paid M365 + Entra ID
+// + admin-consented app registration.
+//
+// STORED_PLATFORMS = platforms that may exist in the D1 `appointments` table
+// (historical rows). Wider superset for reading existing data including 'teams'.
 export const APPOINTMENT_CONFIG = {
   VALID_DURATIONS: [15, 30, 60] as const,
-  VALID_PLATFORMS: ['discord', 'google', 'teams', 'jitsi'] as const,
+  VALID_PLATFORMS: ['discord', 'jitsi', 'google'] as const,
+  STORED_PLATFORMS: ['discord', 'jitsi', 'google', 'teams'] as const,
   DEFAULT_TIMEZONE: 'America/Los_Angeles'
 } as const
 
@@ -88,7 +100,10 @@ export const PAGINATION_DEFAULTS = {
 } as const
 
 // Type helpers
+// AppointmentPlatform = platforms accepted on new bookings (narrow).
+// StoredAppointmentPlatform = platforms that may appear in D1 (wide, includes legacy).
 export type AppointmentPlatform = (typeof APPOINTMENT_CONFIG.VALID_PLATFORMS)[number]
+export type StoredAppointmentPlatform = (typeof APPOINTMENT_CONFIG.STORED_PLATFORMS)[number]
 export type TemplateType = (typeof TEMPLATE_CONFIG.TEMPLATE_TYPES)[number]
 export type TemplateStatus = (typeof TEMPLATE_CONFIG.TEMPLATE_STATUSES)[number]
 export type AppointmentDuration = (typeof APPOINTMENT_CONFIG.VALID_DURATIONS)[number]

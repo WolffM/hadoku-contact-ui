@@ -1,8 +1,17 @@
 /**
  * Meeting link generation service
+ *
+ * Discord — static invite (synchronous).
+ * Jitsi   — URL construction (synchronous).
+ * Google  — Google Calendar API call (async, returns null link if OAuth secrets missing).
+ *
+ * Validation in validation.ts ensures `platform` matches VALID_PLATFORMS
+ * before this is reached, so the default branch is defensive only.
  */
 
-export type MeetingPlatform = 'discord' | 'google' | 'teams' | 'jitsi'
+import { createGoogleMeetEvent } from './google-meet'
+
+export type MeetingPlatform = 'discord' | 'jitsi' | 'google'
 
 export interface MeetingLinkResult {
   success: boolean
@@ -20,20 +29,18 @@ export interface AppointmentDetails {
   message?: string
 }
 
-export function generateMeetingLink(
+export async function generateMeetingLink(
   platform: MeetingPlatform,
   appointment: AppointmentDetails,
   env: Record<string, unknown>
-): MeetingLinkResult {
+): Promise<MeetingLinkResult> {
   switch (platform) {
     case 'discord':
-      return generateDiscordLink(appointment, env)
-    case 'google':
-      return generateGoogleMeetLink(appointment, env)
-    case 'teams':
-      return generateTeamsLink(appointment, env)
+      return generateDiscordLink(appointment)
     case 'jitsi':
       return generateJitsiLink(appointment, env)
+    case 'google':
+      return createGoogleMeetEvent(appointment, env as Parameters<typeof createGoogleMeetEvent>[1])
     default:
       return {
         success: false,
@@ -42,56 +49,11 @@ export function generateMeetingLink(
   }
 }
 
-function generateDiscordLink(
-  appointment: AppointmentDetails,
-  _env: Record<string, unknown>
-): MeetingLinkResult {
-  const discordInvite = 'https://discord.gg/Epchg7QQ'
-
+function generateDiscordLink(appointment: AppointmentDetails): MeetingLinkResult {
   return {
     success: true,
-    meetingLink: discordInvite,
+    meetingLink: 'https://discord.gg/Epchg7QQ',
     meetingId: `discord-${appointment.slotId}`
-  }
-}
-
-function generateGoogleMeetLink(
-  _appointment: AppointmentDetails,
-  env: Record<string, unknown>
-): MeetingLinkResult {
-  const hasGoogleCredentials = env.GOOGLE_CALENDAR_API_KEY && env.GOOGLE_CALENDAR_ID
-
-  if (!hasGoogleCredentials) {
-    return {
-      success: false,
-      error:
-        'Google Calendar API not configured. Set GOOGLE_CALENDAR_API_KEY and GOOGLE_CALENDAR_ID in secrets.'
-    }
-  }
-
-  return {
-    success: false,
-    error: 'Google Meet integration not yet implemented. Configure Google Calendar API.'
-  }
-}
-
-function generateTeamsLink(
-  _appointment: AppointmentDetails,
-  env: Record<string, unknown>
-): MeetingLinkResult {
-  const hasTeamsCredentials = env.MICROSOFT_GRAPH_CLIENT_ID && env.MICROSOFT_GRAPH_CLIENT_SECRET
-
-  if (!hasTeamsCredentials) {
-    return {
-      success: false,
-      error:
-        'Microsoft Graph API not configured. Set MICROSOFT_GRAPH_CLIENT_ID and MICROSOFT_GRAPH_CLIENT_SECRET in secrets.'
-    }
-  }
-
-  return {
-    success: false,
-    error: 'Microsoft Teams integration not yet implemented. Configure Microsoft Graph API.'
   }
 }
 
@@ -102,11 +64,10 @@ function generateJitsiLink(
   const roomName = `hadoku-${appointment.slotId}`
   const jitsiDomain =
     (typeof env.JITSI_DOMAIN === 'string' ? env.JITSI_DOMAIN : null) ?? 'meet.jit.si'
-  const meetingLink = `https://${jitsiDomain}/${roomName}`
 
   return {
     success: true,
-    meetingLink,
+    meetingLink: `https://${jitsiDomain}/${roomName}`,
     meetingId: roomName
   }
 }

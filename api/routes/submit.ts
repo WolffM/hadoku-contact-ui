@@ -234,7 +234,7 @@ export function createSubmitRoutes(rateLimitOverrides?: {
           )
         }
 
-        const meetingLinkResult = generateMeetingLink(
+        const meetingLinkResult = await generateMeetingLink(
           appointmentData.platform,
           {
             slotId: appointmentData.slotId,

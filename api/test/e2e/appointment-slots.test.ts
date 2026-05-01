@@ -26,26 +26,24 @@ interface SlotsResponse {
   slots: Slot[]
 }
 
-/** Get next weekday N days from now */
+/** Get a weekday N days from now using UTC math (deterministic regardless of host TZ) */
 function getNextWeekday(daysFromNow: number): Date {
   const date = new Date()
-  date.setDate(date.getDate() + daysFromNow)
-  const day = date.getDay()
-  if (day === 0) date.setDate(date.getDate() + 1)
-  else if (day === 6) date.setDate(date.getDate() + 2)
+  date.setUTCDate(date.getUTCDate() + daysFromNow)
+  const day = date.getUTCDay()
+  if (day === 0) date.setUTCDate(date.getUTCDate() + 1)
+  else if (day === 6) date.setUTCDate(date.getUTCDate() + 2)
   return date
 }
 
-/** Get next Sunday, at least 48h from now */
-function getNextSunday(): Date {
-  const date = new Date()
-  const day = date.getDay()
-  const daysUntil = day === 0 ? 7 : 7 - day
-  date.setDate(date.getDate() + daysUntil)
-  if (date.getTime() - Date.now() < 48 * 60 * 60 * 1000) {
-    date.setDate(date.getDate() + 7)
-  }
-  return date
+/** Get the next occurrence of a UTC weekday at least minDaysOut days in the future. */
+function nextUtcWeekday(targetDay: number, minDaysOut = 5): string {
+  const d = new Date()
+  d.setUTCHours(0, 0, 0, 0)
+  d.setUTCDate(d.getUTCDate() + minDaysOut)
+  const cur = d.getUTCDay()
+  d.setUTCDate(d.getUTCDate() + ((targetDay - cur + 7) % 7))
+  return d.toISOString().split('T')[0]
 }
 
 async function fetchSlots(date: string, duration: number) {
@@ -191,11 +189,11 @@ describe('Appointment Slots Integration', () => {
 
   describe('Business Rules', () => {
     it('should reject dates within advance notice window', async () => {
-      const tomorrow = new Date()
-      tomorrow.setDate(tomorrow.getDate() + 1)
-      const date = tomorrow.toISOString().split('T')[0]
+      // Use today's UTC date — its 9 AM NY (= 13:00 or 14:00 UTC) is at most ~24h
+      // out and may already be in the past, so the 24h advance check rejects it.
+      const today = new Date().toISOString().split('T')[0]
 
-      const response = await fetchSlots(date, 30)
+      const response = await fetchSlots(today, 30)
       expect(response.status).toBe(400)
       const data = (await response.json()) as { message: string }
       expect(data.message).toContain('advance')
@@ -213,8 +211,8 @@ describe('Appointment Slots Integration', () => {
     })
 
     it('should reject unavailable day of week (weekend)', async () => {
-      const sunday = getNextSunday()
-      const date = sunday.toISOString().split('T')[0]
+      // Pick the next Sunday at least 5 days out using UTC math (avoids local-TZ flake).
+      const date = nextUtcWeekday(0, 5)
 
       const response = await fetchSlots(date, 30)
       expect(response.status).toBe(400)

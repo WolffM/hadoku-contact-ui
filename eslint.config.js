@@ -101,6 +101,22 @@ export default [
     }
   },
 
+  // Node scripts (`.mjs`) — Node globals only, no TypeScript/React rules
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        fetch: 'readonly',
+        URL: 'readonly',
+        URLSearchParams: 'readonly'
+      }
+    }
+  },
+
   // Prettier config (must be last)
   prettierConfig
 ]

@@ -2,7 +2,11 @@
  * Appointment storage operations
  */
 
-import { PAGINATION_DEFAULTS, type AppointmentPlatform } from '../constants'
+import {
+  PAGINATION_DEFAULTS,
+  type AppointmentPlatform,
+  type StoredAppointmentPlatform
+} from '../constants'
 
 export interface AppointmentConfig {
   id: number
@@ -29,7 +33,7 @@ export interface StoredAppointment {
   end_time: string
   duration: number
   timezone: string
-  platform: AppointmentPlatform
+  platform: StoredAppointmentPlatform
   meeting_link: string | null
   meeting_id: string | null
   status: 'confirmed' | 'cancelled' | 'completed' | 'no_show'

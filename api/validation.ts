@@ -272,7 +272,7 @@ export function validateAppointment(data: unknown): AppointmentValidationResult 
   const platformLower = (appointment.platform as string).toLowerCase()
   if (
     !APPOINTMENT_CONFIG.VALID_PLATFORMS.includes(
-      platformLower as 'discord' | 'google' | 'teams' | 'jitsi'
+      platformLower as (typeof APPOINTMENT_CONFIG.VALID_PLATFORMS)[number]
     )
   ) {
     errors.push({

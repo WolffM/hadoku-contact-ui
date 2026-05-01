@@ -203,7 +203,7 @@ describe('Appointment Booking Integration', () => {
   describe('Platform Validation', () => {
     it('should accept valid platforms', async () => {
       const date = futureDate(3)
-      const platforms = ['discord', 'google', 'teams', 'jitsi']
+      const platforms = ['discord', 'jitsi', 'google']
 
       for (let i = 0; i < platforms.length; i++) {
         const response = await bookAppointment({
@@ -218,6 +218,17 @@ describe('Appointment Booking Integration', () => {
 
       const { results } = await env.DB.prepare('SELECT * FROM appointments').all()
       expect(results).toHaveLength(platforms.length)
+    })
+
+    it('should reject teams platform (no longer bookable)', async () => {
+      const response = await bookAppointment({
+        name: 'Teams User',
+        email: 'teams@example.com',
+        date: futureDate(3),
+        startHour: 14,
+        platform: 'teams'
+      })
+      expect(response.status).toBe(400)
     })
 
     it('should reject invalid platform', async () => {
