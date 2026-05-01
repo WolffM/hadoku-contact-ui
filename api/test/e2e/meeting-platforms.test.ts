@@ -8,8 +8,8 @@
  *              (full mock path covered in unit tests for createGoogleMeetEvent)
  *   - teams:   removed from VALID_PLATFORMS — bookings rejected by validation
  */
-import { env, SELF } from 'cloudflare:test'
-import { describe, it, expect, beforeEach } from 'vitest'
+import { env, SELF, fetchMock } from 'cloudflare:test'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 
 function futureDate(days: number): string {
   const d = new Date()
@@ -91,8 +91,22 @@ describe('Meeting Platform Integration', () => {
     })
   })
 
-  describe('Google Meet (OAuth not configured in test env)', () => {
-    it('booking succeeds; meeting_link is null when OAuth secrets are missing', async () => {
+  describe('Google Meet (Calendar API failure path)', () => {
+    beforeEach(() => {
+      fetchMock.activate()
+      fetchMock.disableNetConnect()
+    })
+    afterEach(() => {
+      fetchMock.deactivate()
+    })
+
+    it('booking succeeds with meeting_link=null when OAuth fails', async () => {
+      // Simulate Google OAuth refusing the refresh token (e.g., revoked).
+      fetchMock
+        .get('https://oauth2.googleapis.com')
+        .intercept({ path: '/token', method: 'POST' })
+        .reply(401, 'invalid_grant')
+
       const { response, slotId } = await bookWithPlatform('google', 12)
       expect(response.status).toBe(201)
 

@@ -8,8 +8,8 @@
  * - Meeting link generation
  * - Platform validation
  */
-import { env, SELF } from 'cloudflare:test'
-import { describe, it, expect, beforeEach } from 'vitest'
+import { env, SELF, fetchMock } from 'cloudflare:test'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 
 /** Get a date N days from now, formatted as YYYY-MM-DD */
 function futureDate(days: number): string {
@@ -202,22 +202,35 @@ describe('Appointment Booking Integration', () => {
 
   describe('Platform Validation', () => {
     it('should accept valid platforms', async () => {
-      const date = futureDate(3)
-      const platforms = ['discord', 'jitsi', 'google']
+      // Mock Google OAuth to fail so the google booking goes through with a
+      // null meeting_link instead of attempting a real network call.
+      fetchMock.activate()
+      fetchMock.disableNetConnect()
+      fetchMock
+        .get('https://oauth2.googleapis.com')
+        .intercept({ path: '/token', method: 'POST' })
+        .reply(401, 'invalid_grant')
 
-      for (let i = 0; i < platforms.length; i++) {
-        const response = await bookAppointment({
-          name: `User ${i}`,
-          email: `user${i}@example.com`,
-          date,
-          startHour: 10 + i,
-          platform: platforms[i]
-        })
-        expect(response.status).toBe(201)
+      try {
+        const date = futureDate(3)
+        const platforms = ['discord', 'jitsi', 'google']
+
+        for (let i = 0; i < platforms.length; i++) {
+          const response = await bookAppointment({
+            name: `User ${i}`,
+            email: `user${i}@example.com`,
+            date,
+            startHour: 10 + i,
+            platform: platforms[i]
+          })
+          expect(response.status).toBe(201)
+        }
+
+        const { results } = await env.DB.prepare('SELECT * FROM appointments').all()
+        expect(results).toHaveLength(platforms.length)
+      } finally {
+        fetchMock.deactivate()
       }
-
-      const { results } = await env.DB.prepare('SELECT * FROM appointments').all()
-      expect(results).toHaveLength(platforms.length)
     })
 
     it('should reject teams platform (no longer bookable)', async () => {
