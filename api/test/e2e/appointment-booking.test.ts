@@ -9,7 +9,7 @@
  * - Platform validation
  */
 import { env, SELF, fetchMock } from 'cloudflare:test'
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 
 /** Get a date N days from now, formatted as YYYY-MM-DD */
 function futureDate(days: number): string {
