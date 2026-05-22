@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
 import type { ContactUIProps } from './types'
 import ContactForm from './ContactForm'
+import { themePrefs } from './prefs/themePrefs'
 import {
   ThemePicker,
   SunIcon,
@@ -174,6 +175,7 @@ export default function App(props: ContactUIProps = {}) {
   const handleThemeChange = (newTheme: string) => {
     logger.theme(newTheme, { previousTheme: theme })
     setTheme(newTheme)
+    void themePrefs.save({ theme: newTheme }, { scope: 'device' })
   }
 
   const handleToggle = () => {
