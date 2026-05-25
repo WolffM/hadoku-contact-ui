@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactElement } from 'react'
+import { usePrefs } from '@wolffm/prefs-client/react'
 import type { ContactUIProps } from './types'
 import ContactForm from './ContactForm'
 import { themePrefs } from './prefs/themePrefs'
@@ -129,6 +130,16 @@ export default function App(props: ContactUIProps = {}) {
   const containerRef = useRef<HTMLDivElement>(null)
   const hasInitializedFromProps = useRef(false)
 
+  // Subscribe to the cross-device prefs row so a freshly opened tab adopts
+  // the persisted theme as soon as the SDK resolves — useState above only
+  // sees props/browser-preference, neither of which survives a browser
+  // close. Without this read, `themePrefs.save` was effectively write-only
+  // and the theme appeared to reset between sessions.
+  const { prefs: persistedPrefs, save: savePrefs } = usePrefs(themePrefs)
+  // Track whether the user has already changed the theme this session, so a
+  // late prefs resolve doesn't yank them back to the old persisted value.
+  const userOverroteThemeRef = useRef(false)
+
   logger.debug('[App] Current render state', { theme, isPickerOpen })
 
   // Track if browser prefers dark mode
@@ -172,10 +183,38 @@ export default function App(props: ContactUIProps = {}) {
     }
   }, [props.theme])
 
+  // When the prefs SDK resolves the persisted row, adopt that theme — but
+  // only if props.theme isn't driving (parent shell already plumbs the SDK
+  // read through) and the user hasn't already toggled this session.
+  useEffect(() => {
+    if (props.theme) return
+    if (userOverroteThemeRef.current) return
+    const persisted = persistedPrefs?.theme
+    if (!persisted || persisted === theme) return
+    const isKnownTheme = THEME_FAMILIES.some(
+      f => f.lightTheme === persisted || f.darkTheme === persisted
+    )
+    if (isKnownTheme) {
+      logger.debug('[App] Hydrating theme from prefs SDK', { persisted, previousTheme: theme })
+      setTheme(persisted)
+    }
+  }, [persistedPrefs?.theme, props.theme])
+
   const handleThemeChange = (newTheme: string) => {
     logger.theme(newTheme, { previousTheme: theme })
     setTheme(newTheme)
-    void themePrefs.save({ theme: newTheme }, { scope: 'device' })
+    userOverroteThemeRef.current = true
+    // Persist via the unified prefs store. Use the live save() returned by
+    // usePrefs so the SDK can update its in-memory cache (otherwise the
+    // next read could race a stale snapshot back into state). Log failures
+    // instead of swallowing — silent saves were the original "my theme
+    // reset" bug.
+    savePrefs({ theme: newTheme }, { scope: 'device' }).catch(err => {
+      logger.error('[App] prefs save failed:', {
+        error: (err as Error)?.message ?? String(err),
+        theme: newTheme
+      })
+    })
   }
 
   const handleToggle = () => {
