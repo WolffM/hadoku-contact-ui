@@ -9,7 +9,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 
 const ADMIN_HEADERS = {
   'Content-Type': 'application/json',
-  'X-User-Key': 'test-admin-key'
+  // Edge-auth: edge-router stamps these; the worker trusts the tier.
+  'X-Edge-Auth': 'test-edge-secret',
+  'X-Hadoku-Tier': 'admin'
 }
 
 async function sendEmail(body: Record<string, unknown>, headers = ADMIN_HEADERS) {

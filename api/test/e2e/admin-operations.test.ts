@@ -14,9 +14,13 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 
 const ADMIN_HEADERS = {
   'Content-Type': 'application/json',
-  'X-User-Key': 'test-admin-key'
+  // Edge-auth: edge-router stamps these on proxied requests; the worker
+  // trusts the tier (was X-User-Key validated against ADMIN_KEYS).
+  'X-Edge-Auth': 'test-edge-secret',
+  'X-Hadoku-Tier': 'admin'
 }
 
+// No edge-auth headers → createEdgeAuth degrades to public → requireAdmin 403.
 const NO_AUTH_HEADERS = {
   'Content-Type': 'application/json'
 }

@@ -100,7 +100,8 @@ describe('Auto-Whitelist on Admin Reply', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-User-Key': 'test-admin-key'
+        'X-Edge-Auth': 'test-edge-secret',
+        'X-Hadoku-Tier': 'admin'
       },
       body: JSON.stringify({
         from: 'matthaeus@hadoku.me',

@@ -7,6 +7,10 @@ export interface ContactEnv {
   RATE_LIMIT_KV: KVNamespace
   TEMPLATES_KV: KVNamespace
   ANALYTICS_ENGINE?: AnalyticsEngineDataset
+  // Edge provenance secret — createEdgeAuth verifies inbound X-Edge-Auth.
+  EDGE_AUTH_SECRET?: string
+  // ADMIN_KEYS/FRIEND_KEYS no longer read inbound (createEdgeAuth replaced the
+  // inlined key validation). Kept until Step 5 prunes them from CF secrets.
   ADMIN_KEYS?: string
   FRIEND_KEYS?: string
   EMAIL_PROVIDER?: string
@@ -26,7 +30,7 @@ export interface ContactHandlerOptions {
 }
 
 export interface HadokuAuthContext {
-  userType: 'admin' | 'friend' | 'public'
+  userType: 'admin' | 'service' | 'friend' | 'public'
   credential: string | null
 }
 

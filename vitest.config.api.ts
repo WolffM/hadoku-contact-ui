@@ -14,6 +14,11 @@ export default defineWorkersConfig({
           d1Databases: ['DB'],
           kvNamespaces: ['RATE_LIMIT_KV', 'TEMPLATES_KV'],
           bindings: {
+            // Edge-auth: tests authenticate the way edge-router stamps
+            // requests (X-Edge-Auth + X-Hadoku-Tier), not X-User-Key.
+            EDGE_AUTH_SECRET: 'test-edge-secret',
+            // ADMIN_KEYS/FRIEND_KEYS retained but no longer read inbound
+            // (createEdgeAuth replaced the inlined key validation).
             ADMIN_KEYS: '["test-admin-key"]',
             FRIEND_KEYS: '["test-friend-key"]',
             RESEND_API_KEY: 'test-resend-key',

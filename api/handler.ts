@@ -7,7 +7,7 @@
 
 import { Hono } from 'hono'
 import { createCorsMiddleware, DEFAULT_HADOKU_ORIGINS } from './utils/cors'
-import { createHadokuAuth } from './utils/auth'
+import { createEdgeAuth } from './utils/auth'
 import { createErrorHandlers } from './utils/error-handlers'
 import { createSubmitRoutes } from './routes/submit'
 import { createAdminRoutes } from './routes/admin'
@@ -71,8 +71,9 @@ export function createContactHandler(basePath = '/contact/api', options?: Contac
     })
   )
 
-  // Authentication Middleware
-  app.use('*', createHadokuAuth())
+  // Authentication: trust the edge-stamped tier (centralized auth channel).
+  // Public submit routes pass through; admin routes gate via requireAdmin.
+  app.use('*', createEdgeAuth())
 
   // Health check
   app.get('/health', c => {
