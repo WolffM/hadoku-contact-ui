@@ -1,8 +1,6 @@
 {
   "//": "Loaded by ../hadoku_site/scripts/secrets/dev-vault.mjs. UI_* keys are shared with hadoku-task-mobile.",
   "HADOKU_SITE_TOKEN": "CONTACTUI_HADOKU_SITE_TOKEN",
-  "ADMIN_KEYS": "ADMIN_KEYS",
-  "FRIEND_KEYS": "FRIEND_KEYS",
   "LOCAL_BASE": "LOCAL_BASE",
   "WORKER_BASE": "WORKER_BASE",
   "LAMBDA_BASE": "UI_LAMBDA_BASE",
