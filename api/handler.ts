@@ -92,10 +92,13 @@ export function createContactHandler(basePath = '/contact/api', options?: Contac
   // Admin routes
   app.route('/admin', createAdminRoutes())
 
-  // Internal endpoint: daily maintenance
+  // Internal endpoint: daily maintenance.
+  // Dispatched by mgmt-api's cron orchestrator with MGMT_CRON_KEY (service
+  // tier) — same caller and rationale as the monitoring-api carve-outs for
+  // POST /health/api/jobs and POST /health/api/cleanup/run.
   app.post('/internal/run-daily', async c => {
     const auth = c.get('authContext')
-    if (auth.userType !== 'admin') {
+    if (auth.userType !== 'admin' && auth.userType !== 'service') {
       return c.json({ error: 'Unauthorized' }, 403)
     }
 
