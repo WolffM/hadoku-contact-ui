@@ -1,4 +1,4 @@
-import { logger } from '@wolffm/task-ui-components'
+import { logger } from '@wolffm/logger/client'
 import type {
   FetchSlotsResponse,
   SubmitContactRequest,

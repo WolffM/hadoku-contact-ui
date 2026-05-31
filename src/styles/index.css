@@ -12,7 +12,7 @@
  * Available theme variables from @wolffm/themes:
  * Colors: --color-bg, --color-text, --color-primary, --color-border, --color-bg-card, etc.
  * Typography: --font-size-*, --font-weight-*, --line-height-*
- * Spacing: --spacing-*, --border-radius*
+ * Spacing: --spacing-*, --hdk-radius*
  * Effects: --shadow-*, --transition-*
  * See @wolffm/themes/style.css for complete list
  */
@@ -119,7 +119,7 @@ body {
 .contact-alert {
   padding: 1rem;
   margin-bottom: 1.5rem;
-  border-radius: var(--border-radius);
+  border-radius: var(--hdk-radius);
   border-width: 1px;
   border-style: solid;
 }
@@ -159,9 +159,9 @@ body {
 .contact-textarea {
   width: 100%;
   padding: 0.75rem;
-  font-size: var(--font-size-base);
+  font-size: var(--hdk-text-base);
   border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
+  border-radius: var(--hdk-radius);
   outline: none;
   transition: border-color var(--transition-fast);
   background-color: var(--color-bg-card);
@@ -171,7 +171,7 @@ body {
 .contact-input:focus,
 .contact-textarea:focus {
   border-color: var(--color-primary);
-  box-shadow: var(--shadow-focus);
+  box-shadow: var(--hdk-shadow-focus);
 }
 
 .contact-textarea {
@@ -187,7 +187,7 @@ body {
 .contact-error-text {
   display: block;
   margin-top: 0.25rem;
-  font-size: var(--font-size-sm);
+  font-size: var(--hdk-text-sm);
   color: var(--color-danger-dark);
   font-weight: var(--font-weight-semibold);
 }
@@ -195,7 +195,7 @@ body {
 .contact-field-hint {
   display: block;
   margin-top: 0.375rem;
-  font-size: var(--font-size-xs);
+  font-size: var(--hdk-text-xs);
   color: var(--color-text-secondary);
   font-style: italic;
   opacity: 0.8;
@@ -215,12 +215,12 @@ body {
   display: block;
   margin: 0 auto;
   padding: 0.875rem 2rem;
-  font-size: var(--font-size-base);
+  font-size: var(--hdk-text-base);
   font-weight: var(--font-weight-bold);
   color: var(--color-bg);
   background-color: var(--color-primary);
   border: none;
-  border-radius: var(--border-radius);
+  border-radius: var(--hdk-radius);
   cursor: pointer;
   transition:
     background-color var(--transition-fast),
@@ -250,8 +250,8 @@ body {
   padding: 1.5rem;
   background-color: var(--color-bg-card);
   border: 1px solid var(--color-border);
-  border-radius: var(--border-radius-lg);
-  box-shadow: var(--shadow-sm);
+  border-radius: var(--hdk-radius-lg);
+  box-shadow: var(--hdk-shadow-sm);
 }
 
 .appointment-picker__header {
@@ -266,7 +266,7 @@ body {
 }
 
 .appointment-picker__subtitle {
-  font-size: var(--font-size-sm);
+  font-size: var(--hdk-text-sm);
   color: var(--color-text-secondary);
   margin: 0;
 }
@@ -310,8 +310,8 @@ body {
   padding: 1rem;
   background-color: var(--color-primary-bg);
   border: 1px solid var(--color-primary);
-  border-radius: var(--border-radius);
-  font-size: var(--font-size-sm);
+  border-radius: var(--hdk-radius);
+  font-size: var(--hdk-text-sm);
   color: var(--color-text);
 }
 
@@ -328,7 +328,7 @@ body {
   justify-content: center;
   background-color: transparent;
   border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
+  border-radius: var(--hdk-radius);
   color: var(--color-text-secondary);
   font-size: 1.25rem;
   cursor: pointer;
@@ -360,7 +360,7 @@ body {
 }
 
 .duration-selector__label {
-  font-size: var(--font-size-base);
+  font-size: var(--hdk-text-base);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text);
 }
@@ -373,7 +373,7 @@ body {
 
 .duration-pill {
   padding: 0.5rem 1.25rem;
-  font-size: var(--font-size-sm);
+  font-size: var(--hdk-text-sm);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-secondary);
   background-color: var(--color-bg);
@@ -462,7 +462,7 @@ body {
 .calendar__navigation button:hover:not(:disabled),
 .react-calendar__navigation button:hover:not(:disabled) {
   background-color: var(--color-primary-hover) !important;
-  border-radius: var(--border-radius);
+  border-radius: var(--hdk-radius);
   color: var(--color-text) !important;
 }
 
@@ -488,7 +488,7 @@ body {
 .react-calendar__month-view__weekdays {
   text-align: center;
   font-weight: var(--font-weight-bold);
-  font-size: var(--font-size-xs);
+  font-size: var(--hdk-text-xs);
   color: var(--color-text-secondary) !important;
   text-transform: uppercase;
 }
@@ -512,7 +512,7 @@ body {
   justify-content: center;
   padding: 0.375rem 0.25rem;
   margin: 2px;
-  border-radius: var(--border-radius);
+  border-radius: var(--hdk-radius);
   color: var(--color-text) !important;
   background-color: transparent !important;
   min-height: 2rem;
@@ -616,7 +616,7 @@ button.react-calendar__tile--active:hover {
 }
 
 .time-slot-picker__label {
-  font-size: var(--font-size-base);
+  font-size: var(--hdk-text-base);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text);
 }
@@ -628,8 +628,8 @@ button.react-calendar__tile--active:hover {
   text-align: center;
   color: var(--color-text-secondary);
   background-color: var(--color-bg);
-  border-radius: var(--border-radius);
-  font-size: var(--font-size-sm);
+  border-radius: var(--hdk-radius);
+  font-size: var(--hdk-text-sm);
 }
 
 .time-slot-picker__error {
@@ -658,13 +658,13 @@ button.react-calendar__tile--active:hover {
 
 .time-slot {
   padding: 0.75rem 0.5rem;
-  font-size: var(--font-size-sm);
+  font-size: var(--hdk-text-sm);
   font-weight: var(--font-weight-semibold);
   text-align: center;
   color: var(--color-text);
   background-color: var(--color-bg);
   border: 2px solid var(--color-border);
-  border-radius: var(--border-radius);
+  border-radius: var(--hdk-radius);
   cursor: pointer;
   transition:
     background-color var(--transition-fast),
@@ -677,7 +677,7 @@ button.react-calendar__tile--active:hover {
   border-color: var(--color-primary);
   background-color: var(--color-primary-light);
   transform: translateY(-2px);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--hdk-shadow-sm);
 }
 
 .time-slot--selected {
@@ -736,7 +736,7 @@ button.react-calendar__tile--active:hover {
   padding: 0.75rem;
   background-color: var(--color-danger-light);
   border: 1px solid var(--color-danger);
-  border-radius: var(--border-radius);
+  border-radius: var(--hdk-radius);
   margin-bottom: 1rem;
 }
 
@@ -751,7 +751,7 @@ button.react-calendar__tile--active:hover {
 }
 
 .meeting-platform-selector__label {
-  font-size: var(--font-size-base);
+  font-size: var(--hdk-text-base);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text);
 }
@@ -778,7 +778,7 @@ button.react-calendar__tile--active:hover {
   padding: 0.5rem 0.75rem;
   background-color: var(--color-bg);
   border: 2px solid var(--color-border);
-  border-radius: var(--border-radius);
+  border-radius: var(--hdk-radius);
   cursor: pointer;
   transition:
     background-color var(--transition-fast),
@@ -829,7 +829,7 @@ button.react-calendar__tile--active:hover {
 }
 
 .platform-button__label {
-  font-size: var(--font-size-sm);
+  font-size: var(--hdk-text-sm);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text);
   white-space: nowrap;

@@ -1,6 +1,6 @@
 import { useState, FormEvent, ChangeEvent, ReactNode, useRef } from 'react'
 import { format } from 'date-fns'
-import { logger } from '@wolffm/task-ui-components'
+import { logger } from '@wolffm/logger/client'
 import AppointmentPicker, { type AppointmentPickerRef } from './components/AppointmentPicker'
 import { submitContactWithAppointment, AppointmentAPIError } from './api/appointments'
 import type { FormData, FormErrors, SubmitStatus, AppointmentSelection } from './types'

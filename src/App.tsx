@@ -14,9 +14,9 @@ import {
   ZapIcon,
   FlowerIcon,
   CoffeeIcon,
-  logger,
   type ThemeFamily
 } from '@wolffm/task-ui-components'
+import { logger } from '@wolffm/logger/client'
 
 // Theme families configuration
 const THEME_FAMILIES: ThemeFamily[] = [
