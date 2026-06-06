@@ -9,11 +9,11 @@ importers:
   .:
     dependencies:
       '@wolffm/logger':
-        specifier: ^1.1.0
-        version: 1.1.0
+        specifier: ^1.2.1
+        version: 1.2.1
       '@wolffm/prefs-client':
-        specifier: ^1.0.1
-        version: 1.0.1(react@19.2.0)(zod@4.1.12)
+        specifier: ^1.0.2
+        version: 1.0.2(react@19.2.0)(zod@4.1.12)
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
@@ -1557,12 +1557,12 @@ packages:
   '@wojtekmaj/date-utils@2.0.2':
     resolution: {integrity: sha512-Do66mSlSNifFFuo3l9gNKfRMSFi26CRuQMsDJuuKO/ekrDWuTTtE4ZQxoFCUOG+NgxnpSeBq/k5TY8ZseEzLpA==}
 
-  '@wolffm/logger@1.1.0':
-    resolution: {integrity: sha512-GU9gEvpWjV6l2bEIwM1YUa8BiGtf0BpOiUX5ab0x2h2GX/sAz/cjSl5YdAPmtJkCip8lUqIrkR4PwLM+RvOe5Q==, tarball: https://npm.pkg.github.com/download/@wolffm/logger/1.1.0/840a3412fc301295186d226b24dae56fdee8b414}
+  '@wolffm/logger@1.2.1':
+    resolution: {integrity: sha512-HTKg6runjmoRdiIuzNaUla/6u9DekPv5j55rG1DoUoYmELC+fAZRbeJxEuag9NMAzqbhHUC/QtDMSiPFQpXyag==, tarball: https://npm.pkg.github.com/download/@wolffm/logger/1.2.1/0b7d17996195ec741784bd89430e4a9d895b519c}
     engines: {node: '>=18'}
 
-  '@wolffm/prefs-client@1.0.1':
-    resolution: {integrity: sha512-E/KTe+MfQbb6YfOZuQjGhX1lbIeJchz5oL8cptUcnlwm2FqmT5OrqClqdZcgGJ6D8CKaJkg2VCXx3486mJ5Exg==, tarball: https://npm.pkg.github.com/download/@wolffm/prefs-client/1.0.1/d02adcf65668a2de113f8bfcae62ec31ec55f6c1}
+  '@wolffm/prefs-client@1.0.2':
+    resolution: {integrity: sha512-7GTvZMQb8KEp5pR1ZDmk+veSuNP1/u22cBIHdHr0KKwMILuTZ3F4fYUHF6lUsc5OfmlDsxOWrb7OSTdfJLXHyw==, tarball: https://npm.pkg.github.com/download/@wolffm/prefs-client/1.0.2/175c485248d16ef3a59bec1fae6f3a660d9751ad}
     engines: {node: '>=18'}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
@@ -4387,9 +4387,9 @@ snapshots:
 
   '@wojtekmaj/date-utils@2.0.2': {}
 
-  '@wolffm/logger@1.1.0': {}
+  '@wolffm/logger@1.2.1': {}
 
-  '@wolffm/prefs-client@1.0.1(react@19.2.0)(zod@4.1.12)':
+  '@wolffm/prefs-client@1.0.2(react@19.2.0)(zod@4.1.12)':
     dependencies:
       react: 19.2.0
       zod: 4.1.12
