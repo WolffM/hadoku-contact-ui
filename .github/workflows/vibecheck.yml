@@ -22,7 +22,7 @@ jobs:
       - name: Run vibeCheck
         uses: WolffM/vibecheck@main
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.HADOKU_SITE_TOKEN }}
           cadence: weekly
           severity_threshold: medium
           confidence_threshold: medium

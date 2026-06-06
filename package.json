@@ -1,8 +1,9 @@
 {
   "name": "@wolffm/contact-ui",
-  "version": "1.1.18",
+  "version": "1.1.19",
   "description": "Contact form micro-frontend for hadoku.me",
   "type": "module",
+  "packageManager": "pnpm@11.5.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WolffM/hadoku-contact-ui.git"
@@ -82,12 +83,5 @@
     "hono": "^4.7.10",
     "react-calendar": "^6.0.0",
     "zod": "^4.1.12"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "workerd",
-      "sharp"
-    ]
   }
 }

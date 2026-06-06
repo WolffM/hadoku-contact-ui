@@ -1,0 +1,15 @@
+packages:
+  - .
+
+allowBuilds:
+  esbuild: true
+  sharp: true
+  workerd: true
+
+minimumReleaseAgeExclude:
+  - '@wolffm/*'
+
+onlyBuiltDependencies:
+  - esbuild
+  - workerd
+  - sharp
