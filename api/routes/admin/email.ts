@@ -15,6 +15,7 @@ import {
 import { createEmailProvider } from '../../email'
 import { EMAIL_CONFIG, VALIDATION_CONSTRAINTS } from '../../constants'
 import { adminOk } from './index'
+import { pushMailToCalendar } from '../../services/task-calendar'
 import type { AppContext } from '../../types'
 
 export function createEmailRoutes() {
@@ -91,6 +92,16 @@ export function createEmailRoutes() {
         referrer: null,
         direction: 'outbound'
       })
+
+      // Mirror the sent mail into the owner's task calendar as an all-day event
+      // (best-effort, once). Never blocks or fails the send — the push swallows
+      // its own errors.
+      const calendarPush = pushMailToCalendar(submission, c.env, { sentBy: adminIdentifier })
+      try {
+        c.executionCtx.waitUntil(calendarPush)
+      } catch {
+        void calendarPush
+      }
 
       return adminOk(c, {
         success: true,

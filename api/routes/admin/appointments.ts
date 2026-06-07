@@ -22,6 +22,7 @@ import {
   VALIDATION_CONSTRAINTS,
   type AppointmentPlatform
 } from '../../constants'
+import { pushAppointmentToCalendar } from '../../services/task-calendar'
 import type { AppContext } from '../../types'
 
 interface AdminCreateAppointmentBody {
@@ -202,6 +203,15 @@ export function createAppointmentAdminRoutes() {
         meeting_link: typeof body.meeting_link === 'string' ? body.meeting_link : undefined,
         meeting_id: typeof body.meeting_id === 'string' ? body.meeting_id : undefined
       })
+
+      // Mirror into the owner's task calendar (best-effort, once). Never blocks
+      // or fails the booking — the push swallows its own errors.
+      const calendarPush = pushAppointmentToCalendar(appointment, c.env)
+      try {
+        c.executionCtx.waitUntil(calendarPush)
+      } catch {
+        void calendarPush
+      }
 
       return adminOk(c, { appointment }, 201)
     } catch (error) {

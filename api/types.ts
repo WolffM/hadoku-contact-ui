@@ -19,6 +19,10 @@ export interface ContactEnv {
   // Inbound forwarding — scraper (pickleball waitlist trigger, etc.)
   SCRAPER_API_URL?: string
   SCRAPER_API_KEY?: string
+  // task-calendar bridge — registered key identifying the calendar owner and an
+  // optional endpoint override. See services/task-calendar.ts.
+  CONTACT_SYNC_KEY?: string
+  TASK_API_URL?: string
 }
 
 export interface ContactHandlerOptions {

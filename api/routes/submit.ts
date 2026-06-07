@@ -22,6 +22,7 @@ import {
 } from '../storage'
 import { checkRateLimit, recordSubmission } from '../rate-limit'
 import { generateMeetingLink } from '../services/meeting-links'
+import { pushAppointmentToCalendar } from '../services/task-calendar'
 import { createEmailProvider } from '../email'
 import {
   formatAppointmentConfirmation,
@@ -65,6 +66,9 @@ interface Env {
   ANALYTICS_ENGINE?: AnalyticsEngineDataset
   EMAIL_PROVIDER?: string
   RESEND_API_KEY?: string
+  // task-calendar bridge — see services/task-calendar.ts
+  CONTACT_SYNC_KEY?: string
+  TASK_API_URL?: string
 }
 
 export function createSubmitRoutes(rateLimitOverrides?: {
@@ -267,6 +271,16 @@ export function createSubmitRoutes(rateLimitOverrides?: {
           ip_address: ipAddress ?? undefined,
           user_agent: userAgent ?? undefined
         })
+
+        // Mirror the booking into the owner's task calendar (best-effort, once).
+        // Never blocks or fails the booking — handed to waitUntil; the push
+        // itself swallows all errors.
+        const calendarPush = pushAppointmentToCalendar(appointment, c.env)
+        try {
+          c.executionCtx.waitUntil(calendarPush)
+        } catch {
+          void calendarPush
+        }
 
         try {
           const providerName = c.env.EMAIL_PROVIDER ?? 'resend'
