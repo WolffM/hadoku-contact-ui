@@ -78,7 +78,7 @@
   },
   "dependencies": {
     "@wolffm/logger": "^1.2.2",
-    "@wolffm/prefs-client": "^1.0.3",
+    "@wolffm/prefs-client": "^1.0.4",
     "date-fns": "^4.1.0",
     "hono": "^4.7.10",
     "react-calendar": "^6.0.0",
