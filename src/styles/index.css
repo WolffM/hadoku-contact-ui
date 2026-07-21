@@ -40,13 +40,6 @@ body {
   padding: 2rem 2rem 0 2rem;
 }
 
-.contact-ui__header-bar {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: 1rem;
-  padding: 0.5rem 0;
-}
-
 /* Contact Form Styles */
 .contact-container {
   max-width: 1400px;
@@ -88,18 +81,6 @@ body {
 
 .contact-header {
   margin-bottom: 2rem;
-}
-
-.contact-header__title-row {
-  display: flex;
-  justify-content: flex-start; /* Changed from space-between to flex-start */
-  align-items: center;
-  gap: 1rem; /* Add gap between title and picker */
-  margin-bottom: 0.5rem;
-}
-
-.contact-header__theme-picker {
-  flex-shrink: 0;
 }
 
 .contact-title {

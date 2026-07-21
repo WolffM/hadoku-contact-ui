@@ -4,6 +4,7 @@ import App from './App'
 import type { ContactUIProps } from './types'
 import '@wolffm/themes/style.css'
 import '@wolffm/task-ui-components/theme-picker.css'
+import '@wolffm/task-ui-components/app-header.css'
 import './styles/index.css'
 
 // Re-export all types

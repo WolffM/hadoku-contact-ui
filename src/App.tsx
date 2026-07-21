@@ -5,6 +5,7 @@ import type { ContactUIProps } from './types'
 import ContactForm from './ContactForm'
 import { themePrefs } from './prefs/themePrefs'
 import {
+  AppHeader,
   ThemePicker,
   SunIcon,
   MoonIcon,
@@ -237,7 +238,8 @@ export default function App(props: ContactUIProps = {}) {
       data-dark-theme={isDarkTheme ? 'true' : 'false'}
     >
       <div className="contact-ui">
-        <ContactForm
+        <AppHeader
+          title="Contact"
           themePicker={
             <ThemePicker
               currentTheme={theme}
@@ -254,6 +256,7 @@ export default function App(props: ContactUIProps = {}) {
             />
           }
         />
+        <ContactForm />
       </div>
     </div>
   )
