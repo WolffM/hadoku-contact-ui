@@ -37,7 +37,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.HADOKU_SITE_TOKEN }}
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm --config.store-dir=${{ runner.tool_cache }}/pnpm-store install --frozen-lockfile
         env:
           NODE_AUTH_TOKEN: ${{ secrets.HADOKU_SITE_TOKEN }}
 
@@ -121,7 +121,7 @@ jobs:
             echo "✅ Version bumped: $original_version → $new_version"
 
             # Update lock file
-            pnpm install --lockfile-only
+            pnpm --config.store-dir=${{ runner.tool_cache }}/pnpm-store install --lockfile-only
 
             # Update current_version for any subsequent checks
             current_version="$new_version"
