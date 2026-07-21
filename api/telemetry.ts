@@ -16,8 +16,7 @@ export const EventType = {
   EMAIL_FAILED: 'email_failed',
   APPOINTMENT_BOOKED: 'appt_booked',
   APPOINTMENT_CONFLICT: 'appt_conflict',
-  SUBMISSION_CREATED: 'submit_created',
-  SCHEDULED_RUN: 'scheduled_run'
+  SUBMISSION_CREATED: 'submit_created'
 } as const
 
 export type EventTypeValue = (typeof EventType)[keyof typeof EventType]
@@ -187,14 +186,5 @@ export function logSubmissionCreated(env: TelemetryEnv, recipient: string): void
     severity: Severity.INFO,
     value: 1,
     context: recipient
-  })
-}
-
-export function logScheduledRun(env: TelemetryEnv, taskName: string, success: boolean): void {
-  logEvent(env, {
-    eventType: EventType.SCHEDULED_RUN,
-    severity: success ? Severity.INFO : Severity.ERROR,
-    value: success ? 1 : 0,
-    context: taskName
   })
 }

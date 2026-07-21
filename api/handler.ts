@@ -15,44 +15,42 @@ import { createInboundRoutes } from './routes/inbound'
 import { createAppointmentsRoutes } from './routes/appointments'
 import { archiveOldSubmissions, getDatabaseSize, purgeOldDeletedSubmissions } from './storage'
 import { RETENTION_CONFIG } from './constants'
-import { logDbCapacity, logArchive, logTrashPurge, logScheduledRun } from './telemetry'
+import { logDbCapacity, logArchive, logTrashPurge } from './telemetry'
 import type { AppContext, ContactEnv, ContactHandlerOptions } from './types'
 
 async function handleScheduled(env: ContactEnv): Promise<void> {
   console.log('Running scheduled tasks...')
-  let success = true
 
-  try {
-    const archivedCount = await archiveOldSubmissions(env.DB, RETENTION_CONFIG.ARCHIVE_AFTER_DAYS)
-    console.log(
-      `Archived ${archivedCount} submission(s) older than ${RETENTION_CONFIG.ARCHIVE_AFTER_DAYS} days`
-    )
-    logArchive(env, archivedCount, RETENTION_CONFIG.ARCHIVE_AFTER_DAYS)
+  // Steps throw on failure — the /internal/run-daily route's catch turns that
+  // into a 500 { success: false }, so mgmt-api's dispatch records the
+  // daily-maintenance JobExecution as failed. (Previously this swallowed errors
+  // and logged a local `scheduled_run` breadcrumb, so the route always returned
+  // success and the central record lied.) The execution-log record in
+  // monitoring-api is now the single source of truth — no local breadcrumb.
+  const archivedCount = await archiveOldSubmissions(env.DB, RETENTION_CONFIG.ARCHIVE_AFTER_DAYS)
+  console.log(
+    `Archived ${archivedCount} submission(s) older than ${RETENTION_CONFIG.ARCHIVE_AFTER_DAYS} days`
+  )
+  logArchive(env, archivedCount, RETENTION_CONFIG.ARCHIVE_AFTER_DAYS)
 
-    const purgedCount = await purgeOldDeletedSubmissions(env.DB)
-    console.log(
-      `Purged ${purgedCount} deleted submission(s) older than ${RETENTION_CONFIG.TRASH_RETENTION_DAYS} days`
-    )
-    logTrashPurge(env, purgedCount, RETENTION_CONFIG.TRASH_RETENTION_DAYS)
+  const purgedCount = await purgeOldDeletedSubmissions(env.DB)
+  console.log(
+    `Purged ${purgedCount} deleted submission(s) older than ${RETENTION_CONFIG.TRASH_RETENTION_DAYS} days`
+  )
+  logTrashPurge(env, purgedCount, RETENTION_CONFIG.TRASH_RETENTION_DAYS)
 
-    const dbSize = await getDatabaseSize(env.DB)
-    console.log(
-      `Database capacity: ${dbSize.percentUsed.toFixed(1)}% (${(dbSize.sizeBytes / 1024 / 1024).toFixed(2)} MB)`
-    )
-    logDbCapacity(env, dbSize.percentUsed, dbSize.sizeBytes)
+  const dbSize = await getDatabaseSize(env.DB)
+  console.log(
+    `Database capacity: ${dbSize.percentUsed.toFixed(1)}% (${(dbSize.sizeBytes / 1024 / 1024).toFixed(2)} MB)`
+  )
+  logDbCapacity(env, dbSize.percentUsed, dbSize.sizeBytes)
 
-    if (dbSize.warning) {
-      console.warn('WARNING: Database capacity threshold exceeded!')
-      console.warn('Consider archiving more aggressively or cleaning up old data')
-    }
-
-    console.log('Scheduled tasks completed successfully')
-  } catch (error) {
-    console.error('Error running scheduled tasks:', error)
-    success = false
+  if (dbSize.warning) {
+    console.warn('WARNING: Database capacity threshold exceeded!')
+    console.warn('Consider archiving more aggressively or cleaning up old data')
   }
 
-  logScheduledRun(env, 'daily_maintenance', success)
+  console.log('Scheduled tasks completed successfully')
 }
 
 export function createContactHandler(basePath = '/contact/api', options?: ContactHandlerOptions) {
