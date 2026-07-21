@@ -131,9 +131,9 @@ body {
 }
 
 .contact-alert--error {
-  background-color: var(--color-danger-light);
+  background-color: var(--color-danger-bg);
   border-color: var(--color-danger);
-  color: var(--color-danger-darker);
+  color: var(--color-danger-dark);
 }
 
 /* Form Styles */
@@ -217,7 +217,7 @@ body {
   padding: 0.875rem 2rem;
   font-size: var(--hdk-text-base);
   font-weight: var(--font-weight-bold);
-  color: var(--color-bg);
+  color: var(--color-on-primary);
   background-color: var(--color-primary);
   border: none;
   border-radius: var(--hdk-radius);
@@ -339,9 +339,9 @@ body {
 }
 
 .appointment-picker__clear-btn:hover:not(:disabled) {
-  background-color: var(--color-danger-light);
+  background-color: var(--color-danger-bg);
   border-color: var(--color-danger);
-  color: var(--color-danger);
+  color: var(--color-on-danger-bg);
 }
 
 .appointment-picker__clear-btn:disabled {
@@ -396,12 +396,12 @@ body {
 .duration-pill--selected {
   background-color: var(--color-primary);
   border-color: var(--color-primary);
-  color: var(--color-bg);
+  color: var(--color-on-primary);
   font-weight: var(--font-weight-bold);
 }
 
 .duration-pill--selected:hover:not(:disabled) {
-  color: var(--color-bg);
+  color: var(--color-on-primary);
   background-color: var(--color-primary-dark);
   border-color: var(--color-primary-dark);
 }
@@ -556,20 +556,20 @@ button.react-calendar__tile--active,
 button.react-calendar__tile--active:enabled,
 button.react-calendar__tile--active:hover {
   background-color: var(--color-primary) !important;
-  color: var(--color-bg) !important;
+  color: var(--color-on-primary) !important;
   font-weight: var(--font-weight-bold) !important;
 }
 
 .calendar__tile--now,
 .react-calendar__tile--now {
-  background-color: var(--color-primary-light) !important;
+  background-color: var(--color-primary-bg) !important;
   color: var(--color-text) !important;
   font-weight: var(--font-weight-semibold);
 }
 
 .calendar__tile--now:enabled:hover,
 .react-calendar__tile--now:enabled:hover {
-  background-color: var(--color-primary-light) !important;
+  background-color: var(--color-primary-bg) !important;
   color: var(--color-text) !important;
 }
 
@@ -633,8 +633,8 @@ button.react-calendar__tile--active:hover {
 }
 
 .time-slot-picker__error {
-  color: var(--color-danger);
-  background-color: var(--color-danger-light);
+  color: var(--color-on-danger-bg);
+  background-color: var(--color-danger-bg);
   border: 1px solid var(--color-danger);
 }
 
@@ -675,7 +675,7 @@ button.react-calendar__tile--active:hover {
 
 .time-slot:hover:not(:disabled) {
   border-color: var(--color-primary);
-  background-color: var(--color-primary-light);
+  background-color: var(--color-primary-bg);
   transform: translateY(-2px);
   box-shadow: var(--hdk-shadow-sm);
 }
@@ -683,14 +683,14 @@ button.react-calendar__tile--active:hover {
 .time-slot--selected {
   background-color: var(--color-primary);
   border-color: var(--color-primary);
-  color: var(--color-bg);
+  color: var(--color-on-primary);
   font-weight: var(--font-weight-bold);
 }
 
 .time-slot--selected:hover:not(:disabled) {
   background-color: var(--color-primary-dark);
   border-color: var(--color-primary-dark);
-  color: var(--color-bg);
+  color: var(--color-on-primary);
 }
 
 .time-slot--disabled {
@@ -734,7 +734,7 @@ button.react-calendar__tile--active:hover {
 
 .contact-field-error {
   padding: 0.75rem;
-  background-color: var(--color-danger-light);
+  background-color: var(--color-danger-bg);
   border: 1px solid var(--color-danger);
   border-radius: var(--hdk-radius);
   margin-bottom: 1rem;
@@ -791,29 +791,29 @@ button.react-calendar__tile--active:hover {
 
 .platform-button:hover:not(:disabled) {
   border-color: var(--color-primary);
-  background-color: var(--color-primary-light);
+  background-color: var(--color-primary-bg);
   transform: translateY(-1px);
 }
 
 .platform-button--selected {
   background-color: var(--color-primary);
   border-color: var(--color-primary);
-  color: var(--color-bg);
+  color: var(--color-on-primary);
   font-weight: var(--font-weight-bold);
 }
 
 .platform-button--selected:hover:not(:disabled) {
   background-color: var(--color-primary-dark);
   border-color: var(--color-primary-dark);
-  color: var(--color-bg) !important;
+  color: var(--color-on-primary) !important;
 }
 
 .platform-button--selected .platform-button__label {
-  color: var(--color-bg);
+  color: var(--color-on-primary);
 }
 
 .platform-button--selected .platform-button__icon {
-  color: var(--color-bg);
+  color: var(--color-on-primary);
 }
 
 .platform-button:disabled {

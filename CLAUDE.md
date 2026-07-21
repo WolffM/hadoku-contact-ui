@@ -37,6 +37,19 @@ pnpm lint:fix       # ESLint auto-fix
 pnpm format         # Prettier
 ```
 
+## Colors
+
+All colors come from `@wolffm/themes` (consumed here as raw CSS `var(--color-*)` in `src/styles/index.css`; `entry.tsx` imports `@wolffm/themes/style.css` — this repo does not use Tailwind color classes).
+Read `node_modules/@wolffm/themes/THEME_USAGE_GUIDE.md` before writing styles.
+
+- **A token names a semantic role, not a hue.** Light/dark is automatic — never branch on theme mode or `[data-theme]`.
+- `<f>` ∈ `primary | success | warning | danger | neutral`. Every family has exactly six tokens: `--color-<f>`, `-dark`, `-bg`, `-hover`, `--color-on-<f>`, `--color-on-<f>-bg`. If a name isn't in that shape, it doesn't exist (v3 removed `-light`/`-lighter`/`-darker`/`--color-muted-bg`).
+- **Filled surface** → `background: var(--color-<f>)` + `color: var(--color-on-<f>)`. **Tint badge/banner/alert** → `background: var(--color-<f>-bg)` + `color: var(--color-on-<f>-bg)` (NOT `var(--color-<f>)` as text — it fails AA in most themes). **Body text** → `var(--color-text)`. **Card** → `var(--color-bg-card)`. **Border** → `var(--color-border)`.
+- **Never** `var(--color-x, #hex)` fallbacks (they hide broken tokens) or hex/`white`/`var(--color-bg)` literals as text on a filled background — use `var(--color-on-<f>)`.
+- `entry.tsx` must import `style.css` **unlayered** — `layer(...)` makes every color resolve to nothing.
+- `--color-text-tertiary` / `--color-text-muted` are decorative-only (fail AA on most backgrounds); any text a user must read takes `--color-text` or `--color-text-secondary`.
+- Verify with `pnpm run lint:css` (runs stylelint + `check-usage` from the package). A reference to a token the theme doesn't define renders as nothing — the gate is the only thing that catches it.
+
 ## Version management
 
 - Pre-commit hook auto-bumps patch version when `src/`, `api/`, `package.json`, or build config files change
