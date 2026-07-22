@@ -188,18 +188,31 @@ export async function archiveOldSubmissions(
   const cutoffTime = Date.now() - daysOld * 24 * 60 * 60 * 1000
   const archivedAt = Date.now()
 
-  const copyResult = await db
-    .prepare(
-      `INSERT INTO contact_submissions_archive
+  // The copy-then-delete must be BOTH idempotent and atomic. D1 auto-commits each
+  // statement, so a plain INSERT followed by a separate DELETE can leave rows
+  // copied into the archive but NOT removed from the source if the run is
+  // interrupted between them (dispatch timeout, worker eviction, a later step
+  // throwing). On the next run those rows still satisfy `created_at < cutoff`, the
+  // INSERT re-inserts ids already in the archive, and it dies on the archive's
+  // `id TEXT PRIMARY KEY` — a UNIQUE failure that throws before the DELETE runs, so
+  // the rows never leave the source and every subsequent night fails identically.
+  // (Masked for months by the old error-swallowing handler; the execution-log
+  // unification surfaced it 2026-07.) INSERT OR IGNORE makes the copy idempotent
+  // (an already-archived id is skipped, not an error, so a wedged split-state
+  // self-heals next run); db.batch() runs copy + delete as one transaction so they
+  // can never split again.
+  const [copyResult] = await db.batch([
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO contact_submissions_archive
 			(id, name, email, message, status, created_at, archived_at, ip_address, user_agent, referrer)
 			SELECT id, name, email, message, status, created_at, ?, ip_address, user_agent, referrer
 			FROM contact_submissions
 			WHERE created_at < ?`
-    )
-    .bind(archivedAt, cutoffTime)
-    .run()
-
-  await db.prepare(`DELETE FROM contact_submissions WHERE created_at < ?`).bind(cutoffTime).run()
+      )
+      .bind(archivedAt, cutoffTime),
+    db.prepare(`DELETE FROM contact_submissions WHERE created_at < ?`).bind(cutoffTime)
+  ])
 
   return copyResult.meta?.changes ?? 0
 }
