@@ -1,16 +1,12 @@
-import { useState, FormEvent, ChangeEvent, ReactNode, useRef } from 'react'
+import { useState, FormEvent, ChangeEvent, useRef } from 'react'
 import { format } from 'date-fns'
 import { logger } from '@wolffm/logger/client'
 import AppointmentPicker, { type AppointmentPickerRef } from './components/AppointmentPicker'
 import { submitContactWithAppointment, AppointmentAPIError } from './api/appointments'
 import type { FormData, FormErrors, SubmitStatus, AppointmentSelection } from './types'
 
-interface ContactFormProps {
-  themePicker?: ReactNode
-}
-
-export default function ContactForm({ themePicker }: ContactFormProps) {
-  logger.component('update', 'ContactForm', { hasThemePicker: !!themePicker })
+export default function ContactForm() {
+  logger.component('update', 'ContactForm', {})
   const appointmentPickerRef = useRef<AppointmentPickerRef>(null)
 
   const [formData, setFormData] = useState<FormData>({
@@ -213,12 +209,10 @@ export default function ContactForm({ themePicker }: ContactFormProps) {
 
   return (
     <div className="contact-container">
-      {/* Header */}
+      {/* Form hero — the app-level header bar (title + theme + settings) is
+          rendered above by <AppHeader>; this is the form's own heading. */}
       <div className="contact-header">
-        <div className="contact-header__title-row">
-          <h1 className="contact-title">Get in Touch</h1>
-          {themePicker && <div className="contact-header__theme-picker">{themePicker}</div>}
-        </div>
+        <h1 className="contact-title">Get in Touch</h1>
         <p className="contact-subtitle">
           Have a question or want to work together? Send me a message!
         </p>
