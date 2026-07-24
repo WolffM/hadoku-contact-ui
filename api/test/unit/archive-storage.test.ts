@@ -12,7 +12,7 @@
  */
 import { env } from 'cloudflare:test'
 import { describe, it, expect, beforeEach } from 'vitest'
-import { archiveOldSubmissions } from '../../storage'
+import { archiveOldSubmissions, purgeOldDeletedSubmissions } from '../../storage'
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -119,5 +119,35 @@ describe('archiveOldSubmissions', () => {
     await expect(archiveOldSubmissions(env.DB)).resolves.toBe(0)
     expect(await count('contact_submissions_archive', 'a')).toBe(1)
     expect(await count('contact_submissions_archive', 'b')).toBe(1)
+  })
+})
+
+describe('purgeOldDeletedSubmissions', () => {
+  beforeEach(async () => {
+    await env.DB.prepare('DELETE FROM appointments').run()
+    await env.DB.prepare('DELETE FROM contact_submissions').run()
+  })
+
+  async function seedDeleted(id: string, deletedAt: number): Promise<void> {
+    await env.DB.prepare(
+      `INSERT INTO contact_submissions (id, name, email, message, status, created_at, deleted_at)
+       VALUES (?, 'Name', 'a@example.com', 'hello', 'deleted', ?, ?)`
+    )
+      .bind(id, deletedAt, deletedAt)
+      .run()
+  }
+
+  it('does not purge a soft-deleted submission still referenced by an appointment (FK-safe)', async () => {
+    // Regression: daily-maintenance also runs purge; a deleted submission an
+    // appointment references cannot be hard-deleted (FK), so purge threw FOREIGN
+    // KEY and the job failed even after the archive delete was fixed.
+    const old = Date.now() - 40 * DAY // older than the 7-day trash retention
+    await seedDeleted('del-ref', old)
+    await seedAppointment('appt-2', 'del-ref')
+    await seedDeleted('del-free', old)
+
+    await expect(purgeOldDeletedSubmissions(env.DB)).resolves.toBe(1)
+    expect(await count('contact_submissions', 'del-ref')).toBe(1) // referenced: kept
+    expect(await count('contact_submissions', 'del-free')).toBe(0) // unreferenced: purged
   })
 })

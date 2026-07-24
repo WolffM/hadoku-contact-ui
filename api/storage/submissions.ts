@@ -155,9 +155,16 @@ export async function purgeOldDeletedSubmissions(db: D1Database): Promise<number
   const retentionMs = RETENTION_CONFIG.TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000
   const cutoffTime = Date.now() - retentionMs
 
+  // Same FK guard as archiveOldSubmissions: a soft-deleted submission an
+  // appointment still references cannot be hard-deleted (appointments.submission_id
+  // FK, no ON DELETE) — skip it until that appointment is gone, or the purge throws
+  // FOREIGN KEY constraint and daily-maintenance fails. IS NOT NULL: a NULL in a
+  // NOT IN set voids the predicate.
   const result = await db
     .prepare(
-      `DELETE FROM contact_submissions WHERE status = 'deleted' AND deleted_at IS NOT NULL AND deleted_at < ?`
+      `DELETE FROM contact_submissions
+       WHERE status = 'deleted' AND deleted_at IS NOT NULL AND deleted_at < ?
+         AND id NOT IN (SELECT submission_id FROM appointments WHERE submission_id IS NOT NULL)`
     )
     .bind(cutoffTime)
     .run()
