@@ -201,6 +201,17 @@ export async function archiveOldSubmissions(
   // (an already-archived id is skipped, not an error, so a wedged split-state
   // self-heals next run); db.batch() runs copy + delete as one transaction so they
   // can never split again.
+  //
+  // `appointments.submission_id` is a FK -> contact_submissions(id) with no ON DELETE
+  // clause, so deleting an old submission a booked appointment still references fails
+  // with FOREIGN KEY constraint. (The old code never hit this — it died at the INSERT
+  // above first; fixing that surfaced the delete.) Exclude referenced submissions from
+  // BOTH the copy and the delete: a submission an appointment points at is still in
+  // use, so it stays active until that appointment is gone — never orphaned, never
+  // half-archived. The `IS NOT NULL` guard is required: a NULL in a NOT IN set makes
+  // the whole predicate unknown (nothing matches).
+  const notReferenced =
+    'id NOT IN (SELECT submission_id FROM appointments WHERE submission_id IS NOT NULL)'
   const [copyResult] = await db.batch([
     db
       .prepare(
@@ -208,10 +219,12 @@ export async function archiveOldSubmissions(
 			(id, name, email, message, status, created_at, archived_at, ip_address, user_agent, referrer)
 			SELECT id, name, email, message, status, created_at, ?, ip_address, user_agent, referrer
 			FROM contact_submissions
-			WHERE created_at < ?`
+			WHERE created_at < ? AND ${notReferenced}`
       )
       .bind(archivedAt, cutoffTime),
-    db.prepare(`DELETE FROM contact_submissions WHERE created_at < ?`).bind(cutoffTime)
+    db
+      .prepare(`DELETE FROM contact_submissions WHERE created_at < ? AND ${notReferenced}`)
+      .bind(cutoffTime)
   ])
 
   return copyResult.meta?.changes ?? 0

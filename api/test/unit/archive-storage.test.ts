@@ -25,6 +25,16 @@ async function seedActive(id: string, createdAt: number): Promise<void> {
     .run()
 }
 
+async function seedAppointment(id: string, submissionId: string): Promise<void> {
+  await env.DB.prepare(
+    `INSERT INTO appointments
+       (id, submission_id, name, email, slot_id, date, start_time, end_time, duration, timezone, platform, created_at, updated_at)
+     VALUES (?, ?, 'A', 'a@example.com', ?, '2026-05-01', '2026-05-01T10:00:00Z', '2026-05-01T10:30:00Z', 30, 'UTC', 'discord', ?, ?)`
+  )
+    .bind(id, submissionId, `slot-${id}`, Date.now(), Date.now())
+    .run()
+}
+
 async function count(table: string, id: string): Promise<number> {
   const row = await env.DB.prepare(`SELECT COUNT(*) AS c FROM ${table} WHERE id = ?`)
     .bind(id)
@@ -34,6 +44,8 @@ async function count(table: string, id: string): Promise<number> {
 
 describe('archiveOldSubmissions', () => {
   beforeEach(async () => {
+    // appointments FK -> contact_submissions, so clear children first
+    await env.DB.prepare('DELETE FROM appointments').run()
     await env.DB.prepare('DELETE FROM contact_submissions').run()
     await env.DB.prepare('DELETE FROM contact_submissions_archive').run()
   })
@@ -51,6 +63,27 @@ describe('archiveOldSubmissions', () => {
     expect(await count('contact_submissions_archive', 'old-1')).toBe(1) // into archive
     expect(await count('contact_submissions', 'recent-1')).toBe(1) // recent untouched
     expect(await count('contact_submissions_archive', 'recent-1')).toBe(0)
+  })
+
+  it('does not archive/delete an old submission still referenced by an appointment (FK-safe)', async () => {
+    // Regression for the FOREIGN KEY constraint failure the idempotency fix
+    // surfaced: appointments.submission_id -> contact_submissions(id) with no
+    // ON DELETE, so deleting a referenced old submission throws. A referenced
+    // submission is still in use — it must stay active, not be archived.
+    const old = Date.now() - 40 * DAY
+    await seedActive('ref-1', old)
+    await seedAppointment('appt-1', 'ref-1')
+    await seedActive('free-1', old)
+
+    // Must NOT throw, and must archive only the unreferenced old submission.
+    await expect(archiveOldSubmissions(env.DB)).resolves.toBe(1)
+
+    // Referenced submission: stays active, NOT archived (integrity preserved).
+    expect(await count('contact_submissions', 'ref-1')).toBe(1)
+    expect(await count('contact_submissions_archive', 'ref-1')).toBe(0)
+    // Unreferenced old submission: archived + removed as normal.
+    expect(await count('contact_submissions', 'free-1')).toBe(0)
+    expect(await count('contact_submissions_archive', 'free-1')).toBe(1)
   })
 
   it('self-heals a wedged split-state instead of throwing (the production bug)', async () => {
