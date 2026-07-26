@@ -4,7 +4,7 @@
  * Part of the hadoku centralized auth channel: edge-router (hadoku.me)
  * resolves the caller's tier once and stamps every proxied request with
  * `X-Edge-Auth` (provenance) + `X-Hadoku-Tier`. This worker trusts that stamp
- * instead of re-validating ADMIN_KEYS/FRIEND_KEYS.
+ * instead of resolving the caller's key itself.
  *
  * Was an inlined copy of `validateKeyAndGetType` + `createHadokuAuth` (the
  * duplicated key-validation that the auth-channel consolidation removes).

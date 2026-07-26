@@ -9,10 +9,6 @@ export interface ContactEnv {
   ANALYTICS_ENGINE?: AnalyticsEngineDataset
   // Edge provenance secret — createEdgeAuth verifies inbound X-Edge-Auth.
   EDGE_AUTH_SECRET?: string
-  // ADMIN_KEYS/FRIEND_KEYS no longer read inbound (createEdgeAuth replaced the
-  // inlined key validation). Kept until Step 5 prunes them from CF secrets.
-  ADMIN_KEYS?: string
-  FRIEND_KEYS?: string
   EMAIL_PROVIDER?: string
   RESEND_API_KEY?: string
   RESEND_WEBHOOK_SECRET?: string

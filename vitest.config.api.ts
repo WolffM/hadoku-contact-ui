@@ -17,10 +17,6 @@ export default defineWorkersConfig({
             // Edge-auth: tests authenticate the way edge-router stamps
             // requests (X-Edge-Auth + X-Hadoku-Tier), not X-User-Key.
             EDGE_AUTH_SECRET: 'test-edge-secret',
-            // ADMIN_KEYS/FRIEND_KEYS retained but no longer read inbound
-            // (createEdgeAuth replaced the inlined key validation).
-            ADMIN_KEYS: '["test-admin-key"]',
-            FRIEND_KEYS: '["test-friend-key"]',
             RESEND_API_KEY: 'test-resend-key',
             // Google OAuth fakes — present so createGoogleMeetEvent makes
             // real HTTP calls (intercepted via fetchMock) instead of bailing

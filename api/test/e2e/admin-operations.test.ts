@@ -15,7 +15,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 const ADMIN_HEADERS = {
   'Content-Type': 'application/json',
   // Edge-auth: edge-router stamps these on proxied requests; the worker
-  // trusts the tier (was X-User-Key validated against ADMIN_KEYS).
+  // trusts the tier (was an X-User-Key validated in-worker).
   'X-Edge-Auth': 'test-edge-secret',
   'X-Hadoku-Tier': 'admin'
 }
