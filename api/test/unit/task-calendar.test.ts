@@ -116,8 +116,17 @@ describe('pushAppointmentToCalendar', () => {
     fetchMock.deactivate()
   })
 
-  it('skips (no fetch) when CONTACT_SYNC_KEY is unset', async () => {
+  it('skips (no fetch) when CONTACTUI_SERVICE_KEY is unset', async () => {
     const result = await pushAppointmentToCalendar(SAMPLE, {})
+    expect(result).toEqual({ ok: false, skipped: true })
+  })
+
+  it('skips (no fetch) when TASK_CALENDAR_BOARD is unset', async () => {
+    // Without the handle the write would land on this worker's OWN default
+    // board instead of the owner's, silently. Refuse rather than mis-file.
+    const result = await pushAppointmentToCalendar(SAMPLE, {
+      CONTACTUI_SERVICE_KEY: 'contactui-key-uuid'
+    })
     expect(result).toEqual({ ok: false, skipped: true })
   })
 
@@ -137,14 +146,19 @@ describe('pushAppointmentToCalendar', () => {
       })
 
     const result = await pushAppointmentToCalendar(SAMPLE, {
-      CONTACT_SYNC_KEY: 'owner-key-uuid',
+      CONTACTUI_SERVICE_KEY: 'contactui-key-uuid',
+      TASK_CALENDAR_BOARD: 'MRY93H8LG7ZCSK998165RCUBHW',
       TASK_API_URL: 'https://task.test/api'
     })
 
     expect(result.ok).toBe(true)
     expect(result.taskId).toBe('contact-appt-123')
-    expect(sentKey).toBe('owner-key-uuid')
+    // We authenticate as OURSELVES, not as the calendar owner.
+    expect(sentKey).toBe('contactui-key-uuid')
     expect((sentBody as { id: string }).id).toBe('contact-appt-123')
+    // ...and address the owner's board by handle, which is what routes the
+    // write out of our namespace and into theirs via the share grant.
+    expect((sentBody as { boardId: string }).boardId).toBe('MRY93H8LG7ZCSK998165RCUBHW')
   })
 
   it('resolves with ok:false on a non-2xx response (never throws)', async () => {
@@ -154,7 +168,8 @@ describe('pushAppointmentToCalendar', () => {
       .reply(403, 'forbidden')
 
     const result = await pushAppointmentToCalendar(SAMPLE, {
-      CONTACT_SYNC_KEY: 'owner-key-uuid',
+      CONTACTUI_SERVICE_KEY: 'contactui-key-uuid',
+      TASK_CALENDAR_BOARD: 'MRY93H8LG7ZCSK998165RCUBHW',
       TASK_API_URL: 'https://task.test/api'
     })
 

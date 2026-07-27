@@ -5,15 +5,26 @@
  * Tasks, ONCE at creation time. task-api is the source of truth after that — we
  * never re-push or sync, so the owner's local edits always win.
  *
- * Two event sources, one contract and one key:
+ * Two event sources, one contract:
  *   - appointments (booked meetings)  → timed events,   source "contact"
  *   - admin outbound mail             → all-day events,  source "admin-mail"
  *
- * Routing: we POST to the task-api create endpoint over the public edge with
- * `X-User-Key: <CONTACT_SYNC_KEY>`. task-api scopes storage by that credential,
- * so events land in the calendar belonging to that key/identity. The key is a
- * registered key (admin tier) read from the vault; edge-router authorizes
- * /task/api/* and stamps X-Edge-Auth + X-Hadoku-Tier for us.
+ * Routing: we POST to the task-api create endpoint over the public edge as
+ * OURSELVES (`X-User-Key: <CONTACTUI_SERVICE_KEY>`, this worker's own
+ * service-tier identity) and address the owner's calendar by its shared-board
+ * HANDLE. task-api resolves the handle against `board_shares`, confirms this
+ * caller is a grantee, and writes into the OWNER's rows.
+ *
+ * This replaced a dedicated `CONTACT_SYNC_KEY` (2026-07-26). That key existed
+ * only because the create endpoint had no way to address someone else's board:
+ * storage followed the presented credential, so mirroring into the owner's
+ * calendar meant BEING the owner — which is why a contact form worker ended up
+ * holding an admin-tier credential. Shared boards removed the reason, so the
+ * key was deleted rather than downgraded.
+ *
+ * A shared board is addressable ONLY by handle: a plain slug always resolves
+ * inside the caller's own namespace (that is the security invariant in
+ * board-sharing.ts), so `TASK_CALENDAR_BOARD` must be the handle, not "main".
  */
 
 import type { StoredAppointment } from '../storage/appointments'
@@ -23,10 +34,16 @@ import type { StoredSubmission } from '../storage/submissions'
 const DEFAULT_TASK_API_URL = 'https://hadoku.me/task/api'
 
 export interface TaskCalendarEnv {
-  // Registered key (admin tier) identifying the calendar owner. Sent verbatim
-  // as X-User-Key. When unset, the push is skipped so the originating action
-  // still succeeds (calendar mirroring is best-effort, never load-bearing).
-  CONTACT_SYNC_KEY?: string
+  // This worker's OWN service-tier key, sent as X-User-Key. It needs no special
+  // tier — only a board_shares grant from the calendar owner. When unset the
+  // push is skipped so the originating action still succeeds (calendar
+  // mirroring is best-effort, never load-bearing).
+  CONTACTUI_SERVICE_KEY?: string
+  // Handle of the owner's calendar board, shared with us as contributor. MUST be
+  // the handle (e.g. MRY93H8LG7ZCSK998165RCUBHW), never a slug like "main" —
+  // slugs resolve inside the caller's own namespace, so a slug here would
+  // silently mirror into this worker's own empty board instead of the owner's.
+  TASK_CALENDAR_BOARD?: string
   // Override for the create endpoint (tests / local). Defaults to the edge route.
   TASK_API_URL?: string
 }
@@ -123,9 +140,14 @@ export async function postTaskToCalendar(
   body: Record<string, unknown>,
   env: TaskCalendarEnv
 ): Promise<CalendarPushResult> {
-  const key = env.CONTACT_SYNC_KEY
+  const key = env.CONTACTUI_SERVICE_KEY
   if (!key) {
-    console.warn('[task-calendar] CONTACT_SYNC_KEY not set; skipping calendar push')
+    console.warn('[task-calendar] CONTACTUI_SERVICE_KEY not set; skipping calendar push')
+    return { ok: false, skipped: true }
+  }
+  const board = env.TASK_CALENDAR_BOARD
+  if (!board) {
+    console.warn('[task-calendar] TASK_CALENDAR_BOARD not set; skipping calendar push')
     return { ok: false, skipped: true }
   }
 
@@ -139,7 +161,8 @@ export async function postTaskToCalendar(
         'Content-Type': 'application/json',
         'X-User-Key': key
       },
-      body: JSON.stringify(body)
+      // The handle routes the write to the owner's board via their share grant.
+      body: JSON.stringify({ ...body, boardId: board })
     })
 
     if (!res.ok) {
