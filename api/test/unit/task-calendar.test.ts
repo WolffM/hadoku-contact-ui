@@ -10,7 +10,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import {
   buildTaskFromAppointment,
   buildTaskFromMail,
-  pushAppointmentToCalendar
+  pushAppointmentToCalendar,
+  __resetCalendarBoardCache
 } from '../../services/task-calendar'
 import type { StoredAppointment } from '../../storage/appointments'
 import type { StoredSubmission } from '../../storage/submissions'
@@ -121,11 +122,65 @@ describe('pushAppointmentToCalendar', () => {
     expect(result).toEqual({ ok: false, skipped: true })
   })
 
-  it('skips (no fetch) when TASK_CALENDAR_BOARD is unset', async () => {
-    // Without the handle the write would land on this worker's OWN default
-    // board instead of the owner's, silently. Refuse rather than mis-file.
+  it('discovers the shared board from GET /boards, ignoring our own boards', async () => {
+    __resetCalendarBoardCache()
+    let sentBoard: string | undefined
+    fetchMock
+      .get('https://task.test')
+      .intercept({ path: '/api/boards', method: 'GET' })
+      .reply(200, {
+        boards: [
+          // Our own board, also called "main" — selecting by display name would
+          // pick this and mirror into an empty board of ours.
+          { id: 'main', name: 'main', access: 'owner' },
+          { id: 'HANDLE-SHARED-WITH-US', name: 'main', access: 'contributor' }
+        ]
+      })
+    fetchMock
+      .get('https://task.test')
+      .intercept({ path: '/api', method: 'POST' })
+      .reply(200, (opts: { body: string }) => {
+        sentBoard = (JSON.parse(opts.body) as { boardId: string }).boardId
+        return { ok: true, id: 'contact-appt-123', version: 1 }
+      })
+
     const result = await pushAppointmentToCalendar(SAMPLE, {
-      CONTACTUI_SERVICE_KEY: 'contactui-key-uuid'
+      CONTACTUI_SERVICE_KEY: 'contactui-key-uuid',
+      TASK_API_URL: 'https://task.test/api'
+    })
+    expect(result.ok).toBe(true)
+    expect(sentBoard).toBe('HANDLE-SHARED-WITH-US')
+  })
+
+  it('skips when no board is shared with us', async () => {
+    __resetCalendarBoardCache()
+    fetchMock
+      .get('https://task.test')
+      .intercept({ path: '/api/boards', method: 'GET' })
+      .reply(200, { boards: [{ id: 'main', name: 'main', access: 'owner' }] })
+
+    const result = await pushAppointmentToCalendar(SAMPLE, {
+      CONTACTUI_SERVICE_KEY: 'contactui-key-uuid',
+      TASK_API_URL: 'https://task.test/api'
+    })
+    expect(result).toEqual({ ok: false, skipped: true })
+  })
+
+  it('refuses (never guesses) when several boards are shared with us', async () => {
+    __resetCalendarBoardCache()
+    fetchMock
+      .get('https://task.test')
+      .intercept({ path: '/api/boards', method: 'GET' })
+      .reply(200, {
+        boards: [
+          { id: 'HANDLE-A', access: 'contributor' },
+          { id: 'HANDLE-B', access: 'contributor' }
+        ]
+      })
+
+    const result = await pushAppointmentToCalendar(SAMPLE, {
+      CONTACTUI_SERVICE_KEY: 'contactui-key-uuid',
+      TASK_API_URL: 'https://task.test/api'
     })
     expect(result).toEqual({ ok: false, skipped: true })
   })

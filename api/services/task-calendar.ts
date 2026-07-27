@@ -11,9 +11,9 @@
  *
  * Routing: we POST to the task-api create endpoint over the public edge as
  * OURSELVES (`X-User-Key: <CONTACTUI_SERVICE_KEY>`, this worker's own
- * service-tier identity) and address the owner's calendar by its shared-board
- * HANDLE. task-api resolves the handle against `board_shares`, confirms this
- * caller is a grantee, and writes into the OWNER's rows.
+ * service-tier identity). The target board is DISCOVERED, not configured: we
+ * ask task-api which boards we can see and take the one shared with us.
+ * task-api then confirms the grant and writes into the OWNER's rows.
  *
  * This replaced a dedicated `CONTACT_SYNC_KEY` (2026-07-26). That key existed
  * only because the create endpoint had no way to address someone else's board:
@@ -22,9 +22,13 @@
  * holding an admin-tier credential. Shared boards removed the reason, so the
  * key was deleted rather than downgraded.
  *
- * A shared board is addressable ONLY by handle: a plain slug always resolves
- * inside the caller's own namespace (that is the security invariant in
- * board-sharing.ts), so `TASK_CALENDAR_BOARD` must be the handle, not "main".
+ * Why discovery rather than a configured board id: a shared board is
+ * addressable only by its globally-unique handle — a plain name like "main"
+ * resolves to OUR OWN board of that name, so a human-readable value in config
+ * would silently mirror into an empty board of ours and read as a typo rather
+ * than a routing bug. Rather than pin an opaque handle in config and hope it
+ * stays correct, we read it from `GET /boards`, where a shared board's `id` IS
+ * its handle. Selection is by the `access` field, never by display name.
  */
 
 import type { StoredAppointment } from '../storage/appointments'
@@ -39,10 +43,8 @@ export interface TaskCalendarEnv {
   // push is skipped so the originating action still succeeds (calendar
   // mirroring is best-effort, never load-bearing).
   CONTACTUI_SERVICE_KEY?: string
-  // Handle of the owner's calendar board, shared with us as contributor. MUST be
-  // the handle (e.g. MRY93H8LG7ZCSK998165RCUBHW), never a slug like "main" —
-  // slugs resolve inside the caller's own namespace, so a slug here would
-  // silently mirror into this worker's own empty board instead of the owner's.
+  // Optional tiebreak, only needed if more than one board is ever shared with
+  // this worker. Normally unset — the board is discovered.
   TASK_CALENDAR_BOARD?: string
   // Override for the create endpoint (tests / local). Defaults to the edge route.
   TASK_API_URL?: string
@@ -131,6 +133,75 @@ export function buildTaskFromMail(
 }
 
 /**
+ * Board reference to write into: the one board SHARED with this worker.
+ *
+ * `GET /boards` returns every board this caller can see, and a shared board's
+ * `id` is its globally-unique handle (task-api routes that to the owner), with
+ * `access` set to the grant level — 'owner' means it is our own board. So the
+ * selection is: not-owner. Never match on display name; two accounts can both
+ * have a "main", which is exactly how a mirror ends up in the wrong calendar.
+ *
+ * Cached per isolate after the first success. The grant changes about never,
+ * and a fetch per appointment would add a round-trip to a best-effort path.
+ * A failure is not cached, so a transient error self-heals on the next push.
+ */
+let cachedBoardRef: string | null = null
+
+interface BoardSummary {
+  id?: unknown
+  access?: unknown
+  name?: unknown
+}
+
+export async function resolveCalendarBoard(
+  env: TaskCalendarEnv,
+  key: string
+): Promise<string | null> {
+  if (env.TASK_CALENDAR_BOARD) return env.TASK_CALENDAR_BOARD
+  if (cachedBoardRef) return cachedBoardRef
+
+  const base = env.TASK_API_URL || DEFAULT_TASK_API_URL
+  try {
+    const res = await fetch(`${base}/boards`, { headers: { 'X-User-Key': key } })
+    if (!res.ok) {
+      console.error(`[task-calendar] board discovery failed (HTTP ${res.status})`)
+      return null
+    }
+    const body = (await res.json()) as { boards?: BoardSummary[] }
+    const shared = (body.boards ?? []).filter(
+      b => typeof b.access === 'string' && b.access !== 'owner' && typeof b.id === 'string'
+    )
+    if (shared.length === 0) {
+      console.warn(
+        '[task-calendar] no board is shared with this worker; skipping calendar push. ' +
+          'The calendar owner must share their board with us as contributor.'
+      )
+      return null
+    }
+    if (shared.length > 1) {
+      // Refuse rather than guess: picking the wrong one writes a private
+      // appointment into somebody else's calendar.
+      console.error(
+        `[task-calendar] ${shared.length} boards are shared with this worker ` +
+          `(${shared.map(b => String(b.id)).join(', ')}); set TASK_CALENDAR_BOARD to disambiguate`
+      )
+      return null
+    }
+    cachedBoardRef = String(shared[0].id)
+    console.log(`[task-calendar] using shared board ${cachedBoardRef}`)
+    return cachedBoardRef
+  } catch (err) {
+    console.error('[task-calendar] board discovery errored:', err)
+    return null
+  }
+}
+
+/** Test seam — drop the memoised board so a spec can re-drive discovery. */
+export function __resetCalendarBoardCache(): void {
+  cachedBoardRef = null
+}
+
+/**
  * POST a pre-built CreateTaskInput body to the owner's task calendar. Resolves
  * (never rejects) — a calendar failure must not fail the action it mirrors.
  * Best-effort: callers typically hand the returned promise to
@@ -145,11 +216,8 @@ export async function postTaskToCalendar(
     console.warn('[task-calendar] CONTACTUI_SERVICE_KEY not set; skipping calendar push')
     return { ok: false, skipped: true }
   }
-  const board = env.TASK_CALENDAR_BOARD
-  if (!board) {
-    console.warn('[task-calendar] TASK_CALENDAR_BOARD not set; skipping calendar push')
-    return { ok: false, skipped: true }
-  }
+  const board = await resolveCalendarBoard(env, key)
+  if (!board) return { ok: false, skipped: true }
 
   const url = env.TASK_API_URL || DEFAULT_TASK_API_URL
   const id = String(body.id)
