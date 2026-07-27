@@ -1,9 +1,10 @@
 /**
  * Unit tests for the task-calendar bridge.
  *
- * Covers the deterministic body mapping plus the three push outcomes:
- * skipped (no key), success, and a non-2xx response — all of which must
- * resolve (never throw) so a calendar failure can't fail the booking.
+ * Covers the deterministic body mapping plus the push outcomes: skipped (no
+ * key), success, and a non-2xx response — all of which must resolve (never
+ * throw) so a calendar failure can't fail the booking. The delete path carries
+ * the same discipline, plus idempotency: a 404 is a no-op success.
  */
 import { fetchMock } from 'cloudflare:test'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
@@ -11,6 +12,8 @@ import {
   buildTaskFromAppointment,
   buildTaskFromMail,
   pushAppointmentToCalendar,
+  removeAppointmentFromCalendar,
+  removeMailFromCalendar,
   __resetCalendarBoardCache
 } from '../../services/task-calendar'
 import type { StoredAppointment } from '../../storage/appointments'
@@ -230,5 +233,125 @@ describe('pushAppointmentToCalendar', () => {
 
     expect(result.ok).toBe(false)
     expect(result.status).toBe(403)
+  })
+})
+
+describe('removing a mirrored event', () => {
+  const ENV = {
+    CONTACTUI_SERVICE_KEY: 'contactui-key-uuid',
+    TASK_CALENDAR_BOARD: 'MRY93H8LG7ZCSK998165RCUBHW',
+    TASK_API_URL: 'https://task.test/api'
+  }
+
+  beforeEach(() => {
+    fetchMock.activate()
+    fetchMock.disableNetConnect()
+  })
+
+  afterEach(() => {
+    fetchMock.assertNoPendingInterceptors()
+    fetchMock.deactivate()
+  })
+
+  it('skips (no fetch) when CONTACTUI_SERVICE_KEY is unset', async () => {
+    const result = await removeAppointmentFromCalendar('appt-123', {})
+    expect(result).toEqual({ ok: false, skipped: true })
+  })
+
+  it('DELETEs the deterministic task id with the board as a QUERY param', async () => {
+    let sentKey: string | undefined
+    fetchMock
+      .get('https://task.test')
+      .intercept({
+        path: '/api/contact-appt-123',
+        query: { boardId: 'MRY93H8LG7ZCSK998165RCUBHW' },
+        method: 'DELETE'
+      })
+      .reply(200, (opts: { headers: Record<string, string> }) => {
+        sentKey = opts.headers['x-user-key']
+        return { ok: true, message: 'Task contact-appt-123 deleted' }
+      })
+
+    // Same id the create path built for this appointment.
+    expect(buildTaskFromAppointment(SAMPLE).id).toBe('contact-appt-123')
+
+    const result = await removeAppointmentFromCalendar(SAMPLE.id, ENV)
+    expect(result.ok).toBe(true)
+    expect(result.taskId).toBe('contact-appt-123')
+    // We authenticate as OURSELVES here too — the contributor grant covers delete.
+    expect(sentKey).toBe('contactui-key-uuid')
+  })
+
+  it('treats an already-absent task (404) as a no-op success', async () => {
+    fetchMock
+      .get('https://task.test')
+      .intercept({
+        path: '/api/admin-mail-sub-789',
+        query: { boardId: 'MRY93H8LG7ZCSK998165RCUBHW' },
+        method: 'DELETE'
+      })
+      .reply(404, { error: 'Task admin-mail-sub-789 not found', code: 'TASK_NOT_FOUND' })
+
+    const result = await removeMailFromCalendar(SAMPLE_MAIL.id, ENV)
+    expect(result.ok).toBe(true)
+    expect(result.status).toBe(404)
+  })
+
+  it('does NOT swallow a BOARD_NOT_FOUND 404 — a revoked share must surface', async () => {
+    fetchMock
+      .get('https://task.test')
+      .intercept({
+        path: '/api/contact-appt-123',
+        query: { boardId: 'MRY93H8LG7ZCSK998165RCUBHW' },
+        method: 'DELETE'
+      })
+      .reply(404, { error: 'Board ... not found', code: 'BOARD_NOT_FOUND' })
+
+    const result = await removeAppointmentFromCalendar(SAMPLE.id, ENV)
+    expect(result.ok).toBe(false)
+    expect(result.status).toBe(404)
+  })
+
+  it('resolves with ok:false on a non-2xx response (never throws)', async () => {
+    fetchMock
+      .get('https://task.test')
+      .intercept({
+        path: '/api/contact-appt-123',
+        query: { boardId: 'MRY93H8LG7ZCSK998165RCUBHW' },
+        method: 'DELETE'
+      })
+      .reply(403, 'forbidden')
+
+    const result = await removeAppointmentFromCalendar(SAMPLE.id, ENV)
+    expect(result.ok).toBe(false)
+    expect(result.status).toBe(403)
+  })
+
+  it('addresses the SAME discovered board the create path uses', async () => {
+    __resetCalendarBoardCache()
+    fetchMock
+      .get('https://task.test')
+      .intercept({ path: '/api/boards', method: 'GET' })
+      .reply(200, {
+        boards: [
+          { id: 'main', name: 'main', access: 'owner' },
+          { id: 'HANDLE-SHARED-WITH-US', name: 'main', access: 'contributor' }
+        ]
+      })
+    fetchMock
+      .get('https://task.test')
+      .intercept({
+        path: '/api/contact-appt-123',
+        query: { boardId: 'HANDLE-SHARED-WITH-US' },
+        method: 'DELETE'
+      })
+      .reply(200, { ok: true, message: 'deleted' })
+
+    const result = await removeAppointmentFromCalendar(SAMPLE.id, {
+      CONTACTUI_SERVICE_KEY: 'contactui-key-uuid',
+      TASK_API_URL: 'https://task.test/api'
+    })
+    expect(result.ok).toBe(true)
+    __resetCalendarBoardCache()
   })
 })

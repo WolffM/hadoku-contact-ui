@@ -2,18 +2,25 @@
  * Task-calendar bridge
  *
  * Writes contact-api events into the owner's unified hadoku task calendar as
- * Tasks, ONCE at creation time. task-api is the source of truth after that — we
- * never re-push or sync, so the owner's local edits always win.
+ * Tasks, ONCE at creation time, and removes them again when the underlying
+ * record goes away (an appointment is cancelled, an admin mail record is
+ * trashed). In between, task-api is the source of truth — we never re-push or
+ * re-sync, so the owner's local edits always win.
  *
  * Two event sources, one contract:
  *   - appointments (booked meetings)  → timed events,   source "contact"
  *   - admin outbound mail             → all-day events,  source "admin-mail"
  *
- * Routing: we POST to the task-api create endpoint over the public edge as
- * OURSELVES (`X-User-Key: <CONTACTUI_SERVICE_KEY>`, this worker's own
- * service-tier identity). The target board is DISCOVERED, not configured: we
- * ask task-api which boards we can see and take the one shared with us.
- * task-api then confirms the grant and writes into the OWNER's rows.
+ * Routing: we call task-api over the public edge as OURSELVES (`X-User-Key:
+ * <CONTACTUI_SERVICE_KEY>`, this worker's own service-tier identity). The target
+ * board is DISCOVERED, not configured: we ask task-api which boards we can see
+ * and take the one shared with us. task-api then confirms the grant and writes
+ * into the OWNER's rows. A contributor grant covers both create and delete —
+ * task-api refuses only 'readonly' — so removal needs no extra privilege.
+ *
+ * Mind the board-ref asymmetry in task-api's surface: create takes `boardId` in
+ * the BODY, delete takes it as a QUERY param. Both go through
+ * resolveCalendarBoard() so the two paths can never address different boards.
  *
  * This replaced a dedicated `CONTACT_SYNC_KEY` (2026-07-26). That key existed
  * only because the create endpoint had no way to address someone else's board:
@@ -67,18 +74,28 @@ function toUtcDate(epochMs: number): string {
   return new Date(epochMs).toISOString().slice(0, 10)
 }
 
+export const MAIL_SOURCE = 'admin-mail'
+export const APPOINTMENT_SOURCE = 'contact'
+
 /**
- * Map a booked appointment onto a task-api CreateTaskInput body (timed event).
+ * The mirrored task's id: DETERMINISTIC, derived from the source record, so an
+ * accidental re-send upserts the same task instead of duplicating it — and so a
+ * later removal can address the task without storing a mapping anywhere.
  *
- * The id is DETERMINISTIC (`<source>-<appointmentId>`) so an accidental re-send
- * upserts the same task instead of duplicating it.
+ * Every create and every delete goes through this; nothing else should build the
+ * id by hand.
  */
+export function calendarTaskId(source: string, recordId: string): string {
+  return `${source}-${recordId}`
+}
+
+/** Map a booked appointment onto a task-api CreateTaskInput body (timed event). */
 export function buildTaskFromAppointment(
   appt: StoredAppointment,
-  source = 'contact'
+  source = APPOINTMENT_SOURCE
 ): Record<string, unknown> {
   return {
-    id: `${source}-${appt.id}`,
+    id: calendarTaskId(source, appt.id),
     title: `Meeting: ${appt.name}`,
     startTime: appt.start_time,
     endTime: appt.end_time,
@@ -110,9 +127,9 @@ export function buildTaskFromMail(
   sub: StoredSubmission,
   opts: { source?: string; sentBy?: string } = {}
 ): Record<string, unknown> {
-  const source = opts.source ?? 'admin-mail'
+  const source = opts.source ?? MAIL_SOURCE
   return {
-    id: `${source}-${sub.id}`,
+    id: calendarTaskId(source, sub.id),
     // `name` carries the email subject for outbound admin mail.
     title: `Mail: ${sub.name}`,
     date: toUtcDate(sub.created_at),
@@ -249,11 +266,98 @@ export async function postTaskToCalendar(
   }
 }
 
+/**
+ * task-api error bodies carry a machine-readable `code` alongside the message.
+ * Returns null for anything that isn't one — a plain-text 404 from the edge is
+ * not a domain error and must not be mistaken for one.
+ */
+function domainErrorCode(body: string): string | null {
+  try {
+    const parsed = JSON.parse(body) as { code?: unknown }
+    return typeof parsed.code === 'string' ? parsed.code : null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * DELETE a mirrored task from the owner's calendar. Same failure discipline as
+ * the create path: resolves (never rejects), so a mirror that can't be updated
+ * never fails the cancellation that triggered it.
+ *
+ * Idempotent by design. task-api answers 404 / TASK_NOT_FOUND when the task is
+ * already gone — the owner deleted it by hand, the create was skipped, or this
+ * ran twice — and that is a no-op SUCCESS, not an error. The mirror is
+ * best-effort in both directions; "not there" is the state we wanted.
+ *
+ * Only that code, though: task-api also 404s with BOARD_NOT_FOUND when the share
+ * grant is gone, and treating THAT as success would let a silently broken mirror
+ * look healthy forever.
+ *
+ * Note the board ref goes in the query string here, unlike the create body.
+ */
+export async function deleteTaskFromCalendar(
+  taskId: string,
+  env: TaskCalendarEnv
+): Promise<CalendarPushResult> {
+  const key = env.CONTACTUI_SERVICE_KEY
+  if (!key) {
+    console.warn('[task-calendar] CONTACTUI_SERVICE_KEY not set; skipping calendar delete')
+    return { ok: false, skipped: true }
+  }
+  const board = await resolveCalendarBoard(env, key)
+  if (!board) return { ok: false, skipped: true }
+
+  const base = env.TASK_API_URL || DEFAULT_TASK_API_URL
+  const url = `${base}/${encodeURIComponent(taskId)}?boardId=${encodeURIComponent(board)}`
+
+  try {
+    const res = await fetch(url, { method: 'DELETE', headers: { 'X-User-Key': key } })
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      if (res.status === 404 && domainErrorCode(text) === 'TASK_NOT_FOUND') {
+        console.log(`[task-calendar] task ${taskId} already absent; delete is a no-op`)
+        return { ok: true, status: 404, taskId }
+      }
+      console.error(
+        `[task-calendar] delete failed (HTTP ${res.status}) for ${taskId}: ${text.slice(0, 300)}`
+      )
+      return { ok: false, status: res.status, error: text.slice(0, 300) }
+    }
+
+    console.log(`[task-calendar] deleted task ${taskId}`)
+    return { ok: true, status: res.status, taskId }
+  } catch (err) {
+    console.error(`[task-calendar] delete errored for ${taskId}:`, err)
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/**
+ * Hand a best-effort mirror to the platform so it outlives the response.
+ *
+ * `c.executionCtx` THROWS when the request has no execution context (tests, some
+ * dispatch paths), so the property access itself has to sit inside the try. The
+ * mirror already swallows its own errors, so letting it run unawaited there is
+ * safe — the worst case is that it doesn't finish.
+ */
+export function mirrorInBackground(
+  ctx: { executionCtx: { waitUntil(promise: Promise<unknown>): void } },
+  mirror: Promise<CalendarPushResult>
+): void {
+  try {
+    ctx.executionCtx.waitUntil(mirror)
+  } catch {
+    void mirror
+  }
+}
+
 /** Mirror a booked appointment into the owner's calendar (timed event). */
 export function pushAppointmentToCalendar(
   appt: StoredAppointment,
   env: TaskCalendarEnv,
-  source = 'contact'
+  source = APPOINTMENT_SOURCE
 ): Promise<CalendarPushResult> {
   return postTaskToCalendar(buildTaskFromAppointment(appt, source), env)
 }
@@ -265,4 +369,25 @@ export function pushMailToCalendar(
   opts: { source?: string; sentBy?: string } = {}
 ): Promise<CalendarPushResult> {
   return postTaskToCalendar(buildTaskFromMail(sub, opts), env)
+}
+
+/**
+ * Remove a cancelled appointment's mirrored event. Takes the appointment id
+ * (not the row) — a cancellation only ever has the id to hand.
+ */
+export function removeAppointmentFromCalendar(
+  appointmentId: string,
+  env: TaskCalendarEnv,
+  source = APPOINTMENT_SOURCE
+): Promise<CalendarPushResult> {
+  return deleteTaskFromCalendar(calendarTaskId(source, appointmentId), env)
+}
+
+/** Remove a trashed admin-mail submission's mirrored event. */
+export function removeMailFromCalendar(
+  submissionId: string,
+  env: TaskCalendarEnv,
+  source = MAIL_SOURCE
+): Promise<CalendarPushResult> {
+  return deleteTaskFromCalendar(calendarTaskId(source, submissionId), env)
 }

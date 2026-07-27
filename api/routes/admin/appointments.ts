@@ -22,7 +22,11 @@ import {
   VALIDATION_CONSTRAINTS,
   type AppointmentPlatform
 } from '../../constants'
-import { pushAppointmentToCalendar } from '../../services/task-calendar'
+import {
+  mirrorInBackground,
+  pushAppointmentToCalendar,
+  removeAppointmentFromCalendar
+} from '../../services/task-calendar'
 import type { AppContext } from '../../types'
 
 interface AdminCreateAppointmentBody {
@@ -206,12 +210,7 @@ export function createAppointmentAdminRoutes() {
 
       // Mirror into the owner's task calendar (best-effort, once). Never blocks
       // or fails the booking — the push swallows its own errors.
-      const calendarPush = pushAppointmentToCalendar(appointment, c.env)
-      try {
-        c.executionCtx.waitUntil(calendarPush)
-      } catch {
-        void calendarPush
-      }
+      mirrorInBackground(c, pushAppointmentToCalendar(appointment, c.env))
 
       return adminOk(c, { appointment }, 201)
     } catch (error) {
@@ -276,6 +275,13 @@ export function createAppointmentAdminRoutes() {
 
       if (!success) {
         return notFound(c, 'Appointment not found')
+      }
+
+      // A cancellation retracts the mirrored calendar event. Only 'cancelled' —
+      // 'completed' and 'no_show' describe a meeting that still occupied the
+      // slot, so it stays on the calendar as a record of the day.
+      if (body.status === 'cancelled') {
+        mirrorInBackground(c, removeAppointmentFromCalendar(id, c.env))
       }
 
       return adminOk(c, { success: true, message: 'Appointment status updated successfully' })

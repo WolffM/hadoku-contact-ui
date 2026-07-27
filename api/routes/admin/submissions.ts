@@ -19,6 +19,7 @@ import {
 } from '../../storage'
 import { resetRateLimit } from '../../rate-limit'
 import { RETENTION_CONFIG } from '../../constants'
+import { mirrorInBackground, removeMailFromCalendar } from '../../services/task-calendar'
 import { adminOk } from './index'
 import type { AppContext } from '../../types'
 
@@ -94,10 +95,23 @@ export function createSubmissionRoutes() {
     try {
       const id = c.req.param('id')
 
+      // Read before deleting: only OUTBOUND mail was ever mirrored, and after
+      // the soft-delete we can no longer tell which this was without a second
+      // lookup. Skipping inbound spares task-api a subrequest per trashed
+      // submission, which is the overwhelmingly common case.
+      const existing = await getSubmissionById(c.env.DB, id)
+
       const success = await deleteSubmission(c.env.DB, id)
 
       if (!success) {
         return notFound(c, 'Submission not found')
+      }
+
+      // Trashing the record retracts the mirrored calendar event. Restoring it
+      // does NOT bring the event back: the mirror is create-once, and the owner
+      // may have reorganised that day since.
+      if (existing?.direction === 'outbound') {
+        mirrorInBackground(c, removeMailFromCalendar(id, c.env))
       }
 
       return adminOk(c, { success: true, message: 'Submission moved to trash' })
