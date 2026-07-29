@@ -199,6 +199,71 @@ describe('Appointment Slots Integration', () => {
       expect(data.message).toContain('advance')
     })
 
+    /**
+     * Regression: the notice window is per-slot, not per-day.
+     *
+     * Both bounds used to be tested against the day's FIRST slot, so a day was
+     * rejected whole as soon as its 09:00 fell inside the window — even when its
+     * afternoon was well clear. The contact form's calendar enables any date with
+     * a bookable part, so it offered such a date and then got a 400 for all of it.
+     *
+     * Rather than do timezone arithmetic here, this reads a real slot instant back
+     * from the API and sets the notice window to land on it — deterministic no
+     * matter when or where the suite runs.
+     */
+    it('returns the later slots on a day whose early slots are inside the window', async () => {
+      const date = getNextWeekday(5).toISOString().split('T')[0]
+
+      const before = await fetchSlots(date, 30)
+      expect(before.status).toBe(200)
+      const all = ((await before.json()) as SlotsResponse).slots
+      expect(all.length).toBeGreaterThan(4)
+
+      // Put the cutoff exactly on a mid-morning slot: everything before it is now
+      // inside the notice window, everything from it on is still bookable.
+      const cutoff = all[Math.floor(all.length / 2)]
+      const hoursUntilCutoff = Math.ceil(
+        (new Date(cutoff.startTime).getTime() - Date.now()) / (60 * 60 * 1000)
+      )
+      await env.DB.prepare('UPDATE appointment_config SET min_advance_hours = ? WHERE id = 1')
+        .bind(hoursUntilCutoff)
+        .run()
+
+      const after = await fetchSlots(date, 30)
+      // The bug returned 400 here, discarding a day that was still partly open.
+      expect(after.status).toBe(200)
+      const remaining = ((await after.json()) as SlotsResponse).slots
+
+      expect(remaining.length).toBeGreaterThan(0)
+      expect(remaining.length).toBeLessThan(all.length)
+      // Nothing survives that the window should have excluded.
+      const minAllowed = Date.now() + hoursUntilCutoff * 60 * 60 * 1000
+      for (const slot of remaining) {
+        expect(new Date(slot.startTime).getTime()).toBeGreaterThanOrEqual(minAllowed)
+      }
+      expect(remaining.some(s => s.startTime === all[0].startTime)).toBe(false)
+    })
+
+    it('still rejects the whole day when even its last slot is inside the window', async () => {
+      const date = getNextWeekday(5).toISOString().split('T')[0]
+
+      const before = await fetchSlots(date, 30)
+      expect(before.status).toBe(200)
+      const all = ((await before.json()) as SlotsResponse).slots
+
+      // Push the cutoff past the day's final slot — nothing on it is bookable.
+      const last = all[all.length - 1]
+      const hoursPastLast =
+        Math.ceil((new Date(last.startTime).getTime() - Date.now()) / (60 * 60 * 1000)) + 1
+      await env.DB.prepare('UPDATE appointment_config SET min_advance_hours = ? WHERE id = 1')
+        .bind(hoursPastLast)
+        .run()
+
+      const after = await fetchSlots(date, 30)
+      expect(after.status).toBe(400)
+      expect(((await after.json()) as { message: string }).message).toContain('advance')
+    })
+
     it('should reject dates too far in the future', async () => {
       const farFuture = new Date()
       farFuture.setDate(farFuture.getDate() + 60)

@@ -57,14 +57,32 @@ export function createAppointmentsRoutes() {
         )
       }
 
+      // The advance window is a property of each SLOT, not of the day.
+      //
+      // Both bounds used to be tested against the day's FIRST slot, so a day was
+      // rejected whole the moment its 9am fell inside the notice window — even
+      // when its afternoon was hours clear of the cutoff. With a 24h rule and a
+      // 09:00-17:00 day, asking at noon rejected all of tomorrow, including the
+      // 4:30pm slot a full 28h out. The contact form's calendar enables a date
+      // whenever any part of it is bookable, so it offered tomorrow and then got
+      // a 400 for the whole day: a selectable date with no times behind it.
+      //
+      // A day is now refused only when NOTHING on it can be booked, which keeps
+      // the two error messages meaning what they say. Partially-open days return
+      // their bookable slots, filtered below.
       const now = new Date()
-      const minAdvanceMs = config.min_advance_hours * 60 * 60 * 1000
-      const minAllowedTime = new Date(now.getTime() + minAdvanceMs)
+      const minAllowedTime = new Date(now.getTime() + config.min_advance_hours * 60 * 60 * 1000)
+      const maxAllowedTime = new Date(now.getTime() + config.max_advance_days * 24 * 60 * 60 * 1000)
 
       const [startHour, startMinute] = config.business_hours_start.split(':').map(Number)
-      const firstSlotTime = zonedDateToUtc(requestDate, startHour, startMinute, config.timezone)
+      const [endHour, endMinute] = config.business_hours_end.split(':').map(Number)
+      const firstSlotStart = zonedDateToUtc(requestDate, startHour, startMinute, config.timezone)
+      const businessEnd = zonedDateToUtc(requestDate, endHour, endMinute, config.timezone)
+      // Latest start that still fits inside business hours — the day's best case
+      // against the minimum-notice bound.
+      const lastSlotStart = new Date(businessEnd.getTime() - requestDuration * 60 * 1000)
 
-      if (firstSlotTime < minAllowedTime) {
+      if (lastSlotStart < minAllowedTime) {
         return c.json(
           {
             message: `Appointments must be booked at least ${config.min_advance_hours} hours in advance`
@@ -73,10 +91,8 @@ export function createAppointmentsRoutes() {
         )
       }
 
-      const maxAdvanceMs = config.max_advance_days * 24 * 60 * 60 * 1000
-      const maxAllowedTime = new Date(now.getTime() + maxAdvanceMs)
-
-      if (firstSlotTime > maxAllowedTime) {
+      // Mirror image: the earliest slot is the day's best case against the far bound.
+      if (firstSlotStart > maxAllowedTime) {
         return c.json(
           {
             message: `Appointments can only be booked up to ${config.max_advance_days} days in advance`
@@ -95,7 +111,7 @@ export function createAppointmentsRoutes() {
         )
       }
 
-      const slots = await generateTimeSlots(
+      const allSlots = await generateTimeSlots(
         db,
         requestDate,
         requestDuration,
@@ -103,6 +119,14 @@ export function createAppointmentsRoutes() {
         config.business_hours_end,
         config.timezone
       )
+
+      // Drop the individual slots outside the window. Dropped rather than marked
+      // unavailable: `available: false` means "someone already booked this", and
+      // a slot that cannot be offered at all is not the same thing.
+      const slots = allSlots.filter(slot => {
+        const start = new Date(slot.startTime)
+        return start >= minAllowedTime && start <= maxAllowedTime
+      })
 
       return c.json({
         date: requestDate,
