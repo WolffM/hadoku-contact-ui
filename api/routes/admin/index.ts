@@ -11,6 +11,7 @@ import { createEmailRoutes } from './email'
 import { createAppointmentAdminRoutes } from './appointments'
 import { createTemplateRoutes } from './templates'
 import type { AppContext } from '../../types'
+import { tierAtLeast } from '../../utils/auth'
 
 /**
  * Admin API response helper - matches contact-admin client expectations
@@ -24,7 +25,11 @@ function requireAdmin() {
   return async (c: Context<AppContext>, next: Next) => {
     const auth = c.get('authContext')
 
-    if (!auth?.userType || auth.userType !== 'admin') {
+    // Admin is the top tier, so the string compare admitted the right set
+    // today — but it is the pattern that produced the /internal/run-daily bug
+    // one file over, and it silently stops being correct the moment anything
+    // is added above admin. Rank, not equality.
+    if (!tierAtLeast(auth, 'admin')) {
       return c.json(
         {
           success: false,

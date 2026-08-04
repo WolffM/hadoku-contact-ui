@@ -32,6 +32,7 @@ import {
 } from '../email/templates'
 import { EMAIL_CONFIG, APPOINTMENT_CONFIG, RATE_LIMIT_CONFIG } from '../constants'
 import type { HadokuAuthContext } from '../types'
+import { tierAtLeast } from '../utils/auth'
 import {
   logRateLimitHit,
   logRateLimitWarning,
@@ -110,7 +111,7 @@ export function createSubmitRoutes(rateLimitOverrides?: {
 
       // Admin requests bypass rate limiting (for testing and operational use)
       const auth = c.get('authContext')
-      const isAdmin = auth?.userType === 'admin'
+      const isAdmin = tierAtLeast(auth, 'admin')
 
       const rateLimitResult = isAdmin
         ? { allowed: true, remaining: 999, resetAt: 0 }

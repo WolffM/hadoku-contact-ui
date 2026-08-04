@@ -7,7 +7,7 @@
 
 import { Hono } from 'hono'
 import { createCorsMiddleware, DEFAULT_HADOKU_ORIGINS } from './utils/cors'
-import { createEdgeAuth } from './utils/auth'
+import { createEdgeAuth, tierAtLeast } from './utils/auth'
 import { createErrorHandlers } from './utils/error-handlers'
 import { createSubmitRoutes } from './routes/submit'
 import { createAdminRoutes } from './routes/admin'
@@ -96,7 +96,11 @@ export function createContactHandler(basePath = '/contact/api', options?: Contac
   // POST /health/api/jobs and POST /health/api/cleanup/run.
   app.post('/internal/run-daily', async c => {
     const auth = c.get('authContext')
-    if (auth.userType !== 'admin' && auth.userType !== 'service') {
+    // service AND UP. The enumerated form (`!== 'admin' && !== 'service'`) was
+    // an exact-match allowlist: it excluded `wife` even though wife outranks
+    // service, so the tier that is meant to reach everything a service reaches
+    // would have been refused here.
+    if (!tierAtLeast(auth, 'service')) {
       return c.json({ error: 'Unauthorized' }, 403)
     }
 

@@ -31,7 +31,7 @@ export interface ContactHandlerOptions {
 }
 
 export interface HadokuAuthContext {
-  userType: 'admin' | 'service' | 'friend' | 'public'
+  userType: 'admin' | 'wife' | 'service' | 'friend' | 'public'
   credential: string | null
 }
 
