@@ -106,15 +106,15 @@ body {
 }
 
 .contact-alert--success {
-  background-color: var(--color-bg-card);
+  background-color: var(--color-success-bg);
   border-color: var(--color-success);
-  color: var(--color-success-dark);
+  color: var(--color-on-success-bg);
 }
 
 .contact-alert--error {
   background-color: var(--color-danger-bg);
   border-color: var(--color-danger);
-  color: var(--color-danger-dark);
+  color: var(--color-on-danger-bg);
 }
 
 /* Form Styles */
@@ -169,7 +169,7 @@ body {
   display: block;
   margin-top: 0.25rem;
   font-size: var(--hdk-text-sm);
-  color: var(--color-danger-dark);
+  color: var(--color-text);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -370,7 +370,7 @@ body {
 
 .duration-pill:hover:not(:disabled) {
   border-color: var(--color-primary);
-  color: var(--color-primary);
+  color: var(--color-text);
   transform: translateY(-1px);
 }
 
