@@ -2,9 +2,7 @@ import { useRef } from 'react'
 import type { ContactUIProps } from './types'
 import ContactForm from './ContactForm'
 import { AppHeader } from '@wolffm/task-ui-components'
-import { useHadokuTheme } from '@wolffm/themes'
-import { HadokuThemeRoot } from '@wolffm/themes'
-
+import { useHadokuTheme, HadokuThemeRoot } from '@wolffm/themes'
 /**
  * Theming is the platform's, not this app's.
  *
