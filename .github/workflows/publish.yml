@@ -76,7 +76,7 @@ jobs:
             patch=$(echo "$version" | cut -d. -f3)
 
             # Rollover at .20 to keep patch numbers manageable (matching pre-commit hook)
-            if [ "$patch" -eq 20 ]; then
+            if [ "$patch" -ge 20 ]; then
               new_minor=$((minor + 1))
               echo "$major.$new_minor.0"
             else
@@ -101,11 +101,23 @@ jobs:
             echo "$reason"
 
             local original_version="$current_version"
+
+            # Walk from the registry's latest, not the committed version: CI
+            # bumps are published but never committed back, so the committed
+            # version only falls behind and this walk used to replay the whole
+            # gap one version at a time (tenhands died at attempt 99 of exactly
+            # that on 2026-08-05). From latest, one step suffices.
+            local latest_published
+            latest_published=$(npm view "${package_name}" version --registry=https://npm.pkg.github.com 2>/dev/null || echo "")
+            if [ -n "$latest_published" ]; then
+              current_version=$(printf '%s\n%s\n' "$current_version" "$latest_published" | sort -V | tail -1)
+              echo "Registry latest: $latest_published; walking from $current_version"
+            fi
             new_version=$(calculate_next_version "$current_version")
 
             # Keep bumping until we find a version that doesn't exist
             # Add safety limit to prevent infinite loops
-            local max_attempts=50
+            local max_attempts=10
             local attempts=0
             while version_exists "$new_version"; do
               echo "⚠️  Version $new_version already exists, trying next version..."
