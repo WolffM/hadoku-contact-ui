@@ -311,7 +311,41 @@ describe('syncInboundEmails', () => {
     expect(await countSubmissions()).toBe(1)
   })
 
+  it('caps ingests per run and drains the backlog over successive runs', async () => {
+    // The regression this pins: the first production sweep ingested 26 emails,
+    // each costing a sequential Resend retrieve, overran mgmt-api's 15s cron
+    // dispatch, and paged "contact api unavailable" for work that had actually
+    // completed. A reconciliation job that alerts on success is worse than none.
+    const cap = INBOUND_SYNC_CONFIG.MAX_INGESTS_PER_RUN
+    const emails: ListItem[] = Array.from({ length: cap + 5 }, (_, i) => ({
+      id: `em_c${i}`,
+      from: `sender${i}@example.com`,
+      to: ['public@hadoku.me'],
+      subject: `Mail ${i}`,
+      created_at: recentIso(),
+      text: 'body'
+    }))
+
+    const first = await syncInboundEmails(testEnv(), makeResend(emails).fetchImpl)
+    expect(first.stored).toBe(cap)
+    expect(first.truncated).toBe(true)
+    expect(await countSubmissions()).toBe(cap)
+
+    // Next run continues where it left off — no duplicates, no lost mail.
+    const second = await syncInboundEmails(testEnv(), makeResend(emails).fetchImpl)
+    expect(second.stored).toBe(5)
+    expect(second.truncated).toBe(false)
+    expect(await countSubmissions()).toBe(cap + 5)
+
+    // And a third run has nothing left to do.
+    const third = await syncInboundEmails(testEnv(), makeResend(emails).fetchImpl)
+    expect(third.stored).toBe(0)
+    expect(await countSubmissions()).toBe(cap + 5)
+  })
+
   it('paginates until Resend reports no more pages', async () => {
+    // Sized under the per-run ingest cap so this exercises PAGINATION only —
+    // pages of already-seen mail cost no retrieves, so the cap never engages.
     const emails: ListItem[] = Array.from({ length: 150 }, (_, i) => ({
       id: `em_p${i}`,
       from: `sender${i}@example.com`,
@@ -321,12 +355,20 @@ describe('syncInboundEmails', () => {
       text: 'body'
     }))
 
+    for (const e of emails) {
+      await recordInboundEmail(env.DB, {
+        resendEmailId: e.id,
+        source: 'webhook',
+        outcome: 'stored'
+      })
+    }
+
     const { fetchImpl, calls } = makeResend(emails)
     const result = await syncInboundEmails(testEnv(), fetchImpl)
 
     expect(calls.list).toBe(2)
     expect(result.scanned).toBe(150)
-    expect(await countSubmissions()).toBe(150)
+    expect(calls.retrieve).toHaveLength(0)
   })
 
   it('throws when RESEND_API_KEY is missing rather than reporting a clean sweep', async () => {

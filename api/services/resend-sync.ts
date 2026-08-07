@@ -120,8 +120,9 @@ export async function syncInboundEmails(
 
   let after: string | undefined
   let reachedCutoff = false
+  let hitIngestCap = false
 
-  while (result.pages < INBOUND_SYNC_CONFIG.MAX_PAGES && !reachedCutoff) {
+  while (result.pages < INBOUND_SYNC_CONFIG.MAX_PAGES && !reachedCutoff && !hitIngestCap) {
     const page = await listReceived(
       apiKey,
       { limit: INBOUND_SYNC_CONFIG.PAGE_SIZE, after },
@@ -151,6 +152,17 @@ export async function syncInboundEmails(
     const fresh = inWindow.filter(item => !seen.has(item.id))
 
     for (const item of fresh) {
+      // Stop cleanly at the per-run cap and leave the rest for the next run.
+      // Each ingest below costs a sequential network round trip, so an
+      // unbounded backlog would overrun mgmt-api's 15s cron dispatch and page
+      // as a failure for work that actually succeeded. See
+      // INBOUND_SYNC_CONFIG.MAX_INGESTS_PER_RUN.
+      const ingestedCount = result.stored + result.filtered + result.adopted + result.skipped
+      if (ingestedCount >= INBOUND_SYNC_CONFIG.MAX_INGESTS_PER_RUN) {
+        hitIngestCap = true
+        break
+      }
+
       // Sequential on purpose. Resend rate-limits, D1 has a per-invocation
       // statement budget, and a backlog sweep that fans out would trip both.
       // The sweep is a background reconciler — latency is not the constraint.
@@ -197,12 +209,17 @@ export async function syncInboundEmails(
     if (!after) break
   }
 
-  result.truncated = result.pages >= INBOUND_SYNC_CONFIG.MAX_PAGES && !reachedCutoff
+  // Truncated = there is known remaining work, so the next run has something to
+  // do. Not an error: the sweep is incremental by design and the backlog drains
+  // over successive runs. Surfaced so a PERMANENTLY truncated sweep (backlog
+  // arriving faster than 10-per-10-minutes) is visible rather than silent.
+  result.truncated =
+    hitIngestCap || (result.pages >= INBOUND_SYNC_CONFIG.MAX_PAGES && !reachedCutoff)
 
   console.log(
     `[inbound-sync] scanned=${result.scanned} stored=${result.stored} adopted=${result.adopted} ` +
       `filtered=${result.filtered} skipped=${result.skipped} errors=${result.errors} ` +
-      `pages=${result.pages}${result.truncated ? ' TRUNCATED' : ''}`
+      `pages=${result.pages}${result.truncated ? ' TRUNCATED (more remaining; next run continues)' : ''}`
   )
 
   return result

@@ -59,7 +59,23 @@ export const INBOUND_SYNC_CONFIG = {
   // magnitude over any plausible volume, and bounds the worst case (a wedged
   // ledger, a clock skew) to a fixed amount of work per run rather than an
   // unbounded walk of the whole account.
-  MAX_PAGES: 10
+  MAX_PAGES: 10,
+  // How many NEW emails one run may ingest before stopping and leaving the rest
+  // for the next run. This is a WALL-CLOCK bound, not a correctness one.
+  //
+  // Each ingest costs a sequential Resend retrieve (the list endpoint does not
+  // return bodies), so cost scales with the backlog — and mgmt-api's cron
+  // dispatch aborts at DISPATCH_TIMEOUT_MS = 15s, with edge-router capping
+  // around 30s behind it. The very first production sweep ingested 26 emails,
+  // overran the 15s dispatch, and paged "contact api unavailable" for work that
+  // had in fact completed: the sweep kept running server-side and wrote all 26.
+  // A reconciliation job that pages on success is worse than useless.
+  //
+  // 10 keeps a full run near ~6s, comfortably inside both caps. Draining is not
+  // sacrificed: at one run per 10 minutes that is 1,440 emails/day of catch-up
+  // capacity, and steady state is 0-2 per run, so this only ever engages after
+  // an outage or on a cold start.
+  MAX_INGESTS_PER_RUN: 10
 } as const
 
 // Rate limiting
