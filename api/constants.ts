@@ -46,6 +46,22 @@ export const RETENTION_CONFIG = {
   ARCHIVE_AFTER_DAYS: 30
 } as const
 
+// Inbound reconciliation — the sweep that makes the mailbox converge on what
+// Resend actually holds, instead of on whatever the webhook happened to catch.
+export const INBOUND_SYNC_CONFIG = {
+  // Must not exceed RETENTION_CONFIG.ARCHIVE_AFTER_DAYS. Mail older than the
+  // archive horizon has already been moved out of contact_submissions by daily
+  // maintenance; pulling it back in would re-archive it every night forever.
+  MAX_AGE_DAYS: RETENTION_CONFIG.ARCHIVE_AFTER_DAYS,
+  // Resend caps `limit` at 100.
+  PAGE_SIZE: 100,
+  // Ceiling on a single sweep. 10 x 100 covers a month of mail an order of
+  // magnitude over any plausible volume, and bounds the worst case (a wedged
+  // ledger, a clock skew) to a fixed amount of work per run rather than an
+  // unbounded walk of the whole account.
+  MAX_PAGES: 10
+} as const
+
 // Rate limiting
 export const RATE_LIMIT_CONFIG = {
   MAX_SUBMISSIONS_PER_HOUR: 5,

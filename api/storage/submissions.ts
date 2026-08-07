@@ -17,7 +17,24 @@ export interface StoredSubmission {
   referrer: string | null
   recipient: string | null
   direction: 'inbound' | 'outbound'
+  /** Resend's id for the received email. NULL for web-form and outbound rows. */
+  resend_email_id: string | null
+  /**
+   * Non-NULL means the mail was quarantined rather than accepted into the
+   * inbox. It is still a real, readable row — the point is that nothing is
+   * silently discarded any more.
+   */
+  filtered_reason: string | null
 }
+
+/**
+ * Why a mail was quarantined instead of accepted.
+ *
+ * Only one reason today. Retrieval failures are deliberately NOT a reason:
+ * a mail whose body we could not fetch is left unledgered so the next sweep
+ * retries it with a real body, rather than being frozen as a permanent stub.
+ */
+export type FilteredReason = 'not_whitelisted'
 
 export interface CreateSubmissionParams {
   name: string
@@ -28,6 +45,10 @@ export interface CreateSubmissionParams {
   referrer: string | null
   recipient?: string | null
   direction?: 'inbound' | 'outbound'
+  resend_email_id?: string | null
+  filtered_reason?: FilteredReason | null
+  /** Overrides the direction-derived default. Used to backfill old mail as read. */
+  status?: 'unread' | 'read'
 }
 
 export interface SubmissionStats {
@@ -46,13 +67,13 @@ export async function createSubmission(
   const created_at = Date.now()
 
   const direction = params.direction ?? 'inbound'
-  const status = direction === 'outbound' ? 'read' : 'unread'
+  const status = params.status ?? (direction === 'outbound' ? 'read' : 'unread')
 
   await db
     .prepare(
       `INSERT INTO contact_submissions
-			(id, name, email, message, status, created_at, ip_address, user_agent, referrer, recipient, direction)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+			(id, name, email, message, status, created_at, ip_address, user_agent, referrer, recipient, direction, resend_email_id, filtered_reason)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       id,
@@ -65,7 +86,9 @@ export async function createSubmission(
       params.user_agent,
       params.referrer,
       params.recipient ?? null,
-      direction
+      direction,
+      params.resend_email_id ?? null,
+      params.filtered_reason ?? null
     )
     .run()
 
@@ -81,10 +104,67 @@ export async function createSubmission(
     referrer: params.referrer,
     recipient: params.recipient ?? null,
     deleted_at: null,
-    direction
+    direction,
+    resend_email_id: params.resend_email_id ?? null,
+    filtered_reason: params.filtered_reason ?? null
   }
 
   return result
+}
+
+/**
+ * Stamp a Resend id onto a submission the webhook stored BEFORE this column
+ * existed, instead of inserting a duplicate.
+ *
+ * Without this, the first reconciliation sweep would re-ingest every email the
+ * webhook had already handled — the user would open the command station and
+ * find two of everything from the last 30 days. Inbound rows are written by
+ * the webhook with a known shape (`email` = the cleaned sender, `recipient` =
+ * the destination mailbox, `message` = `Subject: {subject}\n\n{body}`), so
+ * that triple identifies the row precisely enough to adopt it.
+ *
+ * Only ever touches a row whose resend_email_id IS NULL, so a correctly
+ * stamped row can never be re-pointed at a different email.
+ *
+ * Returns the adopted submission id, or null if there was nothing to adopt.
+ */
+export async function adoptSubmissionForResendId(
+  db: D1Database,
+  params: { resendEmailId: string; email: string; recipient: string | null; subject: string }
+): Promise<string | null> {
+  const candidate = await db
+    .prepare(
+      `SELECT id FROM contact_submissions
+			WHERE resend_email_id IS NULL
+				AND direction = 'inbound'
+				AND email = ?
+				AND recipient IS ?
+				AND message LIKE ? ESCAPE '\\'
+			ORDER BY created_at DESC
+			LIMIT 1`
+    )
+    .bind(params.email, params.recipient, `${escapeLike(`Subject: ${params.subject}`)}%`)
+    .first<{ id: string }>()
+
+  if (!candidate) return null
+
+  // The WHERE clause repeats `resend_email_id IS NULL`: between the SELECT and
+  // this UPDATE a concurrent sweep could have claimed the same row, and D1
+  // gives us no transaction spanning the two.
+  const updated = await db
+    .prepare(
+      `UPDATE contact_submissions SET resend_email_id = ?
+			WHERE id = ? AND resend_email_id IS NULL`
+    )
+    .bind(params.resendEmailId, candidate.id)
+    .run()
+
+  return (updated.meta?.changes ?? 0) > 0 ? candidate.id : null
+}
+
+/** LIKE treats % and _ as wildcards; a subject containing either would match too much. */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, match => `\\${match}`)
 }
 
 export async function getAllSubmissions(

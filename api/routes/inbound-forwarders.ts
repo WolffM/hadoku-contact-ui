@@ -28,7 +28,7 @@ export interface ForwardResult {
   error?: string
 }
 
-function isForwardRecipient(value: string | null): value is ForwardRecipient {
+export function isForwardRecipient(value: string | null): value is ForwardRecipient {
   return !!value && value in FORWARD_RECIPIENTS
 }
 

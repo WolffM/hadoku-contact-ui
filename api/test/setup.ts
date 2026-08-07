@@ -18,6 +18,8 @@ import migration0004 from '../migrations/0004_create_appointments_tables.sql'
 import migration0005 from '../migrations/0005_create_templates_tables.sql'
 // @ts-expect-error — .sql imports handled by vite plugin
 import migration0006 from '../migrations/0006_add_direction_column.sql'
+// @ts-expect-error — .sql imports handled by vite plugin
+import migration0007 from '../migrations/0007_inbound_email_sync.sql'
 
 /** Split SQL into individual statements, strip comments */
 async function applyMigration(db: D1Database, sql: string) {
@@ -43,7 +45,8 @@ if (!existing) {
     migration0003,
     migration0004,
     migration0005,
-    migration0006
+    migration0006,
+    migration0007
   ]
   for (const sql of migrations) {
     await applyMigration(env.DB, sql)
@@ -55,5 +58,12 @@ if (!existing) {
   ).first()
   if (!hasDirection) {
     await applyMigration(env.DB, migration0006)
+  }
+
+  const hasResendEmailId = await env.DB.prepare(
+    "SELECT 1 FROM pragma_table_info('contact_submissions') WHERE name='resend_email_id'"
+  ).first()
+  if (!hasResendEmailId) {
+    await applyMigration(env.DB, migration0007)
   }
 }

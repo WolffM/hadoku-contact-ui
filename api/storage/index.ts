@@ -6,7 +6,9 @@ export {
   type StoredSubmission,
   type CreateSubmissionParams,
   type SubmissionStats,
+  type FilteredReason,
   createSubmission,
+  adoptSubmissionForResendId,
   getAllSubmissions,
   getSubmissionById,
   updateSubmissionStatus,
@@ -16,6 +18,15 @@ export {
   getSubmissionStats,
   archiveOldSubmissions
 } from './submissions'
+
+export {
+  type InboundSource,
+  type InboundOutcome,
+  type InboundLedgerEntry,
+  recordInboundEmail,
+  getSeenEmailIds,
+  getLedgerEntry
+} from './inbound-ledger'
 
 export {
   type WhitelistEntry,

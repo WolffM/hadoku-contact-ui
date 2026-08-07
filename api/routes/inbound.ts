@@ -1,13 +1,21 @@
 /**
- * Inbound email webhook for receiving emails via Resend
+ * Inbound email webhook for receiving emails via Resend.
+ *
+ * This route is now a thin adapter: it validates the webhook envelope, fetches
+ * the body Resend does not include in the push, and hands off to
+ * services/inbound-ingest, which is shared with the reconciliation sweep.
+ *
+ * It used to own the ingest decision itself and discard anything that failed
+ * it — non-whitelisted senders, unfetchable bodies, any thrown error — always
+ * returning 200. Combined with the webhook being the only ingest path, that is
+ * why mail visible at resend.com never reached the command station.
  */
 
 import { Hono } from 'hono'
 import { ok, badRequest } from '../utils/responses'
-import { isEmailWhitelisted, createSubmission } from '../storage'
-import { EMAIL_CONFIG } from '../constants'
+import { getLedgerEntry } from '../storage'
+import { ingestInboundEmail, extractAddress } from '../services/inbound-ingest'
 import type { AppContext } from '../types'
-import { maybeForwardInboundEmail } from './inbound-forwarders'
 
 interface ResendWebhookEvent {
   type: 'email.received'
@@ -34,7 +42,6 @@ export function createInboundRoutes() {
   const app = new Hono<AppContext>()
 
   app.post('/inbound', async c => {
-    const db = c.env.DB
     const request = c.req.raw
 
     try {
@@ -48,24 +55,37 @@ export function createInboundRoutes() {
       }
 
       const event = await c.req.json<ResendWebhookEvent>()
+      const emailId = event.data?.email_id
+      if (!emailId) {
+        console.warn('Inbound webhook missing email_id')
+        return badRequest(c, 'Invalid webhook payload')
+      }
 
-      const emailId = event.data.email_id
       console.log(`Received email.received webhook for: ${emailId}`)
 
-      const senderEmail = event.data.from.toLowerCase()
-      if (!senderEmail) {
+      if (!event.data.from) {
         console.warn('Inbound email missing sender address')
         return badRequest(c, 'Invalid email format')
       }
+      console.log(`Email from: ${extractAddress(event.data.from)}`)
+      console.log(`Email to: ${event.data.to?.[0]?.toLowerCase() ?? null}`)
 
-      const emailRegex = /<(.+)>/
-      const emailMatch = emailRegex.exec(senderEmail)
-      const cleanEmail = emailMatch?.[1] ?? senderEmail
-
-      console.log(`Email from: ${cleanEmail}`)
-
-      const recipient = event.data.to[0]?.toLowerCase() ?? null
-      console.log(`Email to: ${recipient}`)
+      // Resend retries webhooks. Without this check a retry would create a
+      // second submission for the same email, since the UNIQUE index on
+      // resend_email_id would reject the insert and the whole handler would
+      // fall into the catch below instead — reporting an error for mail that
+      // was in fact already delivered.
+      const alreadyHandled = await getLedgerEntry(c.env.DB, emailId)
+      if (alreadyHandled) {
+        console.log(`Webhook replay for ${emailId} — already ${alreadyHandled.outcome}`)
+        return ok(c, {
+          success: true,
+          message: 'Already processed',
+          emailId,
+          processed: true,
+          submissionId: alreadyHandled.submission_id ?? undefined
+        })
+      }
 
       const resendApiKey = c.env.RESEND_API_KEY
       if (!resendApiKey) {
@@ -78,97 +98,58 @@ export function createInboundRoutes() {
       }
 
       const emailResponse = await fetch(`https://api.resend.com/emails/receiving/${emailId}`, {
-        headers: {
-          Authorization: `Bearer ${resendApiKey}`
-        }
+        headers: { Authorization: `Bearer ${resendApiKey}` }
       })
 
       if (!emailResponse.ok) {
-        console.error(`Failed to fetch email from Resend: ${emailResponse.status}`)
+        // Deliberately NOT recorded in the ledger: leaving it unseen is what
+        // lets the reconciliation sweep pick this email up later and store it
+        // with a real body. Previously this was where mail went to die.
+        console.error(
+          `Failed to fetch email ${emailId} from Resend: ${emailResponse.status} — leaving for reconciliation sweep`
+        )
         return ok(c, {
           success: false,
-          message: 'Failed to retrieve email content',
+          message: 'Failed to retrieve email content; deferred to reconciliation',
           processed: false
         })
       }
 
       const emailDetails = await emailResponse.json<ResendEmailDetails>()
-      const messageBody = emailDetails.text ?? emailDetails.html ?? null
 
-      // Recipient-based forwarders (pickleball waitlist, etc.) bypass the
-      // whitelist — they are trusted routes keyed on the destination
-      // mailbox. If no forwarder claims the recipient, fall through to the
-      // normal contact-submission flow.
-      const forwardResult = await maybeForwardInboundEmail(c.env, {
-        recipient,
-        senderEmail: cleanEmail,
-        subject: event.data.subject,
-        body: messageBody,
-        emailId
-      })
-
-      if (forwardResult.handled) {
-        return ok(c, {
-          success: forwardResult.ok ?? false,
-          message: `Forwarded to ${forwardResult.label}`,
+      const result = await ingestInboundEmail(
+        c.env,
+        {
           emailId,
-          processed: forwardResult.ok ?? false,
-          forwardStatus: forwardResult.status ?? null,
-          forwardError: forwardResult.error ?? null
-        })
-      }
-
-      const isPublicRecipient =
-        recipient &&
-        EMAIL_CONFIG.PUBLIC_RECIPIENTS.includes(
-          recipient as (typeof EMAIL_CONFIG.PUBLIC_RECIPIENTS)[number]
-        )
-
-      const isWhitelisted = await isEmailWhitelisted(db, cleanEmail)
-
-      if (!isWhitelisted && !isPublicRecipient) {
-        console.log(
-          `Rejecting email from non-whitelisted sender: ${cleanEmail} to non-public recipient: ${recipient}`
-        )
-
-        return ok(c, {
-          success: false,
-          message: 'Sender not whitelisted',
-          processed: false
-        })
-      }
-
-      console.log(
-        `Processing email - whitelisted: ${isWhitelisted}, public recipient: ${isPublicRecipient}`
+          from: event.data.from,
+          to: event.data.to,
+          subject: event.data.subject,
+          text: emailDetails.text,
+          html: emailDetails.html,
+          createdAt: emailDetails.created_at
+        },
+        'webhook'
       )
 
-      const message = messageBody ?? '(No message body)'
-
-      const submission = await createSubmission(db, {
-        name: cleanEmail.split('@')[0],
-        email: cleanEmail,
-        message: `Subject: ${event.data.subject}\n\n${message}`,
-        ip_address: null,
-        user_agent: 'Resend Inbound Email',
-        referrer: null,
-        recipient
-      })
-
-      console.log(`Created submission ${submission.id} from inbound email ${emailId}`)
-
       return ok(c, {
-        success: true,
-        message: 'Email processed successfully',
-        submissionId: submission.id,
+        success: result.processed,
+        message: result.message,
         emailId,
-        processed: true
+        processed: result.processed,
+        submissionId: result.submissionId,
+        filteredReason: result.filteredReason,
+        forwardStatus: result.forwardStatus ?? null,
+        forwardError: result.forwardError ?? null
       })
     } catch (error) {
       console.error('Error processing inbound email:', error)
 
+      // Still a 200 — Resend retries on non-2xx and a retry storm helps
+      // nobody. The email is not lost: nothing was written to the ledger, so
+      // the reconciliation sweep will ingest it on its next run.
       return ok(c, {
         success: false,
-        message: 'Internal error processing email',
+        message: 'Internal error processing email; deferred to reconciliation',
         processed: false
       })
     }

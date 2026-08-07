@@ -14,6 +14,7 @@ import { createAdminRoutes } from './routes/admin'
 import { createInboundRoutes } from './routes/inbound'
 import { createAppointmentsRoutes } from './routes/appointments'
 import { archiveOldSubmissions, getDatabaseSize, purgeOldDeletedSubmissions } from './storage'
+import { syncInboundEmails } from './services/resend-sync'
 import { RETENTION_CONFIG } from './constants'
 import { logDbCapacity, logArchive, logTrashPurge } from './telemetry'
 import type { AppContext, ContactEnv, ContactHandlerOptions } from './types'
@@ -110,6 +111,30 @@ export function createContactHandler(basePath = '/contact/api', options?: Contac
       return c.json({ success: true, duration_ms: Date.now() - startTime })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
+      return c.json({ success: false, error: msg, duration_ms: Date.now() - startTime }, 500)
+    }
+  })
+
+  // Internal endpoint: inbound mail reconciliation.
+  //
+  // Separate from run-daily because the cadences are genuinely different — the
+  // archive/purge sweep is a nightly housekeeping job, whereas this is what
+  // makes the mailbox trustworthy and wants to run every few minutes. Folding
+  // it into daily maintenance would mean a webhook miss stays invisible for up
+  // to 24 hours, which is the failure this whole change exists to remove.
+  app.post('/internal/sync-inbound', async c => {
+    const auth = c.get('authContext')
+    if (!tierAtLeast(auth, 'service')) {
+      return c.json({ error: 'Unauthorized' }, 403)
+    }
+
+    const startTime = Date.now()
+    try {
+      const result = await syncInboundEmails(c.env)
+      return c.json({ success: true, ...result, duration_ms: Date.now() - startTime })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error('[inbound-sync] failed:', msg)
       return c.json({ success: false, error: msg, duration_ms: Date.now() - startTime }, 500)
     }
   })
