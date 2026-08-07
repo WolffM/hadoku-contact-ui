@@ -48,9 +48,11 @@ fi
 # Update package.json with new version
 node -e "
 const fs = require('fs');
-const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-pkg.version = '${new_version}';
-fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+const p = 'package.json';
+const src = fs.readFileSync(p, 'utf8');
+const next = src.replace(/(\"version\"\s*:\s*\")[^\"]*(\")/, (m, a, b) => a + '${new_version}' + b);
+if (next === src) { console.error('could not patch version in ' + p); process.exit(1); }
+fs.writeFileSync(p, next);
 "
 
 echo "✅ Version bumped: ${current_version} → ${new_version}"
