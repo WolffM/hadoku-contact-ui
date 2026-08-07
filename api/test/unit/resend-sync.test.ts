@@ -10,8 +10,18 @@ import { env } from 'cloudflare:test'
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { syncInboundEmails } from '../../services/resend-sync'
 import { createSubmission, recordInboundEmail } from '../../storage'
-import { INBOUND_SYNC_CONFIG } from '../../constants'
+import { INBOUND_SYNC_CONFIG, EMAIL_CONFIG } from '../../constants'
 import type { ContactEnv } from '../../types'
+
+/** A mailbox deliberately NOT in PUBLIC_RECIPIENTS, so the whitelist gate applies. */
+const NON_PUBLIC_RECIPIENT = 'support@hadoku.me'
+
+if ((EMAIL_CONFIG.PUBLIC_RECIPIENTS as readonly string[]).includes(NON_PUBLIC_RECIPIENT)) {
+  throw new Error(
+    `${NON_PUBLIC_RECIPIENT} is now in PUBLIC_RECIPIENTS and cannot stand in for a ` +
+      `whitelist-gated mailbox. Pick another address for NON_PUBLIC_RECIPIENT.`
+  )
+}
 
 interface ListItem {
   id: string
@@ -92,7 +102,7 @@ describe('syncInboundEmails', () => {
       {
         id: 'em_1',
         from: 'a@example.com',
-        to: ['matthaeus@hadoku.me'],
+        to: [NON_PUBLIC_RECIPIENT],
         subject: 'One',
         created_at: recentIso(),
         text: 'first'
@@ -110,9 +120,10 @@ describe('syncInboundEmails', () => {
     const result = await syncInboundEmails(testEnv(), fetchImpl)
 
     expect(result.scanned).toBe(2)
-    // Neither sender is whitelisted and matthaeus@ is not a public recipient,
-    // so both land quarantined — but they LAND, which is the whole point.
-    expect(result.filtered).toBe(2)
+    // One gated mailbox, one public one — the sweep ingests BOTH, which is the
+    // whole point. Where they land differs; that they land does not.
+    expect(result.filtered).toBe(1)
+    expect(result.stored).toBe(1)
     expect(await countSubmissions()).toBe(2)
   })
 

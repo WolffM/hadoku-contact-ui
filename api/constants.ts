@@ -7,8 +7,42 @@
 export const EMAIL_CONFIG = {
   DEFAULT_FROM: 'matthaeus@hadoku.me',
   VALID_DOMAINS: ['hadoku.me'],
-  // Recipients that bypass whitelist/referrer checks (public-facing mailboxes)
-  PUBLIC_RECIPIENTS: ['public@hadoku.me', 'meeting@hadoku.me', 'test@hadoku.me', 'alert@hadoku.me'],
+  // Recipients that bypass the whitelist/referrer checks.
+  //
+  // "Public" here means "accept mail from anyone", NOT "publicly advertised".
+  // The distinction matters: everything below is a real mailbox the operator
+  // actually receives at, and until 2026-08-07 a mailbox missing from this list
+  // silently discarded every message from an address that had not been emailed
+  // first. That cost 26 real emails (GitHub billing, PyPI 2FA, insurance) which
+  // were only readable in the Resend dashboard.
+  //
+  // Mail failing this check is now quarantined rather than dropped, so a
+  // missing entry is recoverable — it lands in the Filtered folder instead of
+  // the Inbox. The list is still the difference between "arrives" and "arrives
+  // somewhere you have to go looking".
+  //
+  // Deliberately permissive for now; per-sender filtering is the follow-up.
+  PUBLIC_RECIPIENTS: [
+    'public@hadoku.me',
+    'meeting@hadoku.me',
+    'test@hadoku.me',
+    'alert@hadoku.me',
+    // The primary mailbox. It is also DEFAULT_FROM, which made its absence
+    // here especially costly: every cold email to the address the operator
+    // sends FROM was discarded.
+    'matthaeus@hadoku.me',
+    // Per-service aliases used for signups. Their senders are transactional
+    // no-reply addresses that will never be whitelisted by a reply, so the
+    // whitelist gate could only ever reject them.
+    'wolffm@hadoku.me',
+    'pypi@hadoku.me',
+    'deadlock@hadoku.me',
+    'geico@hadoku.me',
+    // The rua= target in the _dmarc.hadoku.me record. Aggregate reports are
+    // machine-generated XML and arrive from arbitrary receiving domains, so
+    // the whitelist can never pass them.
+    'dmarc@hadoku.me'
+  ],
   // No-reply address - replies will use sender's from address
   NO_REPLY_ADDRESS: 'no-reply@hadoku.me'
 } as const

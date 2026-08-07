@@ -9,6 +9,17 @@
 import { env, SELF, fetchMock } from 'cloudflare:test'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { addToWhitelist } from '../../storage'
+import { EMAIL_CONFIG } from '../../constants'
+
+/** A mailbox deliberately NOT in PUBLIC_RECIPIENTS, so the whitelist gate applies. */
+const NON_PUBLIC_RECIPIENT = 'support@hadoku.me'
+
+if ((EMAIL_CONFIG.PUBLIC_RECIPIENTS as readonly string[]).includes(NON_PUBLIC_RECIPIENT)) {
+  throw new Error(
+    `${NON_PUBLIC_RECIPIENT} is now in PUBLIC_RECIPIENTS and cannot stand in for a ` +
+      `whitelist-gated mailbox. Pick another address for NON_PUBLIC_RECIPIENT.`
+  )
+}
 
 interface SubmissionRow {
   id: string
@@ -60,15 +71,18 @@ describe('POST /contact/api/inbound', () => {
   })
 
   it('QUARANTINES mail from a non-whitelisted sender instead of discarding it', async () => {
-    // This is the bug. matthaeus@hadoku.me is the primary mailbox and is NOT
-    // in PUBLIC_RECIPIENTS, so before this change a cold email to it vanished
-    // with a 200 and no row anywhere.
+    // This is the original bug: a cold email to a whitelist-gated mailbox
+    // vanished with a 200 and no row anywhere. It is now kept and flagged.
+    //
+    // Uses NON_PUBLIC_RECIPIENT rather than the primary mailbox — matthaeus@
+    // was the motivating example, but it became a PUBLIC recipient on
+    // 2026-08-07, so it no longer exercises the gate at all.
     mockRetrieve('em_cold', { id: 'em_cold', text: 'Are you available for contract work?' })
 
     const response = await postWebhook({
       email_id: 'em_cold',
       from: 'Stranger <stranger@example.com>',
-      to: ['matthaeus@hadoku.me'],
+      to: [NON_PUBLIC_RECIPIENT],
       subject: 'Contract opportunity'
     })
 
@@ -78,9 +92,27 @@ describe('POST /contact/api/inbound', () => {
     expect(row).not.toBeNull()
     expect(row?.filtered_reason).toBe('not_whitelisted')
     expect(row?.email).toBe('stranger@example.com')
-    expect(row?.recipient).toBe('matthaeus@hadoku.me')
+    expect(row?.recipient).toBe(NON_PUBLIC_RECIPIENT)
     expect(row?.message).toContain('Contract opportunity')
     expect(row?.message).toContain('Are you available for contract work?')
+  })
+
+  it('accepts mail to the primary mailbox from a stranger', async () => {
+    // The counterpart to the above, and the reason matthaeus@ was made public:
+    // it is DEFAULT_FROM, so it is the address strangers reply TO. Cold mail
+    // there must reach the Inbox, not the Filtered folder.
+    mockRetrieve('em_primary', { id: 'em_primary', text: 'Cold outreach body' })
+
+    await postWebhook({
+      email_id: 'em_primary',
+      from: 'stranger@example.com',
+      to: ['matthaeus@hadoku.me'],
+      subject: 'Hello'
+    })
+
+    const row = await rowFor('em_primary')
+    expect(row).not.toBeNull()
+    expect(row?.filtered_reason).toBeNull()
   })
 
   it('accepts mail from a whitelisted sender with no filtered_reason', async () => {

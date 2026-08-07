@@ -12,6 +12,26 @@
  */
 import { env, SELF } from 'cloudflare:test'
 import { describe, it, expect, beforeEach } from 'vitest'
+import { EMAIL_CONFIG } from '../../constants'
+
+/**
+ * A mailbox that is deliberately NOT in PUBLIC_RECIPIENTS, for the tests that
+ * assert the referrer gate still bites.
+ *
+ * These used to use `matthaeus@hadoku.me`, which stopped working the moment the
+ * primary mailbox was made public on 2026-08-07 — the tests failed for the
+ * right reason (behaviour genuinely changed) but named the wrong thing. The
+ * guard below turns a future repeat into an explicit message instead of a
+ * confusing assertion failure three tests away.
+ */
+const NON_PUBLIC_RECIPIENT = 'support@hadoku.me'
+
+if ((EMAIL_CONFIG.PUBLIC_RECIPIENTS as readonly string[]).includes(NON_PUBLIC_RECIPIENT)) {
+  throw new Error(
+    `${NON_PUBLIC_RECIPIENT} is now in PUBLIC_RECIPIENTS, so it can no longer stand in ` +
+      `for a whitelist-gated mailbox. Pick another address for NON_PUBLIC_RECIPIENT.`
+  )
+}
 
 /** Helper to POST a contact submission */
 async function submitContact(body: Record<string, unknown>, headers: Record<string, string> = {}) {
@@ -158,7 +178,7 @@ describe('Contact Submission Integration', () => {
           name: 'Spammer',
           email: 'spam@evil.com',
           message: 'Spam',
-          recipient: 'matthaeus@hadoku.me'
+          recipient: NON_PUBLIC_RECIPIENT
         },
         { Referer: 'https://evil.com/spam' }
       )
@@ -271,7 +291,7 @@ describe('Contact Submission Integration', () => {
           name: 'External User',
           email: 'user@external.com',
           message: 'Should fail',
-          recipient: 'matthaeus@hadoku.me'
+          recipient: NON_PUBLIC_RECIPIENT
         },
         { Referer: 'https://external-site.com/contact', 'X-Forwarded-For': ip }
       )
