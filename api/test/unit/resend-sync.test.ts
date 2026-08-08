@@ -236,6 +236,97 @@ describe('syncInboundEmails', () => {
     expect(await countSubmissions()).toBe(1)
   })
 
+  it('adopts a long-subject email instead of wedging on the D1 LIKE cap', async () => {
+    // D1 raises "LIKE or GLOB pattern too complex" past a 50-BYTE pattern, so
+    // matching the stored row with `message LIKE 'Subject: ...%'` threw for
+    // every subject over ~40 characters. A throw skips the ledger write, so
+    // the sweep retried the same email every ten minutes, forever. The match
+    // is a substr() prefix compare now, which has no such bound.
+    const subject = 'Your appointment request has been received and is awaiting confirmation'
+    expect(`Subject: ${subject}`.length).toBeGreaterThan(50)
+
+    await createSubmission(env.DB, {
+      name: 'alice',
+      email: 'alice@example.com',
+      message: `Subject: ${subject}\n\nthe body`,
+      ip_address: null,
+      user_agent: 'Resend Inbound Email',
+      referrer: null,
+      recipient: 'matthaeus@hadoku.me'
+    })
+
+    const { fetchImpl } = makeResend([
+      {
+        id: 'em_long',
+        from: 'alice@example.com',
+        to: ['matthaeus@hadoku.me'],
+        subject,
+        created_at: recentIso(),
+        text: 'the body'
+      }
+    ])
+
+    const result = await syncInboundEmails(testEnv(), fetchImpl)
+
+    expect(result.errors).toBe(0)
+    expect(result.adopted).toBe(1)
+    expect(await countSubmissions()).toBe(1)
+  })
+
+  it('recovers when a stored email lost its ledger row', async () => {
+    // A sweep that died between the INSERT and the ledger write leaves the id
+    // stamped on a row with nothing in the ledger. The next sweep sees the
+    // email as fresh; if it tries to stamp that id onto some other id-less row
+    // the UNIQUE index rejects it, the ledger write is skipped again, and the
+    // email is wedged permanently. It has to recognise its own earlier work.
+    await createSubmission(env.DB, {
+      name: 'alice',
+      email: 'alice@example.com',
+      message: 'Subject: Repeat\n\nfirst copy',
+      ip_address: null,
+      user_agent: 'Resend Inbound Email',
+      referrer: null,
+      recipient: 'matthaeus@hadoku.me'
+    })
+    const stored = await createSubmission(env.DB, {
+      name: 'alice',
+      email: 'alice@example.com',
+      message: 'Subject: Repeat\n\nsecond copy',
+      ip_address: null,
+      user_agent: 'Resend Inbound Email',
+      referrer: null,
+      recipient: 'matthaeus@hadoku.me',
+      resend_email_id: 'em_orphan'
+    })
+
+    const { fetchImpl } = makeResend([
+      {
+        id: 'em_orphan',
+        from: 'alice@example.com',
+        to: ['matthaeus@hadoku.me'],
+        subject: 'Repeat',
+        created_at: recentIso(),
+        text: 'second copy'
+      }
+    ])
+
+    const result = await syncInboundEmails(testEnv(), fetchImpl)
+
+    expect(result.errors).toBe(0)
+    expect(result.adopted).toBe(1)
+    // No third row, and the id stays on the row that already had it.
+    expect(await countSubmissions()).toBe(2)
+    expect(await countSubmissions('resend_email_id = ?', 'em_orphan')).toBe(1)
+
+    const ledger = await env.DB.prepare(
+      'SELECT submission_id, outcome FROM inbound_email_ledger WHERE resend_email_id = ?'
+    )
+      .bind('em_orphan')
+      .first<{ submission_id: string; outcome: string }>()
+    expect(ledger?.outcome).toBe('stored')
+    expect(ledger?.submission_id).toBe(stored.id)
+  })
+
   it('does NOT replay a forwarder recipient', async () => {
     // Firing a "new open spot" trigger from a reconciliation pass would act on
     // stale information in another service.

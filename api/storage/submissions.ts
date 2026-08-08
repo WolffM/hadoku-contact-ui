@@ -132,6 +132,30 @@ export async function adoptSubmissionForResendId(
   db: D1Database,
   params: { resendEmailId: string; email: string; recipient: string | null; subject: string }
 ): Promise<string | null> {
+  // Some row already carries this id, so the mail IS stored and only the
+  // ledger entry is missing — a sweep that died between the INSERT and the
+  // ledger write leaves exactly that state. Hand the id back so the caller
+  // ledgers it and stops. Falling through instead would drive the id into the
+  // UNIQUE index (from the adopt UPDATE or the later INSERT), throw, skip the
+  // ledger write again, and wedge this email into a permanent retry loop.
+  const stamped = await db
+    .prepare(
+      `SELECT id FROM contact_submissions
+			WHERE resend_email_id = ?
+			LIMIT 1`
+    )
+    .bind(params.resendEmailId)
+    .first<{ id: string }>()
+
+  if (stamped) return stamped.id
+
+  // Prefix-match with substr(), NOT `message LIKE 'Subject: ...%'`: D1 caps a
+  // LIKE/GLOB pattern at 50 bytes and raises "LIKE or GLOB pattern too
+  // complex" past it, so any subject over ~40 characters threw here — and
+  // since a throw skips the ledger write, every such email retried forever.
+  // length() is evaluated by SQLite on the same bound string it slices, so the
+  // two agree on character counting even for astral-plane subjects.
+  const messagePrefix = `Subject: ${params.subject}`
   const candidate = await db
     .prepare(
       `SELECT id FROM contact_submissions
@@ -139,11 +163,11 @@ export async function adoptSubmissionForResendId(
 				AND direction = 'inbound'
 				AND email = ?
 				AND recipient IS ?
-				AND message LIKE ? ESCAPE '\\'
+				AND substr(message, 1, length(?)) = ?
 			ORDER BY created_at DESC
 			LIMIT 1`
     )
-    .bind(params.email, params.recipient, `${escapeLike(`Subject: ${params.subject}`)}%`)
+    .bind(params.email, params.recipient, messagePrefix, messagePrefix)
     .first<{ id: string }>()
 
   if (!candidate) return null
@@ -160,11 +184,6 @@ export async function adoptSubmissionForResendId(
     .run()
 
   return (updated.meta?.changes ?? 0) > 0 ? candidate.id : null
-}
-
-/** LIKE treats % and _ as wildcards; a subject containing either would match too much. */
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, match => `\\${match}`)
 }
 
 export async function getAllSubmissions(

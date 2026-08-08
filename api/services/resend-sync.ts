@@ -199,7 +199,13 @@ export async function syncInboundEmails(
         }
       } catch (error) {
         // Same rule: no ledger row, so the next sweep tries again.
-        console.error(`[inbound-sync] ingest ${item.id} failed:`, error)
+        //
+        // Interpolate the message rather than passing the Error through:
+        // Workers Logs renders a passed Error as its stack alone, and a D1
+        // failure's stack is entirely internal frames — the one line that says
+        // WHICH constraint or limit was hit gets dropped.
+        const message = error instanceof Error ? error.message : String(error)
+        console.error(`[inbound-sync] ingest ${item.id} failed: ${message}`)
         result.errors += 1
       }
     }
