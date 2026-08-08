@@ -17,10 +17,18 @@ export async function getDatabaseSize(db: D1Database): Promise<DatabaseSize> {
       db.prepare('PRAGMA page_size')
     ])
 
-    const pageCount = (pragmaResult[0].results[0] as Record<string, unknown>)?.page_count ?? 0
-    const pageSize =
+    // Number() rather than a cast: these come out of a D1 PRAGMA as `unknown`,
+    // and a `as number` would have compiled while still yielding NaN for any
+    // non-numeric value — which is exactly the silent-garbage outcome the
+    // capacity warning must not have. Number(undefined) is NaN, so the ?? keeps
+    // the defaults doing real work.
+    const pageCount = Number(
+      (pragmaResult[0].results[0] as Record<string, unknown>)?.page_count ?? 0
+    )
+    const pageSize = Number(
       (pragmaResult[1].results[0] as Record<string, unknown>)?.page_size ??
-      DATABASE_CONFIG.DEFAULT_PAGE_SIZE
+        DATABASE_CONFIG.DEFAULT_PAGE_SIZE
+    )
 
     const sizeBytes = pageCount * pageSize
     const percentUsed = (sizeBytes / DATABASE_CONFIG.FREE_TIER_LIMIT_BYTES) * 100

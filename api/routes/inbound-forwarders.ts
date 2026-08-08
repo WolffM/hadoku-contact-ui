@@ -43,8 +43,15 @@ export async function maybeForwardInboundEmail(
   }
 
   const rule = FORWARD_RECIPIENTS[recipient]
-  const baseUrl = (env as Record<string, string | undefined>)[rule.urlEnv]
-  const apiKey = (env as Record<string, string | undefined>)[rule.keyEnv]
+  // `urlEnv`/`keyEnv` name a ContactEnv field at runtime, but they are plain
+  // strings at compile time, so the lookup needs an index signature ContactEnv
+  // deliberately does not have (it is an explicit list of bindings, which is
+  // what makes a typo in a binding name a compile error elsewhere). Going via
+  // `unknown` is the narrow, honest escape for exactly this dynamic read —
+  // the direct cast TypeScript rejects, correctly, as unrelated types.
+  const envRecord = env as unknown as Record<string, string | undefined>
+  const baseUrl = envRecord[rule.urlEnv]
+  const apiKey = envRecord[rule.keyEnv]
 
   if (!baseUrl || !apiKey) {
     console.warn(

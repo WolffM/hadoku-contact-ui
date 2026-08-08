@@ -259,7 +259,7 @@ export async function getTemplateVersionHistory(
   db: D1Database,
   templateId: string,
   templateType: 'email' | 'chatbot' = 'email',
-  limit = PAGINATION_DEFAULTS.MAX_VERSION_HISTORY
+  limit: number = PAGINATION_DEFAULTS.MAX_VERSION_HISTORY
 ): Promise<TemplateVersion[]> {
   const { results } = await db
     .prepare(

@@ -4,6 +4,23 @@
 
 import type { EmailProvider, EmailParams, EmailResponse } from './provider'
 
+/**
+ * The two shapes Resend's send endpoint returns.
+ *
+ * `Response.json()` is typed `unknown` (correctly — it is parsed JSON from the
+ * network), so reading `.message` / `.id` off it needs a declared shape. Both
+ * fields are optional: the error branch already falls back when Resend answers
+ * with something unexpected, and pretending they are guaranteed would move that
+ * failure from a fallback string to a runtime undefined.
+ */
+interface ResendErrorBody {
+  message?: string
+}
+
+interface ResendSendBody {
+  id?: string
+}
+
 export class ResendProvider implements EmailProvider {
   constructor(private apiKey: string) {}
 
@@ -25,17 +42,19 @@ export class ResendProvider implements EmailProvider {
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }))
+        const errorData = (await response
+          .json()
+          .catch(() => ({ message: 'Unknown error' }))) as ResendErrorBody
         return {
           success: false,
           error: `Resend API error: ${response.status} - ${errorData.message ?? 'Unknown error'}`
         }
       }
 
-      const data = await response.json()
+      const data = (await response.json()) as ResendSendBody
       return {
         success: true,
-        messageId: data.id as string
+        messageId: data.id
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'

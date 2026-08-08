@@ -10,6 +10,7 @@
  */
 
 import { createGoogleMeetEvent } from './google-meet'
+import type { ContactEnv } from '../types'
 
 export type MeetingPlatform = 'discord' | 'jitsi' | 'google'
 
@@ -32,7 +33,7 @@ export interface AppointmentDetails {
 export async function generateMeetingLink(
   platform: MeetingPlatform,
   appointment: AppointmentDetails,
-  env: Record<string, unknown>
+  env: ContactEnv
 ): Promise<MeetingLinkResult> {
   switch (platform) {
     case 'discord':
@@ -40,7 +41,7 @@ export async function generateMeetingLink(
     case 'jitsi':
       return generateJitsiLink(appointment, env)
     case 'google':
-      return createGoogleMeetEvent(appointment, env as Parameters<typeof createGoogleMeetEvent>[1])
+      return createGoogleMeetEvent(appointment, env)
     default:
       return {
         success: false,
@@ -57,13 +58,9 @@ function generateDiscordLink(appointment: AppointmentDetails): MeetingLinkResult
   }
 }
 
-function generateJitsiLink(
-  appointment: AppointmentDetails,
-  env: Record<string, unknown>
-): MeetingLinkResult {
+function generateJitsiLink(appointment: AppointmentDetails, env: ContactEnv): MeetingLinkResult {
   const roomName = `hadoku-${appointment.slotId}`
-  const jitsiDomain =
-    (typeof env.JITSI_DOMAIN === 'string' ? env.JITSI_DOMAIN : null) ?? 'meet.jit.si'
+  const jitsiDomain = env.JITSI_DOMAIN ?? 'meet.jit.si'
 
   return {
     success: true,

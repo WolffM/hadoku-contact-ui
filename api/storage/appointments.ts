@@ -115,7 +115,11 @@ export async function createAppointment(
   db: D1Database,
   params: CreateAppointmentParams
 ): Promise<StoredAppointment> {
-  const id = (globalThis.crypto as { randomUUID: () => string }).randomUUID()
+  // `crypto` is a bare global in the Workers runtime, declared by
+  // @cloudflare/workers-types as `declare const` — which TypeScript does NOT
+  // expose as a property of `globalThis`. Reaching through globalThis was the
+  // reason the cast existed, and the cast is what hid that it did not typecheck.
+  const id = crypto.randomUUID()
   const now = Date.now()
 
   // Remove any cancelled appointment occupying this slot so the UNIQUE constraint

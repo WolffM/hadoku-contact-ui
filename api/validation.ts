@@ -328,8 +328,12 @@ export function validateAppointment(data: unknown): AppointmentValidationResult 
 }
 
 export function validateSlotFetchRequest(
-  date: string | null,
-  duration: string | null
+  // `undefined` as well as `null`: the only caller passes `c.req.query(...)`,
+  // which returns `string | undefined` for an absent param. Narrowing this to
+  // `string | null` did not make the absent case impossible, it just made the
+  // one real call site fail to typecheck.
+  date: string | null | undefined,
+  duration: string | null | undefined
 ): {
   valid: boolean
   errors: string[]

@@ -1,6 +1,6 @@
 {
   "name": "@wolffm/contact-ui",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "description": "Contact form micro-frontend for hadoku.me",
   "type": "module",
   "packageManager": "pnpm@11.5.0",
@@ -33,7 +33,7 @@
     "test:api": "vitest run --config vitest.config.api.ts",
     "test:ui": "vitest run --config vitest.config.ui.ts",
     "test": "pnpm test:api && pnpm test:ui",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.api.json --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lint:css": "stylelint \"src/**/*.css\" && node node_modules/@wolffm/themes/scripts/check-usage.mjs ./src",

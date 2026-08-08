@@ -63,7 +63,11 @@ export async function createSubmission(
   db: D1Database,
   params: CreateSubmissionParams
 ): Promise<StoredSubmission> {
-  const id = (globalThis.crypto as { randomUUID: () => string }).randomUUID()
+  // `crypto` is a bare global in the Workers runtime, declared by
+  // @cloudflare/workers-types as `declare const` — which TypeScript does NOT
+  // expose as a property of `globalThis`. Reaching through globalThis was the
+  // reason the cast existed, and the cast is what hid that it did not typecheck.
+  const id = crypto.randomUUID()
   const created_at = Date.now()
 
   const direction = params.direction ?? 'inbound'
@@ -188,8 +192,8 @@ export async function adoptSubmissionForResendId(
 
 export async function getAllSubmissions(
   db: D1Database,
-  limit = PAGINATION_DEFAULTS.LIMIT,
-  offset = PAGINATION_DEFAULTS.OFFSET,
+  limit: number = PAGINATION_DEFAULTS.LIMIT,
+  offset: number = PAGINATION_DEFAULTS.OFFSET,
   includeDeleted = false
 ): Promise<StoredSubmission[]> {
   const whereClause = includeDeleted ? '' : `WHERE status != 'deleted'`
@@ -289,7 +293,7 @@ export async function getSubmissionStats(db: D1Database): Promise<SubmissionStat
 
 export async function archiveOldSubmissions(
   db: D1Database,
-  daysOld = RETENTION_CONFIG.ARCHIVE_AFTER_DAYS
+  daysOld: number = RETENTION_CONFIG.ARCHIVE_AFTER_DAYS
 ): Promise<number> {
   const cutoffTime = Date.now() - daysOld * 24 * 60 * 60 * 1000
   const archivedAt = Date.now()

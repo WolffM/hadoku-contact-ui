@@ -20,6 +20,16 @@ export interface ContactEnv {
   CONTACTUI_SERVICE_KEY?: string
   TASK_CALENDAR_BOARD?: string
   TASK_API_URL?: string
+  // Meeting-link generation (services/meeting-links.ts, services/google-meet.ts).
+  // These were READ but never declared, which is why generateMeetingLink took
+  // `Record<string, unknown>` — an escape hatch that also removed every
+  // guarantee about the bindings it reads. Declaring them is what lets that
+  // parameter be ContactEnv and a typo in a binding name be a compile error.
+  JITSI_DOMAIN?: string
+  GOOGLE_OAUTH_CLIENT_ID?: string
+  GOOGLE_OAUTH_CLIENT_SECRET?: string
+  GOOGLE_OAUTH_REFRESH_TOKEN?: string
+  GOOGLE_CALENDAR_ID?: string
 }
 
 export interface ContactHandlerOptions {

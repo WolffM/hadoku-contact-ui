@@ -5,7 +5,11 @@
  * Split into domain-specific modules.
  */
 
-import { Hono, type Context, type ContentfulStatusCode, type Next } from 'hono'
+import { Hono, type Context, type Next } from 'hono'
+// Not re-exported from the package root — hono keeps its status-code types in
+// this subpath. The root import compiled only because nothing ever typechecked
+// this tree.
+import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { createSubmissionRoutes } from './submissions'
 import { createEmailRoutes } from './email'
 import { createAppointmentAdminRoutes } from './appointments'

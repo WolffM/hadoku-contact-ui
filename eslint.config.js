@@ -90,6 +90,11 @@ export default [
         Response: 'readonly',
         URL: 'readonly',
         RequestInit: 'readonly',
+        // A real Workers global, and one @cloudflare/workers-types declares as
+        // `declare const` — which TypeScript does NOT expose on `globalThis`.
+        // So `crypto.randomUUID()` is the only spelling that satisfies tsc, and
+        // it needs to be declared here or no-undef rejects it.
+        crypto: 'readonly',
         // Node.js
         __dirname: 'readonly'
       }
