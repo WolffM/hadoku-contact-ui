@@ -6,6 +6,20 @@
 // Email configuration
 export const EMAIL_CONFIG = {
   DEFAULT_FROM: 'matthaeus@hadoku.me',
+  /**
+   * Display name on outbound mail — the most prominent thing in a recipient's
+   * inbox list, and often the only thing they read before deciding to open.
+   *
+   * It was the literal 'Hadoku Mail', hardcoded separately in the Resend and
+   * MailChannels providers. A reply from a person that announces itself as a
+   * brand reads like a ticketing system, which is the opposite of what this
+   * domain's mail is for: recruiters and business contacts replying to a human.
+   *
+   * Overridable per-message via `EmailParams.fromName`, and per-deployment via
+   * the `EMAIL_FROM_NAME` binding, so changing it does not need a package
+   * release.
+   */
+  DEFAULT_FROM_NAME: 'Matthaeus Wolff',
   VALID_DOMAINS: ['hadoku.me'],
   // Recipients that bypass the whitelist/referrer checks.
   //

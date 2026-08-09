@@ -3,6 +3,7 @@
  */
 
 import type { EmailProvider, EmailParams, EmailResponse } from './provider'
+import { EMAIL_CONFIG } from '../constants'
 
 /**
  * The two shapes Resend's send endpoint returns.
@@ -33,7 +34,7 @@ export class ResendProvider implements EmailProvider {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          from: `Hadoku Mail <${params.from}>`,
+          from: `${params.fromName ?? EMAIL_CONFIG.DEFAULT_FROM_NAME} <${params.from}>`,
           to: [params.to],
           subject: params.subject,
           text: params.text,

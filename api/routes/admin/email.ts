@@ -60,7 +60,11 @@ export function createEmailRoutes() {
         to: body.to,
         subject: body.subject,
         text: body.text,
-        replyTo: effectiveReplyTo
+        replyTo: effectiveReplyTo,
+        // Deployment override, so the display name can change from wrangler.toml
+        // without a package release. Falls through to EMAIL_CONFIG.DEFAULT_FROM_NAME
+        // inside the provider when unset.
+        fromName: c.env.EMAIL_FROM_NAME
       })
 
       if (!result.success) {

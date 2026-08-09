@@ -4,6 +4,7 @@
  */
 
 import type { EmailProvider, EmailParams, EmailResponse } from './provider'
+import { EMAIL_CONFIG } from '../constants'
 
 export class MailChannelsProvider implements EmailProvider {
   async sendEmail(params: EmailParams): Promise<EmailResponse> {
@@ -24,7 +25,7 @@ export class MailChannelsProvider implements EmailProvider {
           ],
           from: {
             email: params.from,
-            name: 'Hadoku Mail'
+            name: params.fromName ?? EMAIL_CONFIG.DEFAULT_FROM_NAME
           },
           subject: params.subject,
           content: [

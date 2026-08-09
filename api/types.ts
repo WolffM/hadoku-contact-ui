@@ -10,6 +10,9 @@ export interface ContactEnv {
   // Edge provenance secret — createEdgeAuth verifies inbound X-Edge-Auth.
   EDGE_AUTH_SECRET?: string
   EMAIL_PROVIDER?: string
+  // Display name on outbound mail. Overrides EMAIL_CONFIG.DEFAULT_FROM_NAME
+  // so the name can change without republishing the package.
+  EMAIL_FROM_NAME?: string
   RESEND_API_KEY?: string
   RESEND_WEBHOOK_SECRET?: string
   // Inbound forwarding — scraper (pickleball waitlist trigger, etc.)
