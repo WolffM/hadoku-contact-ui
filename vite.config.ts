@@ -4,6 +4,11 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   build: {
+    // The favicon in public/ is for the `vite dev` harness only. This bundle is
+    // a library mounted into hadoku.me, which serves its own favicon from the
+    // site root — so copying public/ into dist/ would ship a stray asset in the
+    // published package that nothing would ever read.
+    copyPublicDir: false,
     lib: {
       entry: 'src/entry.tsx',
       formats: ['es'],
