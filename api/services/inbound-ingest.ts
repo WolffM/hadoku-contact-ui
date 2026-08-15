@@ -10,12 +10,15 @@
  *
  * The governing rule: nothing is ever silently dropped. Mail that fails the
  * whitelist gate is QUARANTINED (stored with a `filtered_reason`), not
- * discarded, so it is one folder away instead of gone.
+ * discarded, so it is one folder away instead of gone. Blocked mail is the one
+ * case with an expiry on that promise — it is still stored and still visible,
+ * but in Spam, and it is hard-deleted after SPAM_RETENTION_DAYS.
  */
 
 import { EMAIL_CONFIG } from '../constants'
 import {
   isEmailWhitelisted,
+  findBlockRule,
   createSubmission,
   adoptSubmissionForResendId,
   recordInboundEmail,
@@ -144,11 +147,25 @@ export async function ingestInboundEmail(
     }
   }
 
-  // The gate. Failing it no longer means the mail disappears — it means the
-  // mail lands in the Filtered folder with the reason attached.
-  const whitelisted = await isEmailWhitelisted(db, senderEmail)
-  const filteredReason: FilteredReason | null =
-    whitelisted || isPublicRecipient(recipient) ? null : 'not_whitelisted'
+  // The gate, in two tiers.
+  //
+  // The blocklist is consulted FIRST and overrides everything below it —
+  // including the whitelist and the public-recipient bypass. Those two answer
+  // "may this sender reach the inbox by default?", which a block has already
+  // overruled: the operator looked at this sender and said no. Checking the
+  // whitelist first would mean a single past reply (send-email auto-whitelists
+  // its recipient) permanently outranked an explicit block, and mail to a public
+  // mailbox could never be blocked at all — which is exactly the mail that most
+  // needs blocking, since those addresses are the ones scraped off the site.
+  const blockRule = await findBlockRule(db, senderEmail)
+
+  let filteredReason: FilteredReason | null
+  if (blockRule) {
+    filteredReason = 'blocked'
+  } else {
+    const whitelisted = await isEmailWhitelisted(db, senderEmail)
+    filteredReason = whitelisted || isPublicRecipient(recipient) ? null : 'not_whitelisted'
+  }
 
   const submission = await createSubmission(db, {
     name: senderEmail.split('@')[0],
@@ -160,10 +177,15 @@ export async function ingestInboundEmail(
     recipient,
     resend_email_id: input.emailId,
     filtered_reason: filteredReason,
+    // Starts the 90-day countdown at the moment of arrival for mail that was
+    // already blocked when it landed.
+    spammed_at: filteredReason === 'blocked' ? Date.now() : null,
     // Backfilled mail arrives already-read: a sweep that pulls in 30 days of
     // history should not detonate the unread badge with mail the user has
-    // already seen in the Resend dashboard.
-    status: source === 'webhook' ? 'unread' : 'read'
+    // already seen in the Resend dashboard. Blocked mail is likewise never
+    // unread — the entire point of blocking a sender is to stop being notified
+    // by them, so an unread spam row would defeat the feature at the last step.
+    status: source === 'webhook' && !blockRule ? 'unread' : 'read'
   })
 
   await recordInboundEmail(db, {
@@ -173,8 +195,15 @@ export async function ingestInboundEmail(
     outcome: filteredReason ? 'filtered' : 'stored'
   })
 
+  // Name the rule that fired, not just the verdict: "blocked by @cerebras.net"
+  // and "blocked by info@cerebras.net" are the difference between a domain block
+  // that is eating more than intended and one that is doing its job, and that is
+  // the first thing worth knowing when a block turns out to be too wide.
+  const detail = blockRule
+    ? `blocked by ${blockRule.kind} rule ${blockRule.pattern}`
+    : filteredReason
   console.log(
-    `[inbound] ${input.emailId}: ${filteredReason ? `filtered (${filteredReason})` : 'stored'} as ${submission.id}`
+    `[inbound] ${input.emailId}: ${filteredReason ? `filtered (${detail})` : 'stored'} as ${submission.id}`
   )
 
   return {
@@ -182,6 +211,6 @@ export async function ingestInboundEmail(
     outcome: filteredReason ? 'filtered' : 'stored',
     submissionId: submission.id,
     filteredReason: filteredReason ?? undefined,
-    message: filteredReason ? `Quarantined: ${filteredReason}` : 'Email processed successfully'
+    message: filteredReason ? `Quarantined: ${detail}` : 'Email processed successfully'
   }
 }

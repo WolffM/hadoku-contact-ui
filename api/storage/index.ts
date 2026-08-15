@@ -15,9 +15,23 @@ export {
   deleteSubmission,
   restoreSubmission,
   purgeOldDeletedSubmissions,
+  purgeOldSpamSubmissions,
   getSubmissionStats,
   archiveOldSubmissions
 } from './submissions'
+
+export {
+  type BlockKind,
+  type BlocklistEntry,
+  domainOf,
+  normalizeBlockPattern,
+  findBlockRule,
+  getAllBlocklistEntries,
+  addToBlocklist,
+  applyBlockToExistingMail,
+  removeFromBlocklist,
+  restoreBlockedMail
+} from './blocklist'
 
 export {
   type InboundSource,

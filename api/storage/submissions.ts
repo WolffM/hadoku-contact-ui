@@ -25,16 +25,30 @@ export interface StoredSubmission {
    * silently discarded any more.
    */
   filtered_reason: string | null
+  /**
+   * When this mail entered the Spam folder, and the start of its
+   * SPAM_RETENTION_DAYS countdown. Non-NULL exactly when
+   * `filtered_reason = 'blocked'`; NULL for every other row.
+   */
+  spammed_at: number | null
 }
 
 /**
  * Why a mail was quarantined instead of accepted.
  *
- * Only one reason today. Retrieval failures are deliberately NOT a reason:
- * a mail whose body we could not fetch is left unledgered so the next sweep
- * retries it with a real body, rather than being frozen as a permanent stub.
+ * The two are not degrees of the same thing, and the difference is what the
+ * operator has said:
+ *
+ *   not_whitelisted  nobody has vouched for this sender yet. Reviewable in
+ *                    Filtered, kept on the ordinary archive schedule.
+ *   blocked          the operator judged this sender unwanted. Spam folder,
+ *                    exempt from archiving, destroyed after 90 days.
+ *
+ * Retrieval failures are deliberately NOT a reason: a mail whose body we could
+ * not fetch is left unledgered so the next sweep retries it with a real body,
+ * rather than being frozen as a permanent stub.
  */
-export type FilteredReason = 'not_whitelisted'
+export type FilteredReason = 'not_whitelisted' | 'blocked'
 
 export interface CreateSubmissionParams {
   name: string
@@ -47,16 +61,24 @@ export interface CreateSubmissionParams {
   direction?: 'inbound' | 'outbound'
   resend_email_id?: string | null
   filtered_reason?: FilteredReason | null
+  /**
+   * Start of the spam retention clock. Set only alongside
+   * `filtered_reason: 'blocked'`; ingest passes `Date.now()`.
+   */
+  spammed_at?: number | null
   /** Overrides the direction-derived default. Used to backfill old mail as read. */
   status?: 'unread' | 'read'
 }
 
 export interface SubmissionStats {
+  /** Live, non-spam mail. Spam is excluded — a blocked sender must not inflate it. */
   total: number
+  /** Likewise spam-free, so blocked mail can never drive the unread badge. */
   unread: number
   read: number
   archived: number
   deleted: number
+  spam: number
 }
 
 export async function createSubmission(
@@ -76,8 +98,8 @@ export async function createSubmission(
   await db
     .prepare(
       `INSERT INTO contact_submissions
-			(id, name, email, message, status, created_at, ip_address, user_agent, referrer, recipient, direction, resend_email_id, filtered_reason)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+			(id, name, email, message, status, created_at, ip_address, user_agent, referrer, recipient, direction, resend_email_id, filtered_reason, spammed_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       id,
@@ -92,7 +114,8 @@ export async function createSubmission(
       params.recipient ?? null,
       direction,
       params.resend_email_id ?? null,
-      params.filtered_reason ?? null
+      params.filtered_reason ?? null,
+      params.spammed_at ?? null
     )
     .run()
 
@@ -110,7 +133,8 @@ export async function createSubmission(
     deleted_at: null,
     direction,
     resend_email_id: params.resend_email_id ?? null,
-    filtered_reason: params.filtered_reason ?? null
+    filtered_reason: params.filtered_reason ?? null,
+    spammed_at: params.spammed_at ?? null
   }
 
   return result
@@ -279,16 +303,17 @@ export async function getSubmissionStats(db: D1Database): Promise<SubmissionStat
   const result = await db
     .prepare(
       `SELECT
-				SUM(CASE WHEN status != 'deleted' THEN 1 ELSE 0 END) as total,
-				SUM(CASE WHEN status = 'unread' THEN 1 ELSE 0 END) as unread,
+				SUM(CASE WHEN status != 'deleted' AND spammed_at IS NULL THEN 1 ELSE 0 END) as total,
+				SUM(CASE WHEN status = 'unread' AND spammed_at IS NULL THEN 1 ELSE 0 END) as unread,
 				SUM(CASE WHEN status = 'read' THEN 1 ELSE 0 END) as read,
 				SUM(CASE WHEN status = 'archived' THEN 1 ELSE 0 END) as archived,
-				SUM(CASE WHEN status = 'deleted' THEN 1 ELSE 0 END) as deleted
+				SUM(CASE WHEN status = 'deleted' THEN 1 ELSE 0 END) as deleted,
+				SUM(CASE WHEN spammed_at IS NOT NULL THEN 1 ELSE 0 END) as spam
 			FROM contact_submissions`
     )
     .first<SubmissionStats>()
 
-  return result ?? { total: 0, unread: 0, read: 0, archived: 0, deleted: 0 }
+  return result ?? { total: 0, unread: 0, read: 0, archived: 0, deleted: 0, spam: 0 }
 }
 
 export async function archiveOldSubmissions(
@@ -322,6 +347,19 @@ export async function archiveOldSubmissions(
   // the whole predicate unknown (nothing matches).
   const notReferenced =
     'id NOT IN (SELECT submission_id FROM appointments WHERE submission_id IS NOT NULL)'
+
+  // Spam is governed by its own clock and must never enter the archive.
+  //
+  // contact_submissions_archive carries none of the columns added after 0001 —
+  // no `filtered_reason`, no `spammed_at`, no `recipient`, no `direction`. A spam
+  // row that crossed the 30-day archive horizon would therefore come out the far
+  // side stripped of every marker that identified it as spam: indistinguishable
+  // from ordinary old mail, unreachable by the Spam folder (nothing reads the
+  // archive table), and untouchable by purgeOldSpamSubmissions, which scans
+  // contact_submissions alone. The 90-day deletion promise would be silently
+  // broken for every blocked sender at day 30, in the direction that KEEPS the
+  // mail forever. Excluding it here is what makes that promise keepable.
+  const notSpam = 'spammed_at IS NULL'
   const [copyResult] = await db.batch([
     db
       .prepare(
@@ -329,13 +367,45 @@ export async function archiveOldSubmissions(
 			(id, name, email, message, status, created_at, archived_at, ip_address, user_agent, referrer)
 			SELECT id, name, email, message, status, created_at, ?, ip_address, user_agent, referrer
 			FROM contact_submissions
-			WHERE created_at < ? AND ${notReferenced}`
+			WHERE created_at < ? AND ${notReferenced} AND ${notSpam}`
       )
       .bind(archivedAt, cutoffTime),
     db
-      .prepare(`DELETE FROM contact_submissions WHERE created_at < ? AND ${notReferenced}`)
+      .prepare(
+        `DELETE FROM contact_submissions
+         WHERE created_at < ? AND ${notReferenced} AND ${notSpam}`
+      )
       .bind(cutoffTime)
   ])
 
   return copyResult.meta?.changes ?? 0
+}
+
+/**
+ * Hard-delete spam whose SPAM_RETENTION_DAYS window has closed.
+ *
+ * Scans `spammed_at`, not `created_at`: the clock starts when the sender was
+ * blocked, so a freshly-blocked backlog of year-old mail gets its full 90 days
+ * of "actually, undo that" rather than evaporating on the next nightly run.
+ *
+ * Same appointments FK guard as the archive and trash sweeps — `appointments.submission_id`
+ * references contact_submissions(id) with no ON DELETE clause, so deleting a row a
+ * booked appointment still points at raises FOREIGN KEY constraint and fails the
+ * whole daily-maintenance job. `IS NOT NULL` is required: a NULL inside a NOT IN
+ * set makes the predicate unknown and matches nothing.
+ */
+export async function purgeOldSpamSubmissions(db: D1Database): Promise<number> {
+  const retentionMs = RETENTION_CONFIG.SPAM_RETENTION_DAYS * 24 * 60 * 60 * 1000
+  const cutoffTime = Date.now() - retentionMs
+
+  const result = await db
+    .prepare(
+      `DELETE FROM contact_submissions
+       WHERE filtered_reason = 'blocked' AND spammed_at IS NOT NULL AND spammed_at < ?
+         AND id NOT IN (SELECT submission_id FROM appointments WHERE submission_id IS NOT NULL)`
+    )
+    .bind(cutoffTime)
+    .run()
+
+  return result.meta?.changes ?? 0
 }

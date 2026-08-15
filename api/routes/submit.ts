@@ -13,6 +13,7 @@ import {
 import {
   createSubmission,
   isEmailWhitelisted,
+  findBlockRule,
   addToWhitelist,
   createAppointment,
   isSlotAvailable,
@@ -98,6 +99,13 @@ export function createSubmitRoutes(rateLimitOverrides?: {
 
       const isPublicMailbox = isPublicRecipient(recipient)
       const isWhitelisted = email ? await isEmailWhitelisted(db, email) : false
+      // The web form is the second way a blocked sender can reach the mailbox,
+      // and left unguarded it is the one that UNDOES the block: a submission
+      // auto-whitelists its sender below, so a blocked spammer filling in the
+      // form would land in the Inbox AND acquire a whitelist entry that outlives
+      // the block. Checked here, next to the other gate inputs, so the two paths
+      // (form and inbound mail) cannot drift on what "blocked" means.
+      const blockRule = email ? await findBlockRule(db, email) : null
 
       if (!isPublicMailbox && !isWhitelisted && !validateReferrer(request)) {
         return c.json({ success: false, message: 'Invalid referrer' }, 400)
@@ -169,7 +177,13 @@ export function createSubmitRoutes(rateLimitOverrides?: {
         recipient: sanitized.recipient,
         ip_address: ipAddress,
         user_agent: userAgent,
-        referrer
+        referrer,
+        filtered_reason: blockRule ? 'blocked' : null,
+        spammed_at: blockRule ? Date.now() : null,
+        // 'unread' is what createSubmission would derive for an inbound row
+        // anyway; stating it keeps the blocked branch from having to pass
+        // `undefined` to express "use the default".
+        status: blockRule ? 'read' : 'unread'
       })
 
       if (!isAdmin) {
@@ -178,7 +192,11 @@ export function createSubmitRoutes(rateLimitOverrides?: {
 
       logSubmissionCreated(c.env, sanitized.recipient || 'default')
 
-      if (!isWhitelisted) {
+      // A blocked sender must never be auto-whitelisted. The whitelist entry
+      // would survive the block being lifted and silently re-admit them, and
+      // worse, it would make the mailbox's own state disagree with the operator's
+      // stated judgement about this sender.
+      if (!isWhitelisted && !blockRule) {
         await addToWhitelist(
           db,
           sanitized.email,

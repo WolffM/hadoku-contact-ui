@@ -91,7 +91,19 @@ export const DATABASE_CONFIG = {
 // Archival and retention
 export const RETENTION_CONFIG = {
   TRASH_RETENTION_DAYS: 7,
-  ARCHIVE_AFTER_DAYS: 30
+  ARCHIVE_AFTER_DAYS: 30,
+  // How long blocked-sender mail sits in Spam before it is hard-deleted.
+  //
+  // Longer than ARCHIVE_AFTER_DAYS on purpose, and that inversion is the whole
+  // reason spam is exempted from the archive sweep: a spam row must OUTLIVE the
+  // 30-day horizon in contact_submissions, because the archive table cannot
+  // represent it (no filtered_reason / spammed_at columns) and nothing reads the
+  // archive back. See archiveOldSubmissions.
+  //
+  // The clock runs from `spammed_at` — the moment of the block — not from when
+  // the mail arrived, so blocking a sender you tolerated for a year gives you a
+  // full 90 days to notice a mistake instead of destroying the backlog tonight.
+  SPAM_RETENTION_DAYS: 90
 } as const
 
 // Inbound reconciliation — the sweep that makes the mailbox converge on what

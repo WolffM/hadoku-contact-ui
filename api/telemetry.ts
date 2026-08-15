@@ -12,6 +12,7 @@ export const EventType = {
   DB_CAPACITY_CRITICAL: 'db_capacity_crit',
   SUBMISSIONS_ARCHIVED: 'submissions_arch',
   TRASH_PURGED: 'trash_purged',
+  SPAM_PURGED: 'spam_purged',
   EMAIL_SENT: 'email_sent',
   EMAIL_FAILED: 'email_failed',
   APPOINTMENT_BOOKED: 'appt_booked',
@@ -130,6 +131,17 @@ export function logTrashPurge(env: TelemetryEnv, purgedCount: number, daysOld: n
     value2: daysOld,
     context: `Purged ${purgedCount} deleted items`,
     detail: `older than ${daysOld} days`
+  })
+}
+
+export function logSpamPurge(env: TelemetryEnv, purgedCount: number, daysOld: number): void {
+  logEvent(env, {
+    eventType: EventType.SPAM_PURGED,
+    severity: Severity.INFO,
+    value: purgedCount,
+    value2: daysOld,
+    context: `Purged ${purgedCount} spam messages`,
+    detail: `blocked more than ${daysOld} days ago`
   })
 }
 

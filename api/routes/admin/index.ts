@@ -12,6 +12,7 @@ import { Hono, type Context, type Next } from 'hono'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { createSubmissionRoutes } from './submissions'
 import { createEmailRoutes } from './email'
+import { createBlocklistRoutes } from './blocklist'
 import { createAppointmentAdminRoutes } from './appointments'
 import { createTemplateRoutes } from './templates'
 import type { AppContext } from '../../types'
@@ -55,6 +56,7 @@ export function createAdminRoutes() {
 
   app.route('/', createSubmissionRoutes())
   app.route('/', createEmailRoutes())
+  app.route('/', createBlocklistRoutes())
   app.route('/', createAppointmentAdminRoutes())
   app.route('/', createTemplateRoutes())
 

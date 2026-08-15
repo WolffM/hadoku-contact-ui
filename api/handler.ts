@@ -13,10 +13,15 @@ import { createSubmitRoutes } from './routes/submit'
 import { createAdminRoutes } from './routes/admin'
 import { createInboundRoutes } from './routes/inbound'
 import { createAppointmentsRoutes } from './routes/appointments'
-import { archiveOldSubmissions, getDatabaseSize, purgeOldDeletedSubmissions } from './storage'
+import {
+  archiveOldSubmissions,
+  getDatabaseSize,
+  purgeOldDeletedSubmissions,
+  purgeOldSpamSubmissions
+} from './storage'
 import { syncInboundEmails } from './services/resend-sync'
 import { RETENTION_CONFIG } from './constants'
-import { logDbCapacity, logArchive, logTrashPurge } from './telemetry'
+import { logDbCapacity, logArchive, logTrashPurge, logSpamPurge } from './telemetry'
 import type { AppContext, ContactEnv, ContactHandlerOptions } from './types'
 
 async function handleScheduled(env: ContactEnv): Promise<void> {
@@ -39,6 +44,16 @@ async function handleScheduled(env: ContactEnv): Promise<void> {
     `Purged ${purgedCount} deleted submission(s) older than ${RETENTION_CONFIG.TRASH_RETENTION_DAYS} days`
   )
   logTrashPurge(env, purgedCount, RETENTION_CONFIG.TRASH_RETENTION_DAYS)
+
+  // Spam's own clock. It runs after the archive step by necessity rather than
+  // taste: archiveOldSubmissions skips `spammed_at IS NOT NULL` rows entirely, so
+  // this is the ONLY thing that ever removes blocked mail from the table. If it
+  // stops running, spam accumulates forever instead of failing loudly.
+  const spamPurgedCount = await purgeOldSpamSubmissions(env.DB)
+  console.log(
+    `Purged ${spamPurgedCount} spam submission(s) blocked more than ${RETENTION_CONFIG.SPAM_RETENTION_DAYS} days ago`
+  )
+  logSpamPurge(env, spamPurgedCount, RETENTION_CONFIG.SPAM_RETENTION_DAYS)
 
   const dbSize = await getDatabaseSize(env.DB)
   console.log(
