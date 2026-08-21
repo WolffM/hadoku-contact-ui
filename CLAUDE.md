@@ -19,6 +19,31 @@ Dual-export npm package: React micro-frontend + Hono API sub-router for the hado
 - Publish: GitHub Packages (`@wolffm` scope)
 - On publish: dispatches `packages_updated` to `WolffM/hadoku_site`
 
+## Inbound gate
+
+Inbound mail passes two independent tiers before it becomes an Inbox row:
+
+| Tier          | Failing it means                    | Switchable?                                   |
+| ------------- | ----------------------------------- | --------------------------------------------- |
+| **Blocklist** | `blocked` → Spam, purged after 90d  | No, and never should be                       |
+| **Whitelist** | `not_whitelisted` → Filtered folder | Yes — `INBOUND_WHITELIST_MODE=accept-all` var |
+
+`INBOUND_WHITELIST_MODE` is a plain Worker `[vars]` entry, not a secret. It is
+**opt-out**: unset, or any value other than the exact string `accept-all`,
+enforces the whitelist — so upgrading the package never changes what reaches an
+existing deployment, and a typo fails toward the cautious answer.
+
+Everything that consults the whitelist tier reads it through
+`isWhitelistEnforced(env)` (`api/services/inbound-ingest.ts`). That includes
+`restoreBlockedMail`, which re-evaluates the gate when a sender is unblocked and
+takes the answer as a parameter — pass `isWhitelistEnforced(env)` there and
+nothing else, or an unblock will file mail somewhere the sender's next message
+never appears.
+
+The switch governs FUTURE mail only. Rows already carrying
+`filtered_reason = 'not_whitelisted'` keep it; releasing a backlog is a one-off
+UPDATE against D1.
+
 ## External dependencies
 
 - **Parent repo:** `../hadoku_site/` — mounts both UI and API exports, owns the Cloudflare Worker deployment

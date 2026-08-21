@@ -29,6 +29,7 @@ import {
   type BlockKind
 } from '../../storage'
 import { RETENTION_CONFIG } from '../../constants'
+import { isWhitelistEnforced } from '../../services/inbound-ingest'
 import { adminOk } from './index'
 import type { AppContext } from '../../types'
 
@@ -123,7 +124,12 @@ export function createBlocklistRoutes() {
       }
 
       await removeFromBlocklist(c.env.DB, pattern)
-      const restored = await restoreBlockedMail(c.env.DB, entry.pattern, entry.kind)
+      const restored = await restoreBlockedMail(
+        c.env.DB,
+        entry.pattern,
+        entry.kind,
+        isWhitelistEnforced(c.env)
+      )
 
       return adminOk(c, {
         pattern: entry.pattern,
@@ -210,7 +216,12 @@ export function createBlocklistRoutes() {
       }
 
       await removeFromBlocklist(c.env.DB, rule.pattern)
-      const restored = await restoreBlockedMail(c.env.DB, rule.pattern, rule.kind)
+      const restored = await restoreBlockedMail(
+        c.env.DB,
+        rule.pattern,
+        rule.kind,
+        isWhitelistEnforced(c.env)
+      )
 
       return adminOk(c, {
         pattern: rule.pattern,

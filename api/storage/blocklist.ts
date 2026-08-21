@@ -207,12 +207,34 @@ export async function removeFromBlocklist(db: D1Database, pattern: string): Prom
  * from the same sender landed in Filtered, two paths disagreeing about one sender.
  * So the gate is RE-EVALUATED here, in the same terms ingest uses: whitelisted, or
  * addressed to a public recipient, means Inbox; otherwise back to Filtered.
+ *
+ * `enforceWhitelist` is that same "same terms" clause, which is why it is a
+ * parameter rather than a constant: on a deployment running
+ * INBOUND_WHITELIST_MODE=accept-all there is no whitelist tier left to fall back
+ * to, so an unblock returns mail to the Inbox outright. Passing the wrong value
+ * here is exactly the two-paths-disagreeing bug the re-evaluation exists to
+ * prevent — callers pass `isWhitelistEnforced(env)` and nothing else.
  */
 export async function restoreBlockedMail(
   db: D1Database,
   pattern: string,
-  kind: BlockKind
+  kind: BlockKind,
+  enforceWhitelist = true
 ): Promise<number> {
+  if (!enforceWhitelist) {
+    const cleared = await db
+      .prepare(
+        `UPDATE contact_submissions
+         SET filtered_reason = NULL, spammed_at = NULL
+         WHERE ${matchClause(kind)}
+           AND filtered_reason = 'blocked'`
+      )
+      .bind(pattern)
+      .run()
+
+    return cleared.meta?.changes ?? 0
+  }
+
   const publicRecipients = EMAIL_CONFIG.PUBLIC_RECIPIENTS as readonly string[]
   // Built from a compile-time constant, never from caller input — the values are
   // still bound, the placeholders only size the list.

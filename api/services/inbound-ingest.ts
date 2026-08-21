@@ -13,6 +13,9 @@
  * discarded, so it is one folder away instead of gone. Blocked mail is the one
  * case with an expiry on that promise — it is still stored and still visible,
  * but in Spam, and it is hard-deleted after SPAM_RETENTION_DAYS.
+ *
+ * The whitelist half of the gate is switchable per deployment — see
+ * isWhitelistEnforced(). The blocklist half is not, and never should be.
  */
 
 import { EMAIL_CONFIG } from '../constants'
@@ -62,6 +65,29 @@ export function extractAddress(raw: string): string {
 function isPublicRecipient(recipient: string | null): boolean {
   if (!recipient) return false
   return (EMAIL_CONFIG.PUBLIC_RECIPIENTS as readonly string[]).includes(recipient)
+}
+
+/**
+ * Is the WHITELIST half of the gate enforced on this deployment?
+ *
+ * `INBOUND_WHITELIST_MODE = 'accept-all'` turns it off: every sender that is not
+ * explicitly BLOCKED reaches the Inbox, and PUBLIC_RECIPIENTS stops mattering
+ * because there is no longer a default-deny for it to except. That is the right
+ * shape for a mailbox whose owner reads everything anyway — the whitelist is a
+ * noise filter, and a noise filter you have to go and empty every day is worse
+ * than no filter.
+ *
+ * Opt-OUT, not opt-in: an unset binding enforces, so no existing deployment
+ * changes behaviour by upgrading. And an unrecognised value enforces too, since
+ * a typo in a binding that governs what reaches you must fail toward the
+ * cautious answer, not the permissive one.
+ *
+ * The blocklist deliberately has no equivalent switch. "I have not vouched for
+ * this sender yet" is a default the operator may reasonably want to drop;
+ * "I looked at this sender and said no" is not.
+ */
+export function isWhitelistEnforced(env: Pick<ContactEnv, 'INBOUND_WHITELIST_MODE'>): boolean {
+  return env.INBOUND_WHITELIST_MODE !== 'accept-all'
 }
 
 export async function ingestInboundEmail(
@@ -147,7 +173,7 @@ export async function ingestInboundEmail(
     }
   }
 
-  // The gate, in two tiers.
+  // The gate, in two tiers (one of which the deployment may switch off).
   //
   // The blocklist is consulted FIRST and overrides everything below it —
   // including the whitelist and the public-recipient bypass. Those two answer
@@ -162,6 +188,9 @@ export async function ingestInboundEmail(
   let filteredReason: FilteredReason | null
   if (blockRule) {
     filteredReason = 'blocked'
+  } else if (!isWhitelistEnforced(env)) {
+    // Whitelist off: past the blocklist is past the gate.
+    filteredReason = null
   } else {
     const whitelisted = await isEmailWhitelisted(db, senderEmail)
     filteredReason = whitelisted || isPublicRecipient(recipient) ? null : 'not_whitelisted'
