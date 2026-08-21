@@ -17,6 +17,7 @@ import {
   addToBlocklist,
   applyBlockToExistingMail,
   createSubmission,
+  releaseQuarantinedSubmissions,
   restoreBlockedMail
 } from '../../storage'
 import { EMAIL_CONFIG } from '../../constants'
@@ -146,5 +147,68 @@ describe('restoreBlockedMail with the whitelist off', () => {
 
     expect(await restoreBlockedMail(env.DB, 'info@cerebras.net', 'address')).toBe(1)
     expect(await reasonOf(row.id)).toBe('not_whitelisted')
+  })
+})
+
+describe('releaseQuarantinedSubmissions', () => {
+  beforeEach(async () => {
+    await env.DB.prepare('DELETE FROM contact_submissions').run()
+    await env.DB.prepare('DELETE FROM email_blocklist').run()
+  })
+
+  async function quarantined(email: string) {
+    return createSubmission(env.DB, {
+      name: email.split('@')[0],
+      email,
+      message: 'cold outreach',
+      ip_address: null,
+      user_agent: null,
+      referrer: null,
+      filtered_reason: 'not_whitelisted'
+    })
+  }
+
+  it('clears the backlog the switch left behind', async () => {
+    // Turning the gate off stops new mail being stamped and says nothing about
+    // mail already behind it, which would otherwise sit in Filtered for the life
+    // of the row.
+    const a = await quarantined('one@example.com')
+    const b = await quarantined('two@example.com')
+
+    expect(await releaseQuarantinedSubmissions(env.DB)).toBe(2)
+    expect(await reasonOf(a.id)).toBeNull()
+    expect(await reasonOf(b.id)).toBeNull()
+  })
+
+  it('leaves blocked mail in Spam', async () => {
+    // The one thing this must not do. Blocked mail is on a 90-day destruction
+    // clock and releasing it would put an explicitly-rejected sender back in
+    // the Inbox — the opposite of what the operator asked for.
+    const row = await createSubmission(env.DB, {
+      name: 'info',
+      email: 'info@cerebras.net',
+      message: 'spam',
+      ip_address: null,
+      user_agent: null,
+      referrer: null
+    })
+    await applyBlockToExistingMail(env.DB, 'info@cerebras.net', 'address')
+
+    expect(await releaseQuarantinedSubmissions(env.DB)).toBe(0)
+    expect(await reasonOf(row.id)).toBe('blocked')
+
+    const stamped = await env.DB.prepare('SELECT spammed_at FROM contact_submissions WHERE id = ?')
+      .bind(row.id)
+      .first<{ spammed_at: number | null }>()
+    expect(stamped?.spammed_at).not.toBeNull()
+  })
+
+  it('is a no-op on the second run', async () => {
+    // Daily maintenance calls this every day forever. It has to converge, not
+    // keep finding work.
+    await quarantined('one@example.com')
+
+    expect(await releaseQuarantinedSubmissions(env.DB)).toBe(1)
+    expect(await releaseQuarantinedSubmissions(env.DB)).toBe(0)
   })
 })

@@ -299,6 +299,34 @@ export async function purgeOldDeletedSubmissions(db: D1Database): Promise<number
   return result.meta?.changes ?? 0
 }
 
+/**
+ * Clear every lingering `not_whitelisted` stamp. Returns the count.
+ *
+ * For deployments that have switched the whitelist tier off
+ * (INBOUND_WHITELIST_MODE=accept-all). Turning the gate off stops NEW mail being
+ * stamped, but says nothing about mail already carrying the stamp — which then
+ * sits in Filtered, quarantined by a policy that no longer exists, for as long
+ * as the row survives. Daily maintenance calls this so storage converges on the
+ * policy instead of preserving a fossil of the previous one.
+ *
+ * Blocked mail is untouched: `filtered_reason = 'not_whitelisted'` is the whole
+ * predicate, so Spam and its retention clock are out of scope by construction.
+ *
+ * Idempotent, and a no-op on every run after the first — which is the point.
+ * Switching the gate back ON does not re-stamp these rows, and should not: they
+ * are mail the operator has had in the Inbox and left there.
+ */
+export async function releaseQuarantinedSubmissions(db: D1Database): Promise<number> {
+  const result = await db
+    .prepare(
+      `UPDATE contact_submissions SET filtered_reason = NULL
+       WHERE filtered_reason = 'not_whitelisted'`
+    )
+    .run()
+
+  return result.meta?.changes ?? 0
+}
+
 export async function getSubmissionStats(db: D1Database): Promise<SubmissionStats> {
   const result = await db
     .prepare(

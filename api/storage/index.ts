@@ -16,6 +16,7 @@ export {
   restoreSubmission,
   purgeOldDeletedSubmissions,
   purgeOldSpamSubmissions,
+  releaseQuarantinedSubmissions,
   getSubmissionStats,
   archiveOldSubmissions
 } from './submissions'

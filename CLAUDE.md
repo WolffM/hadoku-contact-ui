@@ -40,9 +40,13 @@ takes the answer as a parameter — pass `isWhitelistEnforced(env)` there and
 nothing else, or an unblock will file mail somewhere the sender's next message
 never appears.
 
-The switch governs FUTURE mail only. Rows already carrying
-`filtered_reason = 'not_whitelisted'` keep it; releasing a backlog is a one-off
-UPDATE against D1.
+The switch governs future INGEST only — turning a gate off says nothing about
+mail already behind it. Daily maintenance closes that gap:
+`releaseQuarantinedSubmissions` clears every lingering `not_whitelisted` stamp
+while the mode is `accept-all`, so storage converges on the policy instead of
+keeping a fossil of the previous one. It runs once, reports 0 forever after, and
+never touches `blocked` rows. Switching the gate back on does not re-stamp what
+it released.
 
 ## External dependencies
 

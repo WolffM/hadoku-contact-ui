@@ -17,9 +17,11 @@ import {
   archiveOldSubmissions,
   getDatabaseSize,
   purgeOldDeletedSubmissions,
-  purgeOldSpamSubmissions
+  purgeOldSpamSubmissions,
+  releaseQuarantinedSubmissions
 } from './storage'
 import { syncInboundEmails } from './services/resend-sync'
+import { isWhitelistEnforced } from './services/inbound-ingest'
 import { RETENTION_CONFIG } from './constants'
 import { logDbCapacity, logArchive, logTrashPurge, logSpamPurge } from './telemetry'
 import type { AppContext, ContactEnv, ContactHandlerOptions } from './types'
@@ -54,6 +56,26 @@ async function handleScheduled(env: ContactEnv): Promise<void> {
     `Purged ${spamPurgedCount} spam submission(s) blocked more than ${RETENTION_CONFIG.SPAM_RETENTION_DAYS} days ago`
   )
   logSpamPurge(env, spamPurgedCount, RETENTION_CONFIG.SPAM_RETENTION_DAYS)
+
+  // Policy convergence, not retention. With the whitelist tier switched off
+  // nothing produces `not_whitelisted` any more, so a row still carrying it is
+  // quarantined by a rule that no longer exists — and would stay in Filtered
+  // for the life of the row, because turning a gate off says nothing about mail
+  // already behind it. This is the only step here that can be a permanent
+  // no-op: on an enforcing deployment it never runs at all, and on a switched
+  // one it clears the backlog once and reports 0 forever after.
+  //
+  // No telemetry counter, deliberately. The others measure a recurring rate
+  // worth graphing; this measures a one-time migration whose only interesting
+  // value is its first.
+  if (!isWhitelistEnforced(env)) {
+    const releasedCount = await releaseQuarantinedSubmissions(env.DB)
+    if (releasedCount > 0) {
+      console.log(
+        `Released ${releasedCount} quarantined submission(s) — INBOUND_WHITELIST_MODE=accept-all`
+      )
+    }
+  }
 
   const dbSize = await getDatabaseSize(env.DB)
   console.log(
