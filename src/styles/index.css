@@ -544,6 +544,57 @@ body {
   color: var(--color-text-secondary);
 }
 
+/* --- Neutralise react-calendar's own palette ---------------------------- */
+
+/* `react-calendar/dist/Calendar.css` hardcodes a light theme in hex: #f0f0f0
+ * behind disabled tiles AND disabled nav buttons, #e6e6e6 on hover, #ffff76 for
+ * today, #006edc for the selected day, #d10000 for weekends, white for the
+ * canvas. None of it can follow a theme.
+ *
+ * The rules below paint the day CIRCLE, which is an inner <abbr> — so nothing
+ * was overriding the colours react-calendar puts on the tile itself any more,
+ * and in a dark theme every unavailable date rendered as a pale slab. Whole
+ * weeks of #f0f0f0 with the four bookable days punched out of them.
+ *
+ * Neutralised in one place, with the `.appointment-calendar` prefix purely to
+ * outrank the library. Everything below this block decides colour from tokens.
+ */
+.appointment-calendar .react-calendar,
+.appointment-calendar .react-calendar__tile,
+.appointment-calendar .react-calendar__tile:disabled,
+.appointment-calendar .react-calendar__tile:enabled:hover,
+.appointment-calendar .react-calendar__tile:enabled:focus,
+.appointment-calendar .react-calendar__tile--now,
+.appointment-calendar .react-calendar__tile--now:enabled:hover,
+.appointment-calendar .react-calendar__tile--now:enabled:focus,
+.appointment-calendar .react-calendar__tile--hasActive,
+.appointment-calendar .react-calendar__tile--hasActive:enabled:hover,
+.appointment-calendar .react-calendar__tile--hasActive:enabled:focus,
+.appointment-calendar .react-calendar__tile--active,
+.appointment-calendar .react-calendar__tile--active:enabled:hover,
+.appointment-calendar .react-calendar__tile--active:enabled:focus,
+.appointment-calendar .react-calendar__navigation button,
+.appointment-calendar .react-calendar__navigation button:disabled {
+  background: none;
+  border: none;
+}
+
+/* The nav hover tint is re-applied here rather than in the Navigation block
+   above, because the neutraliser outranks that block and would erase it. */
+.appointment-calendar .react-calendar__navigation button:enabled:hover,
+.appointment-calendar .react-calendar__navigation button:enabled:focus-visible {
+  background-color: var(--color-primary-bg);
+  color: var(--color-on-primary-bg);
+}
+
+/* Same story for text: the library colours weekends #d10000 and disabled days
+   #ababab on the tile, which the circle would otherwise inherit. */
+.appointment-calendar .react-calendar__month-view__days__day--weekend,
+.appointment-calendar .react-calendar__month-view__days__day--neighboringMonth,
+.appointment-calendar .react-calendar__tile:disabled {
+  color: inherit;
+}
+
 /* --- Day grid ---------------------------------------------------------- */
 
 /* react-calendar positions this grid with INLINE styles that a stylesheet rule
@@ -586,9 +637,15 @@ body {
 
 /* Bookable. The tint is the whole affordance: these are the days that read as
    present, and everything else recedes behind them. */
+/* The fill alone is not enough. `--color-primary-bg` is a TINT — in several
+   dark themes it sits within a few percent of `--color-bg-card`, so the circle
+   vanished into the card and the only thing marking a bookable day was the
+   weight of its digits. The ring is what makes the affordance survive a theme
+   whose tint happens to match its own surface. */
 .react-calendar__tile:enabled abbr {
   background-color: var(--color-primary-bg);
   color: var(--color-on-primary-bg);
+  box-shadow: inset 0 0 0 1px var(--color-primary);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -596,6 +653,7 @@ body {
 .react-calendar__tile:enabled:focus-visible abbr {
   background-color: var(--color-primary);
   color: var(--color-on-primary);
+  box-shadow: none;
   transform: scale(1.08);
 }
 
@@ -621,6 +679,7 @@ body {
 .react-calendar__tile--active:enabled:focus-visible abbr {
   background-color: var(--color-primary);
   color: var(--color-on-primary);
+  box-shadow: none;
   font-weight: var(--font-weight-bold);
   transform: none;
 }
