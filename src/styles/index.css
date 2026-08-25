@@ -591,7 +591,12 @@ body {
 
 /* --- Weekday header --------------------------------------------------- */
 
+/* Pinned to exactly 2rem so the day view measures 2rem + 15rem = 17rem, the
+   same box `viewContainer` reserves for the month and year pickers. Left to its
+   own padding it came out 34px, and the card shifted 2px every time you drilled
+   up — small, but it is the same class of jitter as the row jump. */
 .react-calendar__month-view__weekdays {
+  height: 2rem;
   text-align: center;
   font-size: var(--hdk-text-xs);
   font-weight: var(--font-weight-bold);
@@ -601,7 +606,8 @@ body {
 }
 
 .react-calendar__month-view__weekdays__weekday {
-  padding: 0.5rem 0;
+  padding: 0;
+  line-height: 2rem;
 }
 
 .react-calendar__month-view__weekdays__weekday abbr {
