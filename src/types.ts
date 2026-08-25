@@ -32,6 +32,17 @@ export interface AppointmentSelection {
   duration: TimeSlotDuration
   selectedSlot: AppointmentSlot | null
   meetingPlatform: MeetingPlatform | null
+  /**
+   * True when the picker chose `date` itself rather than the user clicking it.
+   *
+   * The calendar opens on the next bookable day so the times are on screen
+   * immediately, which means "a date is selected" is now the resting state of
+   * the form rather than a sign that someone is trying to book. Sending a plain
+   * message must not start demanding a time slot just because the calendar
+   * defaulted to one — but a date the user actually picked and then left
+   * without a time still should.
+   */
+  dateAutoSelected?: boolean
 }
 
 // API Request/Response types

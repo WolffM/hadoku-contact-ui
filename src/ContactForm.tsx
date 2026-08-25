@@ -60,8 +60,19 @@ export default function ContactForm() {
     newErrors.email = validators.email(formData.email)
     newErrors.message = validators.message(formData.message)
 
-    // Appointment is optional, but if a date is selected, a slot and platform must be selected
-    if (appointmentSelection.date && !appointmentSelection.selectedSlot) {
+    // Appointment is optional, but a date the USER picked and then left without a
+    // time is almost certainly a half-finished booking, so it is worth stopping
+    // for. The calendar's own opening choice is not — it defaults to the next
+    // bookable day so the times are visible, and holding up a plain message over
+    // a date nobody chose would make the form impossible to submit. This is the
+    // same line `isFormValid` already drew for the submit button; the two used
+    // to disagree, which would have left the button enabled and the submit
+    // blocked.
+    if (
+      appointmentSelection.date &&
+      !appointmentSelection.dateAutoSelected &&
+      !appointmentSelection.selectedSlot
+    ) {
       newErrors.appointment = 'Please select a time slot or clear the date selection'
     }
     if (appointmentSelection.selectedSlot && !appointmentSelection.meetingPlatform) {
@@ -209,19 +220,22 @@ export default function ContactForm() {
 
   return (
     <div className="contact-container">
-      {/* Form hero — the app-level header bar (title + theme + settings) is
-          rendered above by <AppHeader>; this is the form's own heading. */}
-      <div className="contact-header">
-        <h1 className="contact-title">Get in Touch</h1>
-        <p className="contact-subtitle">
-          Have a question or want to work together? Send me a message!
-        </p>
-      </div>
-
-      {/* Main content: Form (40%) + Appointment Picker (60%) */}
+      {/* Two columns: everything you WRITE on the left, everything you PICK on
+          the right. The hero used to span the full width above both, which cost
+          a whole band of vertical space and left the left column starting
+          level with the calendar's second week. */}
       <div className="contact-content">
         {/* Form Section */}
         <div className="contact-form-section">
+          {/* Form hero — the app-level header bar (title + theme + settings) is
+              rendered above by <AppHeader>; this is the form's own heading. */}
+          <div className="contact-header">
+            <h1 className="contact-title">Get in Touch</h1>
+            <p className="contact-subtitle">
+              Have a question or want to work together? Send me a message!
+            </p>
+          </div>
+
           {/* Success Message */}
           {status === 'success' && (
             <div className="contact-alert contact-alert--success">

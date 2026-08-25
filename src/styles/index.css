@@ -68,18 +68,63 @@ body {
 
 .contact-content {
   display: flex;
-  gap: 3rem;
+  gap: 2rem;
   align-items: flex-start;
 }
 
 .contact-form-section {
-  flex: 0 0 40%;
+  flex: 0 0 38%;
   min-width: 0;
 }
 
 .contact-appointment-section {
-  flex: 0 0 60%;
+  flex: 1 1 auto;
   min-width: 0;
+}
+
+/* Desktop: the picker is capped to what is left of the window, and the list of
+ * times is the only thing that scrolls.
+ *
+ * The alternative is a page that grows with the number of slots — a 15-minute
+ * day is 32 of them — so picking a time meant scrolling the calendar you were
+ * picking it from off the top of the screen.
+ *
+ * The 11rem is the band above the card: the app header bar plus the page's own
+ * top padding. It is a measured constant rather than a derived one because the
+ * header is rendered by <AppHeader> from another package and this stylesheet
+ * cannot ask it how tall it is. If the window is shorter than the calendar
+ * itself the page simply scrolls, which is the honest outcome.
+ */
+@media (min-width: 769px) {
+  /* The cap goes on the picker, NOT on a flex wrapper around it. Making the
+     section `display: flex` turns the picker into a flex item that shrinks to
+     min-content — and because the picker declares `container-type: inline-size`
+     its width no longer depends on its contents, so it collapsed to a 48px
+     ribbon with the heading falling down it one word per line. */
+  .appointment-picker {
+    min-height: 0;
+    max-height: calc(100dvh - 10rem);
+  }
+
+  /* Every link in the chain has to be allowed to shrink, or the grid at the
+     bottom of it inherits an auto height and the cap does nothing. */
+  .appointment-picker__content,
+  .appointment-picker__slots,
+  .time-slot-picker {
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+
+  .appointment-picker__slots {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .time-slot-grid {
+    max-height: none;
+    min-height: 6rem;
+    flex: 1 1 auto;
+  }
 }
 
 /* Mobile: Stack vertically */
@@ -102,8 +147,12 @@ body {
 
 /* On a phone the two nested 2rem gutters ate 128px of a 390px screen — a third
    of the width spent on margin, which left the calendar squeezing seven columns
-   into 262px. The content is the point at that size. */
-@media (max-width: 640px) {
+   into 262px. The content is the point at that size.
+
+   768px, not a number of my own choosing: it is the boundary
+   `@wolffm/task-ui-components` uses in bento.css, toaster.css and its main
+   stylesheet, so a hadoku app changes shape at one width rather than three. */
+@media (max-width: 768px) {
   .contact-ui {
     padding: 1rem 1rem 0 1rem;
   }
@@ -118,11 +167,11 @@ body {
 }
 
 .contact-header {
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
 }
 
 .contact-title {
-  font-size: 2.5rem;
+  font-size: 2rem;
   font-weight: var(--font-weight-bold);
   margin: 0;
   color: var(--color-text);
@@ -272,8 +321,8 @@ body {
   container-name: appointment-picker;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  padding: 1.5rem;
+  gap: 1rem;
+  padding: 1.25rem;
   background-color: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: var(--hdk-radius-lg);
@@ -300,7 +349,7 @@ body {
 .appointment-picker__content {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
 .appointment-picker__calendar {
@@ -325,8 +374,9 @@ body {
   min-width: 0;
 }
 
-/* Side by side only once each half has room for a real row of buttons. */
-@container appointment-picker (min-width: 34rem) {
+/* Side by side once the picker can give each half a row of three. Below that
+   they stack, and each still shows its three across the full width. */
+@container appointment-picker (min-width: 30rem) {
   .appointment-picker__selectors {
     flex-direction: row;
     gap: 1rem;
@@ -400,15 +450,22 @@ body {
   color: var(--color-text);
 }
 
+/* A 3-up grid rather than a flex row, so the duration buttons line up with the
+   three platform buttons beside them and the six read as one band. */
 .duration-selector__pills {
-  display: flex;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
 }
 
 .duration-pill {
-  padding: 0.5rem 1.25rem;
-  font-size: var(--hdk-text-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3rem;
+  min-width: 0;
+  padding: 0.375rem 0.5rem;
+  font-size: var(--hdk-text-xs);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text-secondary);
   background-color: var(--color-bg);
@@ -493,14 +550,22 @@ body {
 }
 
 .react-calendar__navigation button {
-  min-width: 2rem;
-  height: 2rem;
+  min-width: 2.5rem;
+  height: 2.5rem;
   border-radius: 999px;
   color: var(--color-text);
   font-weight: var(--font-weight-semibold);
   transition:
     background-color var(--transition-fast),
     color var(--transition-fast);
+}
+
+/* The arrows were rendering at body size — a ‹ glyph is mostly whitespace, so
+   at 1rem it read as a stray comma rather than a control. They are the only two
+   things on this row you can press. */
+.react-calendar__navigation__arrow {
+  font-size: 1.5rem;
+  line-height: 1;
 }
 
 /* The month name earns the width; the arrows are just controls beside it. */
@@ -604,6 +669,20 @@ body {
    Overriding the tile's flex and margin killed that offset and collapsed each
    day to the width of its own digits, so the month rendered as a smear of 8px
    boxes. The layout is left alone; the circle is an inner element instead.  */
+
+/* Six rows' worth of height, always.
+ *
+ * A month that starts late enough spans six weeks and one that does not spans
+ * five, so paging between them made the whole card jump by a row — the duration
+ * buttons and the times below it moved under the cursor mid-click. Reserving
+ * the taller case keeps the layout still; the sixth row is simply empty in the
+ * months that do not need it.
+ *
+ * 6 x (2.25rem circle + 0.25rem of tile padding) = 15rem. */
+.react-calendar__month-view__days {
+  min-height: 15rem;
+  align-content: flex-start;
+}
 
 .react-calendar__tile {
   display: flex;
@@ -731,10 +810,26 @@ body {
   border: 1px solid var(--color-danger);
 }
 
+/* The times scroll inside their own box instead of pushing the page taller.
+ *
+ * A 15-minute day is 32 slots; at four across that is eight rows, and with the
+ * calendar and the six buttons above it the picker ran well past a laptop
+ * screen — so choosing a time meant scrolling away the calendar you were
+ * choosing it from. Capped here, the whole thing stays on one screen and the
+ * only thing that moves is the list of times.
+ *
+ * `max-height`, not `height`: a short list (a 60-minute day is eight slots)
+ * still takes only the room it needs rather than leaving a hole.
+ */
 .time-slot-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
   gap: 0.5rem;
+  max-height: 15rem;
+  overflow-y: auto;
+  /* Room for the scrollbar so it never sits on top of the last column. */
+  padding-right: 0.25rem;
+  overscroll-behavior: contain;
 }
 
 .time-slot {
@@ -845,30 +940,25 @@ body {
    `minmax(0, ...)` floor lets a track be as narrow as it has to be. */
 .meeting-platform-selector__grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.5rem;
   width: 100%;
 }
 
-/* Three across only once each button clears ~7.5rem — below that they read as
-   cramped chips with a wrapped label, and a full-width stack is both tidier and
-   incapable of overflowing. `minmax(0, 1fr)` rather than `1fr` so a track may
-   shrink under its content: `1fr` floors at min-content, which with the old
-   `white-space: nowrap` label is exactly how the buttons burst out of a 169px
-   column and overlapped each other. */
-@container picker-selector (min-width: 24rem) {
-  .meeting-platform-selector__grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
+/* Three across at every width, which is only safe because the button stacks its
+   icon above its label — laid out side by side, "Google Meet" alone needs ~106px
+   and three of those will not fit the ~170px column this can render in.
+   `minmax(0, 1fr)` rather than `1fr` so a track may shrink below its content:
+   `1fr` floors at min-content, which is exactly how these buttons used to
+   overlap each other and spill out the side. */
 
 .platform-button {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
+  gap: 0.25rem;
+  padding: 0.375rem 0.25rem;
   background-color: var(--color-bg);
   border: 2px solid var(--color-border);
   border-radius: var(--hdk-radius);
@@ -877,7 +967,7 @@ body {
     background-color var(--transition-fast),
     border-color var(--transition-fast),
     transform var(--transition-fast);
-  min-height: 2.75rem;
+  min-height: 3rem;
   width: 100%;
   min-width: 0;
   overflow: hidden;
@@ -916,8 +1006,8 @@ body {
 }
 
 .platform-button__icon {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1rem;
+  height: 1rem;
   flex-shrink: 0;
   color: var(--color-text);
 }
@@ -925,9 +1015,10 @@ body {
 /* No `nowrap`: it is what made the button un-shrinkable, and truncating
    "Google Meet" to "Google M…" is worse than letting it take a second line. */
 .platform-button__label {
-  font-size: var(--hdk-text-sm);
+  font-size: var(--hdk-text-xs);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text);
   min-width: 0;
-  line-height: 1.2;
+  line-height: 1.15;
+  text-align: center;
 }
