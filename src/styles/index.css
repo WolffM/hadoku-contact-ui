@@ -929,6 +929,13 @@ body {
   gap: 0.5rem;
   max-height: 15rem;
   overflow-y: auto;
+  /* Rows keep their own height and any spare room is left at the bottom.
+     Without this a grid distributes leftover height INTO its rows (the initial
+     `align-content: normal` behaves as `stretch` for auto-sized rows), so a day
+     with a single row of times — one slot, at 60 minutes — grew its buttons to
+     96px each to fill the 6rem floor the desktop rule puts under this grid. The
+     buttons are a fixed size; the box around them is what flexes. */
+  align-content: start;
   /* Room for the scrollbar so it never sits on top of the last column. */
   padding-right: 0.25rem;
   overscroll-behavior: contain;
