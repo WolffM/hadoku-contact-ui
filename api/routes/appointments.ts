@@ -4,8 +4,14 @@
 
 import { Hono } from 'hono'
 import { validateSlotFetchRequest } from '../validation'
-import { getAppointmentConfig, getAppointmentsByDate } from '../storage'
-import { zonedDateToUtc, dayOfWeekInZone } from '../utils/timezone'
+import {
+  getAppointmentConfig,
+  getAppointmentsByDate,
+  parseIntList,
+  toBookingWindow
+} from '../storage'
+import { zonedDateToUtc } from '../utils/timezone'
+import { advanceBounds, rejectDate } from '../utils/booking-window'
 
 interface Env {
   DB: D1Database
@@ -45,8 +51,8 @@ export function createAppointmentsRoutes() {
         return c.json({ message: 'Appointment system not configured' }, 500)
       }
 
-      const availableDays = config.available_days.split(',').map(d => parseInt(d.trim()))
-      const slotDurations = config.slot_duration_options.split(',').map(d => parseInt(d.trim()))
+      const slotDurations = parseIntList(config.slot_duration_options)
+      const bookingWindow = toBookingWindow(config)
 
       if (!slotDurations.includes(requestDuration)) {
         return c.json(
@@ -63,52 +69,38 @@ export function createAppointmentsRoutes() {
       // rejected whole the moment its 9am fell inside the notice window — even
       // when its afternoon was hours clear of the cutoff. With a 24h rule and a
       // 09:00-17:00 day, asking at noon rejected all of tomorrow, including the
-      // 4:30pm slot a full 28h out. The contact form's calendar enables a date
-      // whenever any part of it is bookable, so it offered tomorrow and then got
-      // a 400 for the whole day: a selectable date with no times behind it.
+      // 4:30pm slot a full 28h out.
       //
       // A day is now refused only when NOTHING on it can be booked, which keeps
-      // the two error messages meaning what they say. Partially-open days return
-      // their bookable slots, filtered below.
+      // the error messages meaning what they say. Partially-open days return
+      // their bookable slots, filtered below. `rejectDate` is the same function
+      // the contact form's calendar greys dates out with, so a date the user can
+      // still click is a date this endpoint will answer with times.
       const now = new Date()
-      const minAllowedTime = new Date(now.getTime() + config.min_advance_hours * 60 * 60 * 1000)
-      const maxAllowedTime = new Date(now.getTime() + config.max_advance_days * 24 * 60 * 60 * 1000)
+      const { earliest: minAllowedTime, latest: maxAllowedTime } = advanceBounds(bookingWindow, now)
 
-      const [startHour, startMinute] = config.business_hours_start.split(':').map(Number)
-      const [endHour, endMinute] = config.business_hours_end.split(':').map(Number)
-      const firstSlotStart = zonedDateToUtc(requestDate, startHour, startMinute, config.timezone)
-      const businessEnd = zonedDateToUtc(requestDate, endHour, endMinute, config.timezone)
-      // Latest start that still fits inside business hours — the day's best case
-      // against the minimum-notice bound.
-      const lastSlotStart = new Date(businessEnd.getTime() - requestDuration * 60 * 1000)
-
-      if (lastSlotStart < minAllowedTime) {
-        return c.json(
-          {
-            message: `Appointments must be booked at least ${config.min_advance_hours} hours in advance`
-          },
-          400
-        )
-      }
-
-      // Mirror image: the earliest slot is the day's best case against the far bound.
-      if (firstSlotStart > maxAllowedTime) {
-        return c.json(
-          {
-            message: `Appointments can only be booked up to ${config.max_advance_days} days in advance`
-          },
-          400
-        )
-      }
-
-      const dayOfWeek = dayOfWeekInZone(requestDate, config.timezone)
-      if (!availableDays.includes(dayOfWeek)) {
-        return c.json(
-          {
-            message: 'No appointments available on this day of the week'
-          },
-          400
-        )
+      switch (rejectDate(requestDate, requestDuration, bookingWindow, now)) {
+        case 'too_soon':
+          return c.json(
+            {
+              message: `Appointments must be booked at least ${config.min_advance_hours} hours in advance`
+            },
+            400
+          )
+        case 'too_far':
+          return c.json(
+            {
+              message: `Appointments can only be booked up to ${config.max_advance_days} days in advance`
+            },
+            400
+          )
+        case 'day_off':
+          return c.json(
+            {
+              message: 'No appointments available on this day of the week'
+            },
+            400
+          )
       }
 
       const allSlots = await generateTimeSlots(
@@ -137,6 +129,37 @@ export function createAppointmentsRoutes() {
     } catch (error) {
       console.error('Error fetching appointment slots:', error)
       return c.json({ message: 'Failed to fetch available slots' }, 500)
+    }
+  })
+
+  /**
+   * The booking window, public and unauthenticated.
+   *
+   * The contact form needs it to grey out dates nothing can be booked on. It
+   * used to guess — "tomorrow at the browser's local midnight" — which offered
+   * weekends, days past the far bound, and (the report that prompted this)
+   * tomorrow when the notice window had already swallowed all of it. Guessing is
+   * not fixable from the client: only the server knows the timezone, the
+   * business hours and the operator's current notice setting.
+   *
+   * Nothing here is sensitive — it is the same shape the booking page renders —
+   * and it deliberately omits every operational column the admin config returns.
+   */
+  app.get('/appointments/config', async c => {
+    try {
+      const config = await getAppointmentConfig(c.env.DB)
+      if (!config) {
+        return c.json({ message: 'Appointment system not configured' }, 500)
+      }
+
+      return c.json({
+        ...toBookingWindow(config),
+        slotDurations: parseIntList(config.slot_duration_options),
+        platforms: config.meeting_platforms.split(',').map(p => p.trim())
+      })
+    } catch (error) {
+      console.error('Error fetching appointment config:', error)
+      return c.json({ message: 'Failed to fetch appointment configuration' }, 500)
     }
   })
 

@@ -48,6 +48,44 @@ keeping a fossil of the previous one. It runs once, reports 0 forever after, and
 never touches `blocked` rows. Switching the gate back on does not re-stamp what
 it released.
 
+## Booking window
+
+A date is offerable only if some slot on it clears three bounds: the minimum
+notice (`min_advance_hours`), the far bound (`max_advance_days`), and the
+operator's working days (`available_days`).
+
+All three live in **one** function — `rejectDate` in `api/utils/booking-window.ts`
+— imported by both halves of the package: the `/appointments/slots` route
+enforces it, and `AppointmentCalendar` greys dates out with it. That module is
+the reason `src/` imports from `api/`, and it is deliberate. The calendar used
+to carry its own hardcoded version of the rule ("tomorrow at the browser's local
+midnight, weekends included"), so it offered dates the server then refused with
+a 400 the user could not act on — ask at 4:59pm under a 24h notice and a 17:00
+close, and all of tomorrow is gone, but the calendar still let you click it.
+`GET /appointments/config` publishes the window (public, unauthenticated) so the
+form has the real numbers instead of guessing at them.
+
+The window is per-SLOT, not per-day: a day is refused only when even its best
+case fails, so a morning inside the notice window does not discard that
+afternoon. `appointment-slots.test.ts` walks the next 35 days asserting the
+calendar predicate and the endpoint agree on every one — that equivalence is the
+invariant, not either half on its own.
+
+Widening what a user can book is a config change, not a code change:
+`PUT /admin/appointments/config` moves `advance_notice_hours`.
+
+## Mail carries its booking
+
+A contact-form submission that booked a meeting is stored in two tables:
+`contact_submissions` for the message, `appointments` for the slot. The admin
+submissions endpoints attach the second to the first (`submission.appointment`,
+null for the mail that booked nothing), because the Inbox renders them as one
+item and used to show the message with no time on it at all.
+
+The join is done in JS, not SQL: the two tables share `id`, `name`, `email`,
+`message`, `status` and `created_at`, so a `SELECT *` join silently overwrites
+the submission's columns with the appointment's.
+
 ## External dependencies
 
 - **Parent repo:** `../hadoku_site/` — mounts both UI and API exports, owns the Cloudflare Worker deployment

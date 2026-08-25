@@ -4,9 +4,11 @@ import AppointmentCalendar from './AppointmentCalendar'
 import TimeSlotPicker from './TimeSlotPicker'
 import DurationSelector from './DurationSelector'
 import MeetingPlatformSelector from './MeetingPlatformSelector'
-import { fetchAvailableSlots, AppointmentAPIError } from '../api/appointments'
+import { fetchAvailableSlots, fetchBookingWindow, AppointmentAPIError } from '../api/appointments'
+import { isDateBookable } from '../../api/utils/booking-window'
 import type {
   AppointmentSlot,
+  BookingWindowConfig,
   AppointmentSelection,
   TimeSlotDuration,
   MeetingPlatform
@@ -35,6 +37,37 @@ const AppointmentPicker = forwardRef<AppointmentPickerRef, AppointmentPickerProp
     )
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [bookingWindow, setBookingWindow] = useState<BookingWindowConfig | null>(null)
+
+    // Load the server's booking window once. A failure is deliberately silent:
+    // the calendar falls back to offering every future date and the slots
+    // endpoint still refuses what it must, which is exactly the behaviour that
+    // existed before this fetch. Blocking the whole picker on it would be worse.
+    useEffect(() => {
+      let cancelled = false
+      fetchBookingWindow()
+        .then(window => {
+          if (!cancelled) setBookingWindow(window)
+        })
+        .catch(() => {
+          /* fall back to the unfiltered calendar */
+        })
+      return () => {
+        cancelled = true
+      }
+    }, [])
+
+    // A longer meeting needs an earlier start, so raising the duration can push
+    // the selected date out of the window. Drop it rather than let the slots
+    // fetch answer with a whole-day error about a date the calendar has just
+    // greyed out underneath the user.
+    useEffect(() => {
+      if (!bookingWindow || !selectedDate) return
+      if (!isDateBookable(format(selectedDate, 'yyyy-MM-dd'), duration, bookingWindow)) {
+        setSelectedDate(null)
+        setSelectedSlot(null)
+      }
+    }, [bookingWindow, selectedDate, duration])
 
     // Notify parent of selection changes
     useEffect(() => {
@@ -144,6 +177,8 @@ const AppointmentPicker = forwardRef<AppointmentPickerRef, AppointmentPickerProp
             <AppointmentCalendar
               selectedDate={selectedDate}
               onDateChange={handleDateChange}
+              bookingWindow={bookingWindow}
+              duration={duration}
               disabled={disabled}
             />
           </div>

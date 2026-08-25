@@ -1,5 +1,6 @@
 import { logger } from '@wolffm/logger/client'
 import type {
+  BookingWindowConfig,
   FetchSlotsResponse,
   SubmitContactRequest,
   SubmitContactResponse,
@@ -19,6 +20,26 @@ const BUSINESS_END_HOUR = 17 // 5 PM
 const SLOT_UNAVAILABLE_PROBABILITY = 0.2 // 20% chance slot is unavailable
 const CONFLICT_PROBABILITY = 0.1 // 10% chance of slot conflict on submit
 const RATE_LIMIT_PROBABILITY = 0.05 // 5% chance of rate limit on submit
+
+/**
+ * The dev-mode stand-in for `GET /appointments/config`. Mirrors the D1 defaults
+ * from migration 0004 so the mocked calendar greys out the same dates the real
+ * one does.
+ */
+export async function mockFetchBookingWindow(): Promise<BookingWindowConfig> {
+  await new Promise(resolve => setTimeout(resolve, MOCK_DELAY_MS))
+
+  return {
+    timezone: 'America/Los_Angeles',
+    businessHoursStart: `${String(BUSINESS_START_HOUR).padStart(2, '0')}:00`,
+    businessHoursEnd: `${String(BUSINESS_END_HOUR).padStart(2, '0')}:00`,
+    availableDays: [1, 2, 3, 4, 5],
+    minAdvanceHours: 24,
+    maxAdvanceDays: 30,
+    slotDurations: [15, 30, 60],
+    platforms: ['discord', 'google', 'teams', 'jitsi']
+  }
+}
 
 /**
  * Generate mock time slots for a given date

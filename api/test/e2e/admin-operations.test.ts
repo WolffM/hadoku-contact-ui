@@ -96,6 +96,86 @@ describe('Admin Operations Integration', () => {
       expect(data.submission.email).toBe('user1@example.com')
     })
 
+    /**
+     * A submission that booked a meeting IS that meeting to the person who sent
+     * it, but the two live in separate tables — so the Inbox rendered the message
+     * with a sender, an IP, and nothing about WHEN, and the reader had to go match
+     * it up in the Appointments tab by name.
+     */
+    describe('booked meetings ride along with the mail', () => {
+      beforeEach(async () => {
+        await env.DB.prepare(
+          `INSERT INTO appointments
+             (id, submission_id, name, email, message, slot_id, date, start_time, end_time,
+              duration, timezone, platform, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+          .bind(
+            'apt-1',
+            'sub-1',
+            'User One',
+            'user1@example.com',
+            'First message',
+            'slot-2026-08-26-a',
+            '2026-08-26',
+            '2026-08-26T16:00:00.000Z',
+            '2026-08-26T16:30:00.000Z',
+            30,
+            'America/Los_Angeles',
+            'jitsi',
+            'confirmed',
+            Date.now(),
+            Date.now()
+          )
+          .run()
+      })
+
+      it('attaches the appointment to the submission that booked it', async () => {
+        const response = await adminRequest('/contact/api/admin/submissions/sub-1')
+
+        expect(response.status).toBe(200)
+        const result = (await response.json()) as Record<string, unknown>
+        const data = unwrapData<{ submission: Record<string, unknown> }>(result)
+        expect(data.submission.appointment).toMatchObject({
+          id: 'apt-1',
+          start_time: '2026-08-26T16:00:00.000Z',
+          end_time: '2026-08-26T16:30:00.000Z',
+          duration: 30,
+          platform: 'jitsi',
+          status: 'confirmed'
+        })
+      })
+
+      it('leaves the appointment null on mail that booked nothing', async () => {
+        const response = await adminRequest('/contact/api/admin/submissions?limit=10&offset=0')
+
+        const result = (await response.json()) as Record<string, unknown>
+        const data = unwrapData<{
+          submissions: { id: string; appointment: unknown }[]
+        }>(result)
+        const byId = new Map(data.submissions.map(s => [s.id, s.appointment]))
+
+        expect(byId.get('sub-1')).toMatchObject({ id: 'apt-1' })
+        expect(byId.get('sub-2')).toBeNull()
+      })
+
+      /**
+       * The join must not let the appointment's columns bleed over the
+       * submission's — the two tables share `id`, `name`, `email`, `message`,
+       * `status` and `created_at`, and a `SELECT *` join would have quietly
+       * replaced the mail's id with the booking's.
+       */
+      it('does not let the appointment overwrite the submission it hangs off', async () => {
+        const response = await adminRequest('/contact/api/admin/submissions/sub-1')
+
+        const result = (await response.json()) as Record<string, unknown>
+        const data = unwrapData<{ submission: Record<string, unknown> }>(result)
+        expect(data.submission.id).toBe('sub-1')
+        expect(data.submission.status).toBe('unread')
+        expect(data.submission.message).toBe('First message')
+      })
+    })
+
     it('PATCH - should update submission status in D1', async () => {
       const response = await adminRequest('/contact/api/admin/submissions/sub-1/status', {
         method: 'PATCH',

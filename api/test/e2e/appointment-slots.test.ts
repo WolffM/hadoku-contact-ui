@@ -11,6 +11,7 @@
  */
 import { env, SELF } from 'cloudflare:test'
 import { describe, it, expect, beforeEach } from 'vitest'
+import { isDateBookable, type BookingWindow } from '../../utils/booking-window'
 
 interface Slot {
   id: string
@@ -183,6 +184,61 @@ describe('Appointment Slots Integration', () => {
         expect(response.status).toBe(200)
         const data = (await response.json()) as SlotsResponse
         expect(data.duration).toBe(duration)
+      }
+    })
+  })
+
+  /**
+   * The window the contact form's calendar reads to decide which dates to grey
+   * out. Before this endpoint existed the form guessed ("tomorrow at the
+   * browser's local midnight"), offered weekends and days the notice window had
+   * already closed, and got a 400 back for the whole day when the user clicked
+   * one.
+   */
+  describe('GET /appointments/config', () => {
+    it('publishes the booking window the slots endpoint enforces', async () => {
+      const response = await SELF.fetch('https://test.com/contact/api/appointments/config')
+      expect(response.status).toBe(200)
+
+      const config = (await response.json()) as Record<string, unknown>
+      expect(config).toMatchObject({
+        timezone: 'America/New_York',
+        businessHoursStart: '09:00',
+        businessHoursEnd: '17:00',
+        availableDays: [1, 2, 3, 4, 5],
+        minAdvanceHours: 24,
+        maxAdvanceDays: 30,
+        slotDurations: [15, 30, 60]
+      })
+      expect(config.platforms).toEqual(['discord', 'google', 'teams', 'jitsi'])
+    })
+
+    it('needs no admin credentials — the booking page is public', async () => {
+      const response = await SELF.fetch('https://test.com/contact/api/appointments/config')
+      expect(response.status).toBe(200)
+    })
+
+    /**
+     * The calendar must never grey a date the slots endpoint would have answered,
+     * nor offer one it would refuse. Both now read the same `rejectDate`, so this
+     * walks the next month and asserts they agree on every single day.
+     */
+    it('agrees with the slots endpoint on every date in the window', async () => {
+      const response = await SELF.fetch('https://test.com/contact/api/appointments/config')
+      const config = (await response.json()) as BookingWindow & { slotDurations: number[] }
+
+      for (let offset = 0; offset <= 35; offset++) {
+        const day = new Date()
+        day.setUTCDate(day.getUTCDate() + offset)
+        const date = day.toISOString().split('T')[0]
+
+        const calendarSaysBookable = isDateBookable(date, 30, config)
+        const slots = await fetchSlots(date, 30)
+
+        expect(
+          { date, bookable: calendarSaysBookable },
+          `calendar and slots endpoint disagree about ${date}`
+        ).toEqual({ date, bookable: slots.status === 200 })
       }
     })
   })

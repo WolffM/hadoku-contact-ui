@@ -7,6 +7,7 @@ import {
   type AppointmentPlatform,
   type StoredAppointmentPlatform
 } from '../constants'
+import type { BookingWindow } from '../utils/booking-window'
 
 export interface AppointmentConfig {
   id: number
@@ -19,6 +20,30 @@ export interface AppointmentConfig {
   min_advance_hours: number
   meeting_platforms: string
   last_updated: number
+}
+
+/**
+ * The stored config narrowed to the booking window, with its comma-separated
+ * columns parsed once. Both the slots endpoint and the public config endpoint
+ * read the window through here so neither re-parses `available_days` its own way.
+ */
+export function toBookingWindow(config: AppointmentConfig): BookingWindow {
+  return {
+    timezone: config.timezone,
+    businessHoursStart: config.business_hours_start,
+    businessHoursEnd: config.business_hours_end,
+    availableDays: parseIntList(config.available_days),
+    minAdvanceHours: config.min_advance_hours,
+    maxAdvanceDays: config.max_advance_days
+  }
+}
+
+/** `'15,30,60'` -> `[15, 30, 60]`. */
+export function parseIntList(csv: string): number[] {
+  return csv
+    .split(',')
+    .map(v => parseInt(v.trim(), 10))
+    .filter(v => Number.isFinite(v))
 }
 
 export interface StoredAppointment {
@@ -219,6 +244,46 @@ export async function getAppointmentsByDate(
     .all<StoredAppointment>()
 
   return result.results ?? []
+}
+
+/**
+ * The appointments booked by each of `submissionIds`, keyed by submission.
+ *
+ * The Inbox renders a booking and its message as one item, but they live in two
+ * tables — a form submission that booked a meeting stored the meeting in
+ * `appointments` and left no trace of it on the `contact_submissions` row. The
+ * mail therefore arrived with no time on it, and the only way to find out when
+ * the meeting was, was to go read the Appointments tab and match by name.
+ *
+ * Cancelled bookings are included: "this meeting was cancelled" is information
+ * the message still needs to carry.
+ */
+export async function getAppointmentsBySubmissionIds(
+  db: D1Database,
+  submissionIds: string[]
+): Promise<Map<string, StoredAppointment>> {
+  const bySubmission = new Map<string, StoredAppointment>()
+  if (submissionIds.length === 0) return bySubmission
+
+  const placeholders = submissionIds.map(() => '?').join(', ')
+  const result = await db
+    .prepare(
+      `SELECT * FROM appointments
+			 WHERE submission_id IN (${placeholders})
+			 ORDER BY created_at ASC`
+    )
+    .bind(...submissionIds)
+    .all<StoredAppointment>()
+
+  for (const appointment of result.results ?? []) {
+    // A submission books at most one meeting, but the column carries no UNIQUE
+    // constraint — keep the first so repeated calls agree with each other.
+    if (appointment.submission_id && !bySubmission.has(appointment.submission_id)) {
+      bySubmission.set(appointment.submission_id, appointment)
+    }
+  }
+
+  return bySubmission
 }
 
 export async function getAllAppointments(

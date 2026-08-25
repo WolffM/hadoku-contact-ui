@@ -15,13 +15,45 @@ import {
   purgeOldDeletedSubmissions,
   getSubmissionStats,
   getDatabaseSize,
-  archiveOldSubmissions
+  archiveOldSubmissions,
+  getAppointmentsBySubmissionIds,
+  type StoredAppointment,
+  type StoredSubmission
 } from '../../storage'
 import { resetRateLimit } from '../../rate-limit'
 import { RETENTION_CONFIG } from '../../constants'
 import { mirrorInBackground, removeMailFromCalendar } from '../../services/task-calendar'
 import { adminOk } from './index'
 import type { AppContext } from '../../types'
+
+/**
+ * A submission plus the meeting it booked, if it booked one.
+ *
+ * The Inbox shows a form submission as a piece of mail, and a submission that
+ * came through the scheduler IS the booking — but the two live in separate
+ * tables, so the mail rendered with no time on it and the reader had to go
+ * cross-reference the Appointments tab by name. The join happens here rather
+ * than in SQL because the two tables share half their column names (`id`,
+ * `name`, `email`, `message`, `status`, `created_at`) and a `SELECT *` join
+ * would silently overwrite the submission's with the appointment's.
+ */
+type SubmissionWithAppointment = StoredSubmission & {
+  appointment: StoredAppointment | null
+}
+
+async function withAppointments(
+  db: D1Database,
+  submissions: StoredSubmission[]
+): Promise<SubmissionWithAppointment[]> {
+  const byId = await getAppointmentsBySubmissionIds(
+    db,
+    submissions.map(s => s.id)
+  )
+  return submissions.map(submission => ({
+    ...submission,
+    appointment: byId.get(submission.id) ?? null
+  }))
+}
 
 export function createSubmissionRoutes() {
   const app = new Hono<AppContext>()
@@ -31,7 +63,10 @@ export function createSubmissionRoutes() {
       const limit = Number(c.req.query('limit')) || 100
       const offset = Number(c.req.query('offset')) || 0
 
-      const submissions = await getAllSubmissions(c.env.DB, limit, offset)
+      const submissions = await withAppointments(
+        c.env.DB,
+        await getAllSubmissions(c.env.DB, limit, offset)
+      )
       const stats = await getSubmissionStats(c.env.DB)
 
       return adminOk(c, {
@@ -58,7 +93,9 @@ export function createSubmissionRoutes() {
         return notFound(c, 'Submission not found')
       }
 
-      return adminOk(c, { submission })
+      const [withAppointment] = await withAppointments(c.env.DB, [submission])
+
+      return adminOk(c, { submission: withAppointment })
     } catch (error) {
       console.error('Error fetching submission:', error)
       return serverError(c, 'Failed to fetch submission')

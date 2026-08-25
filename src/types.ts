@@ -35,6 +35,24 @@ export interface AppointmentSelection {
 }
 
 // API Request/Response types
+/**
+ * The server's booking window, fetched from `GET /appointments/config`.
+ *
+ * The calendar greys out dates with this rather than guessing. Its shape is
+ * `BookingWindow` from `api/utils/booking-window` — the module both halves of
+ * the package share — plus the two lists the pickers render.
+ */
+export interface BookingWindowConfig {
+  timezone: string
+  businessHoursStart: string
+  businessHoursEnd: string
+  availableDays: number[]
+  minAdvanceHours: number
+  maxAdvanceDays: number
+  slotDurations: number[]
+  platforms: string[]
+}
+
 export interface FetchSlotsRequest {
   date: string // YYYY-MM-DD
   duration: TimeSlotDuration

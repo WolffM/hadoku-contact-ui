@@ -1,4 +1,5 @@
 import type {
+  BookingWindowConfig,
   FetchSlotsResponse,
   SubmitContactRequest,
   SubmitContactResponse,
@@ -7,6 +8,7 @@ import type {
 } from '../types'
 import {
   mockFetchAvailableSlots,
+  mockFetchBookingWindow,
   mockSubmitContactWithAppointment,
   shouldUseMockAPI
 } from './mockAppointments'
@@ -23,6 +25,36 @@ export class AppointmentAPIError extends Error {
     super(message)
     this.name = 'AppointmentAPIError'
   }
+}
+
+/**
+ * Fetch the booking window the server enforces.
+ *
+ * The calendar needs it to know which dates are offerable at all. Failing this
+ * is not fatal: the caller falls back to showing every future date, which is
+ * what the form did before the endpoint existed.
+ */
+export async function fetchBookingWindow(): Promise<BookingWindowConfig> {
+  if (shouldUseMockAPI()) {
+    return mockFetchBookingWindow()
+  }
+
+  const response = await fetch(`${API_BASE_URL}/appointments/config`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+
+  if (!response.ok) {
+    throw new AppointmentAPIError(
+      'network',
+      `Failed to load booking window: ${response.statusText}`,
+      true
+    )
+  }
+
+  return (await response.json()) as BookingWindowConfig
 }
 
 /**
