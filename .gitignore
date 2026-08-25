@@ -41,3 +41,6 @@ coverage/
 
 # Other agents’ worktrees of this repo (see AGENTS.md)
 .claude/worktrees/
+
+# Playwright MCP scratch output (screenshots, snapshots)
+.playwright-mcp/
