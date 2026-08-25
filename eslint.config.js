@@ -8,7 +8,18 @@ import prettierConfig from 'eslint-config-prettier'
 export default [
   // Ignore build outputs and dependencies
   {
-    ignores: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/.next/**', '**/coverage/**']
+    // `.claude/worktrees/` holds other agents' checkouts of THIS repo on other
+    // branches. Linting them is always wrong: they are someone else's
+    // in-progress work, they are not part of this commit, and their errors block
+    // a pre-commit hook that runs `eslint .` over the whole tree.
+    ignores: [
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/build/**',
+      '**/.next/**',
+      '**/coverage/**',
+      '.claude/**'
+    ]
   },
 
   // Base JavaScript config

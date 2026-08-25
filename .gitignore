@@ -39,3 +39,6 @@ coverage/
 
 # per-repo vault key (Phase 2 of per-key ACL plan; never commit)
 .devvault.local.json
+
+# Other agents’ worktrees of this repo (see AGENTS.md)
+.claude/worktrees/

@@ -34,6 +34,21 @@ body {
     color var(--transition-smooth);
 }
 
+/* Scoped border-box reset.
+ *
+ * This stylesheet had none, so every `width: 100%` control also added its own
+ * padding and border on top: the form inputs measured 518px inside a 492px
+ * column and hung 26px out the side of it. Scoped to the mount root rather than
+ * a bare `*` because this bundle is a micro-frontend dropped into hadoku.me — a
+ * global reset here would silently restyle the host page around it.
+ */
+.contact-ui-container,
+.contact-ui-container *,
+.contact-ui-container *::before,
+.contact-ui-container *::after {
+  box-sizing: border-box;
+}
+
 .contact-ui {
   max-width: 1200px;
   margin: 0 auto;
@@ -71,11 +86,34 @@ body {
 @media (max-width: 768px) {
   .contact-content {
     flex-direction: column;
+    /* `align-items: flex-start` above is right for a ROW — it stops the two
+       columns stretching to equal height. Once the direction flips, that same
+       property governs WIDTH, so both sections shrank to their content instead
+       of filling the page: the form rendered 233px wide inside a 492px column
+       with its own inputs hanging 26px out the side of it. */
+    align-items: stretch;
   }
 
   .contact-form-section,
   .contact-appointment-section {
     flex: 1 1 100%;
+  }
+}
+
+/* On a phone the two nested 2rem gutters ate 128px of a 390px screen — a third
+   of the width spent on margin, which left the calendar squeezing seven columns
+   into 262px. The content is the point at that size. */
+@media (max-width: 640px) {
+  .contact-ui {
+    padding: 1rem 1rem 0 1rem;
+  }
+
+  .contact-container {
+    padding: 1rem;
+  }
+
+  .appointment-picker {
+    padding: 1rem;
   }
 }
 
@@ -225,6 +263,13 @@ body {
 
 /* Appointment Picker Container */
 .appointment-picker {
+  /* The picker is mounted in a column of the contact page, not at viewport
+     width — on a 1280px screen it renders about 400px wide. Viewport media
+     queries are blind to that, which is why the two selectors sat side by side
+     in 169px each and the platform buttons burst out of their column. Every
+     breakpoint below is a @container query against this box. */
+  container-type: inline-size;
+  container-name: appointment-picker;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -264,18 +309,27 @@ body {
 
 .appointment-picker__selectors {
   display: flex;
-  gap: 1rem;
+  flex-direction: column;
+  gap: 1.25rem;
   width: 100%;
 }
 
+/* A second query container: how many platform buttons fit across is a question
+   about THIS column, not about the picker or the viewport. Whether the column is
+   half of a wide picker or the whole of a narrow one, the answer follows from
+   the width it actually got. */
 .appointment-picker__selector-item {
+  container-type: inline-size;
+  container-name: picker-selector;
   flex: 1;
   min-width: 0;
 }
 
-@media (max-width: 768px) {
+/* Side by side only once each half has room for a real row of buttons. */
+@container appointment-picker (min-width: 34rem) {
   .appointment-picker__selectors {
-    flex-direction: column;
+    flex-direction: row;
+    gap: 1rem;
   }
 }
 
@@ -394,196 +448,195 @@ body {
 
 /* ========================================
    CALENDAR STYLES (react-calendar theming)
+
+   react-calendar always emits `react-calendar__*` class names; the `className`
+   prop only ADDS to the root. The `.calendar__month-view__*` selectors this
+   block used to carry matched nothing at all and have been removed.
+
+   The visual language is availability, and only availability. A day the user
+   can book is a filled tint; a day they cannot is dim, flat and unpainted. The
+   disabled rule used to paint every unavailable date a solid `--color-bg`
+   rectangle with square corners — fine when the only disabled days were the
+   past, but the calendar now greys everything with no free slot, so most of a
+   month rendered as a wall of grey blocks with a few holes punched in it.
+   Absence should read as absence.
    ======================================== */
 
 .appointment-calendar {
   width: 100%;
 }
 
-/* Override react-calendar default styles with theme variables */
-.calendar,
 .react-calendar {
   width: 100%;
-  border: none !important;
-  border-radius: 0;
-  background-color: var(--color-bg-card) !important;
+  border: none;
+  background-color: transparent;
   font-family: inherit;
   line-height: 1.5;
 }
 
-.calendar button,
 .react-calendar button {
-  color: var(--color-text) !important;
-  background-color: transparent !important;
+  color: var(--color-text);
+  background-color: transparent;
   border: none;
   cursor: pointer;
+  font-family: inherit;
 }
 
-.calendar__navigation,
+/* --- Navigation ------------------------------------------------------- */
+
 .react-calendar__navigation {
   display: flex;
-  background-color: var(--color-bg-card) !important;
-  border-bottom: 1px solid var(--color-text-secondary) !important;
-  padding: 0.5rem;
-}
-
-.calendar__navigation button,
-.react-calendar__navigation button {
-  min-width: 2.5rem;
-  background-color: transparent !important;
-  color: var(--color-text) !important;
-  font-weight: var(--font-weight-semibold);
-}
-
-.calendar__navigation button:enabled,
-.react-calendar__navigation button:enabled {
-  color: var(--color-text) !important;
-}
-
-.calendar__navigation button:hover:not(:disabled),
-.react-calendar__navigation button:hover:not(:disabled) {
-  background-color: var(--color-primary-hover) !important;
-  border-radius: var(--hdk-radius);
-  color: var(--color-text) !important;
-}
-
-.calendar__navigation button:disabled,
-.react-calendar__navigation button:disabled {
-  opacity: 0.3 !important;
-  cursor: not-allowed !important;
-  color: var(--color-text-secondary) !important;
-  background-color: transparent !important;
-}
-
-.calendar__navigation__label,
-.react-calendar__navigation__label {
-  color: var(--color-text) !important;
-}
-
-.calendar__navigation__arrow,
-.react-calendar__navigation__arrow {
-  color: var(--color-text) !important;
-}
-
-.calendar__month-view__weekdays,
-.react-calendar__month-view__weekdays {
-  text-align: center;
-  font-weight: var(--font-weight-bold);
-  font-size: var(--hdk-text-xs);
-  color: var(--color-text-secondary) !important;
-  text-transform: uppercase;
-}
-
-.calendar__month-view__weekdays__weekday,
-.react-calendar__month-view__weekdays__weekday {
-  padding: 0.75rem 0.5rem;
-}
-
-.calendar__month-view__weekdays__weekday abbr,
-.react-calendar__month-view__weekdays__weekday abbr {
-  text-decoration: none;
-  color: var(--color-text-secondary) !important;
-}
-
-.calendar__month-view__days__day,
-.react-calendar__month-view__days__day,
-.react-calendar__tile {
-  display: flex;
   align-items: center;
-  justify-content: center;
-  padding: 0.375rem 0.25rem;
-  margin: 2px;
-  border-radius: var(--hdk-radius);
-  color: var(--color-text) !important;
-  background-color: transparent !important;
-  min-height: 2rem;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+  padding: 0;
+}
+
+.react-calendar__navigation button {
+  min-width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
   transition:
     background-color var(--transition-fast),
     color var(--transition-fast);
 }
 
-.calendar__month-view__days__day:enabled,
-.react-calendar__month-view__days__day:enabled,
-.react-calendar__tile:enabled {
-  color: var(--color-text) !important;
+/* The month name earns the width; the arrows are just controls beside it. */
+.react-calendar__navigation__label {
+  flex: 1;
+  font-size: var(--hdk-text-base);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+  letter-spacing: 0.01em;
 }
 
-.calendar__month-view__days__day:hover:not(:disabled),
-.react-calendar__month-view__days__day:hover:not(:disabled),
-.react-calendar__tile:hover:not(:disabled):not(.react-calendar__tile--active) {
-  background-color: var(--color-primary-hover) !important;
-  color: var(--color-text) !important;
+.react-calendar__navigation button:enabled:hover,
+.react-calendar__navigation button:enabled:focus-visible {
+  background-color: var(--color-primary-bg);
+  color: var(--color-on-primary-bg);
 }
 
-.calendar__month-view__days__day--neighboringMonth {
-  opacity: 0.4;
+.react-calendar__navigation button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  color: var(--color-text-secondary);
 }
 
-.calendar .react-calendar__tile--active,
-.calendar .react-calendar__tile--active:enabled,
-.calendar .react-calendar__tile--active:enabled:hover,
-.calendar .react-calendar__tile--active:enabled:focus,
-.react-calendar .react-calendar__tile--active,
-.react-calendar .react-calendar__tile--active:enabled,
-.react-calendar .react-calendar__tile--active:enabled:hover,
-.react-calendar .react-calendar__tile--active:enabled:focus,
-.calendar .react-calendar__tile--hasActive,
-.calendar .react-calendar__tile--hasActive:enabled:hover,
-.calendar .react-calendar__tile--hasActive:enabled:focus,
-.react-calendar .react-calendar__tile--hasActive,
-.react-calendar .react-calendar__tile--hasActive:enabled:hover,
-.react-calendar .react-calendar__tile--hasActive:enabled:focus,
-button.react-calendar__tile--active,
-button.react-calendar__tile--active:enabled,
-button.react-calendar__tile--active:hover {
-  background-color: var(--color-primary) !important;
-  color: var(--color-on-primary) !important;
-  font-weight: var(--font-weight-bold) !important;
+/* --- Weekday header --------------------------------------------------- */
+
+.react-calendar__month-view__weekdays {
+  text-align: center;
+  font-size: var(--hdk-text-xs);
+  font-weight: var(--font-weight-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
 }
 
-.calendar__tile--now,
-.react-calendar__tile--now {
-  background-color: var(--color-primary-bg) !important;
-  color: var(--color-text) !important;
+.react-calendar__month-view__weekdays__weekday {
+  padding: 0.5rem 0;
+}
+
+.react-calendar__month-view__weekdays__weekday abbr {
+  text-decoration: none;
+  color: var(--color-text-secondary);
+}
+
+/* --- Day grid ---------------------------------------------------------- */
+
+/* react-calendar positions this grid with INLINE styles that a stylesheet rule
+   cannot outrank without `!important`: `display: flex; flex-wrap: wrap` on the
+   container, and on every tile `flex: 0 0 14.2857%` plus a `margin-inline`
+   offset that is what slides the 1st of the month under the correct weekday.
+   Overriding the tile's flex and margin killed that offset and collapsed each
+   day to the width of its own digits, so the month rendered as a smear of 8px
+   boxes. The layout is left alone; the circle is an inner element instead.  */
+
+.react-calendar__tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.125rem 0;
+  background-color: transparent;
+  border: none;
+}
+
+/* The visible day. Sized in its own right so every date is the same circle
+   regardless of whether it holds one digit or two. */
+.react-calendar__tile abbr {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  max-width: 100%;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  text-decoration: none;
+  font-size: var(--hdk-text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+  background-color: transparent;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+/* Bookable. The tint is the whole affordance: these are the days that read as
+   present, and everything else recedes behind them. */
+.react-calendar__tile:enabled abbr {
+  background-color: var(--color-primary-bg);
+  color: var(--color-on-primary-bg);
   font-weight: var(--font-weight-semibold);
 }
 
-.calendar__tile--now:enabled:hover,
-.react-calendar__tile--now:enabled:hover {
-  background-color: var(--color-primary-bg) !important;
-  color: var(--color-text) !important;
+.react-calendar__tile:enabled:hover abbr,
+.react-calendar__tile:enabled:focus-visible abbr {
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+  transform: scale(1.08);
 }
 
-.calendar-tile--has-slots {
-  position: relative;
+/* Nothing free on this day. Flat, dim, unpainted — never a filled block. */
+.react-calendar__tile:disabled {
+  cursor: not-allowed;
 }
 
-.calendar-tile--has-slots::after {
-  content: '';
-  position: absolute;
-  bottom: 4px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background-color: var(--color-success);
+.react-calendar__tile:disabled abbr,
+.react-calendar__tile:disabled:hover abbr {
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  /* Faded enough to recede behind the bookable days, not so faded that the
+     month stops being readable as a month — the shape of the weeks is how you
+     find your way to the days that ARE open. */
+  opacity: 0.55;
+  transform: none;
 }
 
-/* Disabled dates - force theme colors */
-.calendar__tile:disabled,
-.calendar__tile:disabled:hover,
-.calendar__month-view__days__day:disabled,
-.calendar__month-view__days__day:disabled:hover,
-.react-calendar__tile:disabled,
-.react-calendar__tile:disabled:hover,
-.react-calendar__month-view__days__day:disabled,
-.react-calendar__month-view__days__day:disabled:hover {
-  cursor: not-allowed !important;
-  color: var(--color-text-secondary) !important;
-  background-color: var(--color-bg) !important;
-  opacity: 0.5 !important;
-  border-radius: 0 !important;
+.react-calendar__tile--active abbr,
+.react-calendar__tile--active:enabled abbr,
+.react-calendar__tile--active:enabled:hover abbr,
+.react-calendar__tile--active:enabled:focus-visible abbr {
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+  font-weight: var(--font-weight-bold);
+  transform: none;
+}
+
+/* Today is a ring, not a fill — a fill would compete with the tint that means
+   "bookable", and today usually is not (the notice window has closed it). */
+.react-calendar__tile--now abbr {
+  box-shadow: inset 0 0 0 2px var(--color-primary);
+}
+
+.react-calendar__tile--now:disabled abbr {
+  box-shadow: inset 0 0 0 2px var(--color-border);
+}
+
+.react-calendar__tile--active.react-calendar__tile--now abbr {
+  box-shadow: none;
 }
 
 /* ========================================
@@ -621,24 +674,12 @@ button.react-calendar__tile--active:hover {
 
 .time-slot-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 0.75rem;
-}
-
-@media (max-width: 768px) {
-  .time-slot-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-@media (max-width: 480px) {
-  .time-slot-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));
+  gap: 0.5rem;
 }
 
 .time-slot {
-  padding: 0.75rem 0.5rem;
+  padding: 0.5rem 0.25rem;
   font-size: var(--hdk-text-sm);
   font-weight: var(--font-weight-semibold);
   text-align: center;
@@ -737,16 +778,28 @@ button.react-calendar__tile--active:hover {
   color: var(--color-text);
 }
 
+/* `repeat(2, 1fr)` was wrong twice over: three platforms in two columns leaves
+   an orphan on its own row, and a `1fr` track refuses to shrink below its
+   content — with `white-space: nowrap` on "Google Meet" that floor was 106px,
+   so in a 169px column the buttons overlapped each other and spilled out the
+   side. `auto-fit` picks the column count from the space available, and the
+   `minmax(0, ...)` floor lets a track be as narrow as it has to be. */
 .meeting-platform-selector__grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
   width: 100%;
 }
 
-@media (max-width: 480px) {
+/* Three across only once each button clears ~7.5rem — below that they read as
+   cramped chips with a wrapped label, and a full-width stack is both tidier and
+   incapable of overflowing. `minmax(0, 1fr)` rather than `1fr` so a track may
+   shrink under its content: `1fr` floors at min-content, which with the old
+   `white-space: nowrap` label is exactly how the buttons burst out of a 169px
+   column and overlapped each other. */
+@container picker-selector (min-width: 24rem) {
   .meeting-platform-selector__grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
@@ -765,8 +818,9 @@ button.react-calendar__tile--active:hover {
     background-color var(--transition-fast),
     border-color var(--transition-fast),
     transform var(--transition-fast);
-  min-height: 2.5rem;
+  min-height: 2.75rem;
   width: 100%;
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -809,11 +863,12 @@ button.react-calendar__tile--active:hover {
   color: var(--color-text);
 }
 
+/* No `nowrap`: it is what made the button un-shrinkable, and truncating
+   "Google Meet" to "Google M…" is worse than letting it take a second line. */
 .platform-button__label {
   font-size: var(--hdk-text-sm);
   font-weight: var(--font-weight-semibold);
   color: var(--color-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
+  line-height: 1.2;
 }

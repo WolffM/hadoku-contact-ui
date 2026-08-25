@@ -78,6 +78,11 @@ export default function AppointmentCalendar({
         onActiveStartDateChange={({ activeStartDate }) => {
           if (activeStartDate) onVisibleMonthChange(activeStartDate)
         }}
+        // The year jumps are dead controls: `maxDate` is at most a month out, so
+        // «/» were permanently disabled — two of the five things in the header
+        // did nothing, ever.
+        prev2Label={null}
+        next2Label={null}
         minDate={dayFromToday(0)}
         maxDate={bookingWindow ? dayFromToday(bookingWindow.maxAdvanceDays) : undefined}
         tileDisabled={tileDisabled}
