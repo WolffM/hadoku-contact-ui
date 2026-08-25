@@ -446,6 +446,60 @@ describe('Admin Operations Integration', () => {
       expect(result.data.appointment.submission_id).toBeNull()
     })
 
+    // Platform is optional on the admin path only. These three pin the three
+    // ways a form can say "none" — the field left out, sent as null, or sent as
+    // the empty string an unset <select> submits — because a regression in any
+    // one of them looks like a working feature from the other two.
+    it.each([
+      ['omitted', {}],
+      ['null', { platform: null }],
+      ['empty string', { platform: '' }]
+    ])('POST - should create an event with no platform (%s)', async (_label, platformField) => {
+      const response = await adminRequest('/contact/api/admin/appointments', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'No Platform Event',
+          email: 'matthaeus@hadoku.me',
+          date: '2030-06-16',
+          start_time: `2030-06-16T14:00:00.000Z`,
+          end_time: `2030-06-16T15:00:00.000Z`,
+          duration: 60,
+          timezone: 'America/Los_Angeles',
+          slot_id: `admin-no-platform-${_label.replace(/\s/g, '-')}`,
+          ...platformField
+        })
+      })
+      expect(response.status).toBe(201)
+      const result = (await response.json()) as {
+        data: { appointment: { id: string; platform: string | null } }
+      }
+      expect(result.data.appointment.platform).toBeNull()
+
+      // And it is NULL in D1, not the string 'null' or ''. The column is what
+      // the migration changed, so assert against the column.
+      const row = await env.DB.prepare('SELECT platform FROM appointments WHERE id = ?')
+        .bind(result.data.appointment.id)
+        .first<{ platform: string | null }>()
+      expect(row!.platform).toBeNull()
+    })
+
+    it('POST - should still reject a platform that is not a real one', async () => {
+      const response = await adminRequest('/contact/api/admin/appointments', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'Bad Platform',
+          email: 'matthaeus@hadoku.me',
+          date: '2030-06-17',
+          start_time: '2030-06-17T14:00:00.000Z',
+          end_time: '2030-06-17T15:00:00.000Z',
+          duration: 60,
+          timezone: 'America/Los_Angeles',
+          platform: 'skype'
+        })
+      })
+      expect(response.status).toBe(400)
+    })
+
     it('POST - should reject malformed body with 400', async () => {
       const response = await adminRequest('/contact/api/admin/appointments', {
         method: 'POST',

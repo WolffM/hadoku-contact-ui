@@ -22,6 +22,8 @@ import migration0006 from '../migrations/0006_add_direction_column.sql'
 import migration0007 from '../migrations/0007_inbound_email_sync.sql'
 // @ts-expect-error — .sql imports handled by vite plugin
 import migration0008 from '../migrations/0008_create_email_blocklist.sql'
+// @ts-expect-error — .sql imports handled by vite plugin
+import migration0009 from '../migrations/0009_platform_optional.sql'
 
 /**
  * Split SQL into individual statements, stripping comments.
@@ -62,7 +64,8 @@ if (!existing) {
     migration0005,
     migration0006,
     migration0007,
-    migration0008
+    migration0008,
+    migration0009
   ]
   for (const sql of migrations) {
     await applyMigration(env.DB, sql)
@@ -88,5 +91,15 @@ if (!existing) {
   ).first()
   if (!hasSpammedAt) {
     await applyMigration(env.DB, migration0008)
+  }
+
+  // Probe the COLUMN, not a table's existence: 0009 changes `platform` from
+  // NOT NULL to nullable in place, so the only durable evidence that it ran is
+  // pragma_table_info's `notnull` flag for that column.
+  const platformNullable = await env.DB.prepare(
+    `SELECT 1 FROM pragma_table_info('appointments') WHERE name='platform' AND "notnull"=0`
+  ).first()
+  if (!platformNullable) {
+    await applyMigration(env.DB, migration0009)
   }
 }

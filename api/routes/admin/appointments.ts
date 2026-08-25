@@ -44,6 +44,20 @@ interface AdminCreateAppointmentBody {
   slot_id?: unknown
 }
 
+/**
+ * The body's platform as a value the storage layer understands: a validated
+ * platform, or `undefined` for "none". Absent / null / empty string all collapse
+ * to the same thing, so a form that submits an unset <select> as `''` does not
+ * have to know that.
+ *
+ * Safe to cast because validateAdminAppointment has already rejected any
+ * non-empty value outside VALID_PLATFORMS by the time this runs.
+ */
+function normalizePlatform(value: unknown): AppointmentPlatform | undefined {
+  if (typeof value !== 'string' || value === '') return undefined
+  return value as AppointmentPlatform
+}
+
 function validateAdminAppointment(body: AdminCreateAppointmentBody) {
   const errors: string[] = []
   const isStr = (v: unknown): v is string => typeof v === 'string' && v.length > 0
@@ -63,11 +77,21 @@ function validateAdminAppointment(body: AdminCreateAppointmentBody) {
     !APPOINTMENT_CONFIG.VALID_DURATIONS.includes(body.duration as 15 | 30 | 60)
   )
     errors.push(`duration must be one of: ${APPOINTMENT_CONFIG.VALID_DURATIONS.join(', ')}`)
-  if (
-    !isStr(body.platform) ||
-    !APPOINTMENT_CONFIG.VALID_PLATFORMS.includes(body.platform as AppointmentPlatform)
-  )
-    errors.push(`platform must be one of: ${APPOINTMENT_CONFIG.VALID_PLATFORMS.join(', ')}`)
+  // Platform is OPTIONAL here, unlike the public booking flow. An admin adding
+  // something to their own calendar is usually not booking a video call, and
+  // requiring a platform meant the dialog had to name one, so every such event
+  // claimed a meeting platform it does not have. Absent, null or empty all mean
+  // "no platform". A value that IS supplied is still checked, so a typo is a 400
+  // rather than a row nobody can join.
+  if (body.platform !== undefined && body.platform !== null && body.platform !== '') {
+    if (
+      !isStr(body.platform) ||
+      !APPOINTMENT_CONFIG.VALID_PLATFORMS.includes(body.platform as AppointmentPlatform)
+    )
+      errors.push(
+        `platform, when given, must be one of: ${APPOINTMENT_CONFIG.VALID_PLATFORMS.join(', ')}`
+      )
+  }
   if (!isStr(body.timezone)) errors.push('timezone is required')
 
   return errors
@@ -203,7 +227,7 @@ export function createAppointmentAdminRoutes() {
         end_time: body.end_time as string,
         duration: body.duration as number,
         timezone: body.timezone as string,
-        platform: body.platform as AppointmentPlatform,
+        platform: normalizePlatform(body.platform),
         meeting_link: typeof body.meeting_link === 'string' ? body.meeting_link : undefined,
         meeting_id: typeof body.meeting_id === 'string' ? body.meeting_id : undefined
       })

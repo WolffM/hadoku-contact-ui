@@ -58,7 +58,8 @@ export interface StoredAppointment {
   end_time: string
   duration: number
   timezone: string
-  platform: StoredAppointmentPlatform
+  /** NULL = no meeting platform (an admin-created calendar entry). */
+  platform: StoredAppointmentPlatform | null
   meeting_link: string | null
   meeting_id: string | null
   status: 'confirmed' | 'cancelled' | 'completed' | 'no_show'
@@ -82,7 +83,8 @@ export interface CreateAppointmentParams {
   end_time: string
   duration: number
   timezone: string
-  platform: AppointmentPlatform
+  /** Omit for an event with no meeting platform. Public bookings always set it. */
+  platform?: AppointmentPlatform
   meeting_link?: string
   meeting_id?: string
   ip_address?: string
@@ -174,7 +176,7 @@ export async function createAppointment(
       params.end_time,
       params.duration,
       params.timezone,
-      params.platform,
+      params.platform ?? null,
       params.meeting_link ?? null,
       params.meeting_id ?? null,
       now,
@@ -196,7 +198,7 @@ export async function createAppointment(
     end_time: params.end_time,
     duration: params.duration,
     timezone: params.timezone,
-    platform: params.platform,
+    platform: params.platform ?? null,
     meeting_link: params.meeting_link ?? null,
     meeting_id: params.meeting_id ?? null,
     status: 'confirmed',
