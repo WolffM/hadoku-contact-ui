@@ -684,7 +684,7 @@ body {
   align-content: flex-start;
 }
 
-.react-calendar__tile {
+.react-calendar__month-view .react-calendar__tile {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -695,7 +695,7 @@ body {
 
 /* The visible day. Sized in its own right so every date is the same circle
    regardless of whether it holds one digit or two. */
-.react-calendar__tile abbr {
+.react-calendar__month-view .react-calendar__tile abbr {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -721,15 +721,15 @@ body {
    vanished into the card and the only thing marking a bookable day was the
    weight of its digits. The ring is what makes the affordance survive a theme
    whose tint happens to match its own surface. */
-.react-calendar__tile:enabled abbr {
+.react-calendar__month-view .react-calendar__tile:enabled abbr {
   background-color: var(--color-primary-bg);
   color: var(--color-on-primary-bg);
   box-shadow: inset 0 0 0 1px var(--color-primary);
   font-weight: var(--font-weight-semibold);
 }
 
-.react-calendar__tile:enabled:hover abbr,
-.react-calendar__tile:enabled:focus-visible abbr {
+.react-calendar__month-view .react-calendar__tile:enabled:hover abbr,
+.react-calendar__month-view .react-calendar__tile:enabled:focus-visible abbr {
   background-color: var(--color-primary);
   color: var(--color-on-primary);
   box-shadow: none;
@@ -737,12 +737,12 @@ body {
 }
 
 /* Nothing free on this day. Flat, dim, unpainted — never a filled block. */
-.react-calendar__tile:disabled {
+.react-calendar__month-view .react-calendar__tile:disabled {
   cursor: not-allowed;
 }
 
-.react-calendar__tile:disabled abbr,
-.react-calendar__tile:disabled:hover abbr {
+.react-calendar__month-view .react-calendar__tile:disabled abbr,
+.react-calendar__month-view .react-calendar__tile:disabled:hover abbr {
   background-color: transparent;
   color: var(--color-text-secondary);
   /* Faded enough to recede behind the bookable days, not so faded that the
@@ -752,10 +752,10 @@ body {
   transform: none;
 }
 
-.react-calendar__tile--active abbr,
-.react-calendar__tile--active:enabled abbr,
-.react-calendar__tile--active:enabled:hover abbr,
-.react-calendar__tile--active:enabled:focus-visible abbr {
+.react-calendar__month-view .react-calendar__tile--active abbr,
+.react-calendar__month-view .react-calendar__tile--active:enabled abbr,
+.react-calendar__month-view .react-calendar__tile--active:enabled:hover abbr,
+.react-calendar__month-view .react-calendar__tile--active:enabled:focus-visible abbr {
   background-color: var(--color-primary);
   color: var(--color-on-primary);
   box-shadow: none;
@@ -765,16 +765,112 @@ body {
 
 /* Today is a ring, not a fill — a fill would compete with the tint that means
    "bookable", and today usually is not (the notice window has closed it). */
-.react-calendar__tile--now abbr {
+.react-calendar__month-view .react-calendar__tile--now abbr {
   box-shadow: inset 0 0 0 2px var(--color-primary);
 }
 
-.react-calendar__tile--now:disabled abbr {
+.react-calendar__month-view .react-calendar__tile--now:disabled abbr {
   box-shadow: inset 0 0 0 2px var(--color-border);
 }
 
-.react-calendar__tile--active.react-calendar__tile--now abbr {
+.react-calendar__month-view .react-calendar__tile--active.react-calendar__tile--now abbr {
   box-shadow: none;
+}
+
+/* --- Month, year and decade pickers ------------------------------------ */
+
+/* Clicking "August 2026" drills up: months, then years, then decades. Those
+ * tiles hold WORDS — "September", "2031" — and everything above this point is
+ * built around a 2.25rem circle holding one or two digits. The circle rules ran
+ * in every view, so a 36px ring was drawn straight through the middle of the
+ * word "August" while the rest of it spilled out either side. Hence the scoping
+ * above, and hence this block.
+ *
+ * Same colour language as the day grid, different shape: a rounded rectangle
+ * that takes the width of its row. The decade view is also the one place
+ * react-calendar puts bare text in the tile with no <abbr> at all, so these
+ * rules dress the tile itself rather than an inner element.
+ */
+/* These views hold 10-12 tiles in three columns — four rows against the six the
+   day grid reserves. Taller rows plus centring spend that difference instead of
+   leaving a void under the last row. */
+.react-calendar__year-view__months,
+.react-calendar__decade-view__years,
+.react-calendar__century-view__decades {
+  align-content: center;
+  min-height: 15rem;
+  gap: 0.375rem 0;
+}
+
+.react-calendar__year-view .react-calendar__tile,
+.react-calendar__decade-view .react-calendar__tile,
+.react-calendar__century-view .react-calendar__tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3rem;
+  padding: 0 0.25rem;
+  border-radius: var(--hdk-radius);
+  font-size: var(--hdk-text-sm);
+  color: var(--color-text);
+  background-color: transparent;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.react-calendar__year-view .react-calendar__tile abbr,
+.react-calendar__decade-view .react-calendar__tile abbr {
+  /* Undo the circle: in these views the tile IS the control. */
+  display: inline;
+  width: auto;
+  min-height: 0;
+  aspect-ratio: auto;
+  padding: 0;
+  border-radius: 0;
+  background-color: transparent;
+  box-shadow: none;
+  text-decoration: none;
+  color: inherit;
+  font: inherit;
+}
+
+.appointment-calendar .react-calendar__year-view .react-calendar__tile:enabled,
+.appointment-calendar .react-calendar__decade-view .react-calendar__tile:enabled,
+.appointment-calendar .react-calendar__century-view .react-calendar__tile:enabled {
+  background-color: var(--color-primary-bg);
+  color: var(--color-on-primary-bg);
+  box-shadow: inset 0 0 0 1px var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+}
+
+.appointment-calendar .react-calendar__year-view .react-calendar__tile:enabled:hover,
+.appointment-calendar .react-calendar__year-view .react-calendar__tile:enabled:focus-visible,
+.appointment-calendar .react-calendar__decade-view .react-calendar__tile:enabled:hover,
+.appointment-calendar .react-calendar__decade-view .react-calendar__tile:enabled:focus-visible,
+.appointment-calendar .react-calendar__century-view .react-calendar__tile:enabled:hover,
+.appointment-calendar .react-calendar__century-view .react-calendar__tile:enabled:focus-visible {
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+  box-shadow: none;
+}
+
+.react-calendar__year-view .react-calendar__tile:disabled,
+.react-calendar__decade-view .react-calendar__tile:disabled,
+.react-calendar__century-view .react-calendar__tile:disabled {
+  color: var(--color-text-secondary);
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* --- One box for every view -------------------------------------------- */
+
+/* The month grid reserves six rows so paging between months does not resize the
+   card; drilling up to the month or year picker has to land in the same box for
+   the same reason, or the buttons below jump the moment you tap the title.
+   6 day rows (15rem) + the weekday header (2rem). */
+.react-calendar__viewContainer {
+  min-height: 17rem;
 }
 
 /* ========================================
