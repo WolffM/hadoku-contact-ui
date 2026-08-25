@@ -92,3 +92,46 @@ export function isDateBookable(
 ): boolean {
   return rejectDate(date, duration, window, now) === null
 }
+
+/**
+ * Every slot START instant on `date`, in order — the raw grid, before anything
+ * is subtracted from it.
+ *
+ * Pure on purpose: the slots endpoint and the availability endpoint both need
+ * this grid, and only one of them needs to go to the database to find out what
+ * has been booked out of it.
+ */
+export function slotStarts(
+  date: string,
+  duration: number,
+  window: Pick<BookingWindow, 'timezone' | 'businessHoursStart' | 'businessHoursEnd'>
+): Date[] {
+  const { first, last } = slotStartRange(date, duration, window)
+  const starts: Date[] = []
+  for (let t = first.getTime(); t <= last.getTime(); t += duration * 60 * 1000) {
+    starts.push(new Date(t))
+  }
+  return starts
+}
+
+/** The id `generateTimeSlots` and `appointments.slot_id` both use for a slot. */
+export function slotId(date: string, start: Date): string {
+  return `slot-${date}-${start.toISOString()}`
+}
+
+/**
+ * Every date from `from` to `to` inclusive, as YYYY-MM-DD.
+ *
+ * Stepped in UTC and formatted from the UTC fields, so it never skips or repeats
+ * a date the way local-midnight arithmetic does across a DST boundary.
+ */
+export function datesBetween(from: string, to: string): string[] {
+  const dates: string[] = []
+  const cursor = new Date(`${from}T00:00:00.000Z`)
+  const end = new Date(`${to}T00:00:00.000Z`)
+  while (cursor <= end) {
+    dates.push(cursor.toISOString().split('T')[0])
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  }
+  return dates
+}

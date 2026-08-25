@@ -258,6 +258,29 @@ export async function getAppointmentsByDate(
  * Cancelled bookings are included: "this meeting was cancelled" is information
  * the message still needs to carry.
  */
+/**
+ * The `slot_id`s taken by confirmed bookings between two dates, inclusive.
+ *
+ * One query for a whole month rather than one per day: the calendar asks whether
+ * each of ~31 dates has anything left on it, and doing that a day at a time
+ * would be 31 round-trips to answer one screen.
+ */
+export async function getBookedSlotIdsInRange(
+  db: D1Database,
+  from: string,
+  to: string
+): Promise<Set<string>> {
+  const result = await db
+    .prepare(
+      `SELECT slot_id FROM appointments
+			 WHERE date BETWEEN ? AND ? AND status = 'confirmed'`
+    )
+    .bind(from, to)
+    .all<{ slot_id: string }>()
+
+  return new Set((result.results ?? []).map(row => row.slot_id))
+}
+
 export async function getAppointmentsBySubmissionIds(
   db: D1Database,
   submissionIds: string[]

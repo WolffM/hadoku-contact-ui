@@ -63,6 +63,7 @@ export {
   isSlotAvailable,
   getAppointmentsByDate,
   getAppointmentsBySubmissionIds,
+  getBookedSlotIdsInRange,
   getAllAppointments,
   getAppointmentById,
   updateAppointmentStatus,

@@ -1,5 +1,7 @@
 import { logger } from '@wolffm/logger/client'
+import { datesBetween, rejectDate, slotStarts } from '../../api/utils/booking-window'
 import type {
+  AvailabilityResponse,
   BookingWindowConfig,
   FetchSlotsResponse,
   SubmitContactRequest,
@@ -39,6 +41,34 @@ export async function mockFetchBookingWindow(): Promise<BookingWindowConfig> {
     slotDurations: [15, 30, 60],
     platforms: ['discord', 'google', 'teams', 'jitsi']
   }
+}
+
+/**
+ * The dev-mode stand-in for `GET /appointments/availability`.
+ *
+ * Runs the same `rejectDate` the real endpoint does so the mocked calendar greys
+ * out the same dates, then drops a couple of weekdays to a zero count — the
+ * fully-booked case, which is otherwise impossible to see without seeding a
+ * database.
+ */
+export async function mockFetchAvailability(
+  duration: TimeSlotDuration,
+  from: string,
+  to: string
+): Promise<AvailabilityResponse> {
+  await new Promise(resolve => setTimeout(resolve, MOCK_DELAY_MS))
+
+  const window = await mockFetchBookingWindow()
+  const dates: Record<string, number> = {}
+
+  for (const date of datesBetween(from, to)) {
+    if (rejectDate(date, duration, window)) continue
+    // Every 7th offerable date reads as booked solid.
+    if (Object.keys(dates).length % 7 === 6) continue
+    dates[date] = slotStarts(date, duration, window).length
+  }
+
+  return { duration, from, to, timezone: window.timezone, dates }
 }
 
 /**

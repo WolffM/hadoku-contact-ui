@@ -55,15 +55,28 @@ notice (`min_advance_hours`), the far bound (`max_advance_days`), and the
 operator's working days (`available_days`).
 
 All three live in **one** function — `rejectDate` in `api/utils/booking-window.ts`
-— imported by both halves of the package: the `/appointments/slots` route
-enforces it, and `AppointmentCalendar` greys dates out with it. That module is
-the reason `src/` imports from `api/`, and it is deliberate. The calendar used
-to carry its own hardcoded version of the rule ("tomorrow at the browser's local
-midnight, weekends included"), so it offered dates the server then refused with
-a 400 the user could not act on — ask at 4:59pm under a 24h notice and a 17:00
-close, and all of tomorrow is gone, but the calendar still let you click it.
-`GET /appointments/config` publishes the window (public, unauthenticated) so the
-form has the real numbers instead of guessing at them.
+— which the `/appointments/slots` route enforces and the contact form imports.
+That module is the reason `src/` imports from `api/`, and it is deliberate. The
+calendar used to carry its own hardcoded version of the rule ("tomorrow at the
+browser's local midnight, weekends included"), so it offered dates the server
+then refused with a 400 the user could not act on — ask at 4:59pm under a 24h
+notice and a 17:00 close, and all of tomorrow is gone, but the calendar still
+let you click it.
+
+**A date with nothing on it is greyed out; it is never explained.** The rules
+alone cannot decide that, because a day can clear every bound and still be
+booked solid — so the greying is driven by `GET /appointments/availability`
+(`?duration&from&to`), which returns free-slot counts and names only dates that
+have something left. Anything absent is unclickable: weekends, days inside the
+notice window, days past the far bound and full days are one case to the UI, not
+four. `GET /appointments/config` publishes the window as well, but only as the
+fallback for the moment before counts arrive.
+
+The invariant, pinned by `appointment-slots.test.ts`: no date the availability
+map names comes back with an empty slot list. If the slots route ever does
+refuse a day the calendar offered — stale counts, a cutoff that rolled past —
+the form re-fetches the counts and shows its empty state. It never repeats the
+server's rule at the user.
 
 The window is per-SLOT, not per-day: a day is refused only when even its best
 case fails, so a morning inside the notice window does not discard that

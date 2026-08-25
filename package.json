@@ -1,6 +1,6 @@
 {
   "name": "@wolffm/contact-ui",
-  "version": "2.4.2",
+  "version": "2.4.3",
   "description": "Contact form micro-frontend for hadoku.me",
   "type": "module",
   "packageManager": "pnpm@11.5.0",

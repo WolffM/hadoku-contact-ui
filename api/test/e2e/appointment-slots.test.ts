@@ -243,6 +243,139 @@ describe('Appointment Slots Integration', () => {
     })
   })
 
+  /**
+   * What the calendar greys dates out with. A date the user can click must have
+   * something behind it — the whole complaint that produced this endpoint was a
+   * clickable date answering with a rule instead of times.
+   */
+  describe('GET /appointments/availability', () => {
+    async function fetchAvailability(duration: number, from: string, to: string) {
+      return SELF.fetch(
+        `https://test.com/contact/api/appointments/availability?duration=${duration}&from=${from}&to=${to}`
+      )
+    }
+
+    /** The first and last date of the next 40 days, as YYYY-MM-DD. */
+    function nextDays(count: number): { from: string; to: string } {
+      const start = new Date()
+      const end = new Date()
+      end.setUTCDate(end.getUTCDate() + count)
+      return {
+        from: start.toISOString().split('T')[0],
+        to: end.toISOString().split('T')[0]
+      }
+    }
+
+    it('names only dates that have a slot left on them', async () => {
+      const { from, to } = nextDays(40)
+      const response = await fetchAvailability(30, from, to)
+      expect(response.status).toBe(200)
+
+      const { dates } = (await response.json()) as { dates: Record<string, number> }
+      expect(Object.keys(dates).length).toBeGreaterThan(0)
+      for (const count of Object.values(dates)) {
+        expect(count).toBeGreaterThan(0)
+      }
+    })
+
+    it('omits weekends and everything past the far bound', async () => {
+      const { from, to } = nextDays(40)
+      const { dates } = (await (await fetchAvailability(30, from, to)).json()) as {
+        dates: Record<string, number>
+      }
+
+      const cutoff = new Date()
+      cutoff.setUTCDate(cutoff.getUTCDate() + 30)
+
+      for (const date of Object.keys(dates)) {
+        const day = new Date(`${date}T12:00:00.000Z`).getUTCDay()
+        expect(day).not.toBe(0)
+        expect(day).not.toBe(6)
+        expect(date <= cutoff.toISOString().split('T')[0]).toBe(true)
+      }
+    })
+
+    /**
+     * The case the window rules cannot answer, and the reason this endpoint
+     * exists rather than the config alone: a day that clears every bound but has
+     * been booked solid must be greyed exactly like a weekend.
+     */
+    it('drops a day once every slot on it is booked', async () => {
+      const date = nextUtcWeekday(3)
+      const { from, to } = nextDays(40)
+
+      const before = (await (await fetchAvailability(60, from, to)).json()) as {
+        dates: Record<string, number>
+      }
+      expect(before.dates[date]).toBeGreaterThan(0)
+
+      const slots = ((await (await fetchSlots(date, 60)).json()) as SlotsResponse).slots
+      for (const slot of slots) {
+        await env.DB.prepare(
+          `INSERT INTO appointments
+             (id, name, email, slot_id, date, start_time, end_time, duration, timezone,
+              platform, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?)`
+        )
+          .bind(
+            `booked-${slot.id}`,
+            'Fully Booked',
+            'booked@example.com',
+            slot.id,
+            date,
+            slot.startTime,
+            slot.endTime,
+            60,
+            'America/New_York',
+            'jitsi',
+            Date.now(),
+            Date.now()
+          )
+          .run()
+      }
+
+      const after = (await (await fetchAvailability(60, from, to)).json()) as {
+        dates: Record<string, number>
+      }
+      expect(after.dates[date]).toBeUndefined()
+      // Its neighbours are untouched — only the solid day drops out.
+      expect(Object.keys(after.dates).length).toBe(Object.keys(before.dates).length - 1)
+    })
+
+    it('rejects a malformed or inverted range', async () => {
+      expect((await fetchAvailability(30, 'not-a-date', '2026-09-01')).status).toBe(400)
+      expect((await fetchAvailability(30, '2026-09-30', '2026-09-01')).status).toBe(400)
+    })
+
+    it('refuses a range too wide to be one calendar screen', async () => {
+      expect((await fetchAvailability(30, '2026-01-01', '2026-12-31')).status).toBe(400)
+    })
+
+    it('rejects a duration the operator does not offer', async () => {
+      const { from, to } = nextDays(10)
+      expect((await fetchAvailability(45, from, to)).status).toBe(400)
+    })
+
+    /**
+     * Every date the availability map names must actually return bookable slots,
+     * and every weekday it omits must have none. This is the invariant the whole
+     * change rests on: no clickable date without times behind it.
+     */
+    it('never names a date whose slot list comes back empty', async () => {
+      const { from, to } = nextDays(35)
+      const { dates } = (await (await fetchAvailability(30, from, to)).json()) as {
+        dates: Record<string, number>
+      }
+
+      for (const date of Object.keys(dates)) {
+        const response = await fetchSlots(date, 30)
+        expect(response.status, `${date} was offered but slots refused it`).toBe(200)
+        const slots = ((await response.json()) as SlotsResponse).slots.filter(s => s.available)
+        expect(slots.length, `${date} was offered but has no free slots`).toBeGreaterThan(0)
+      }
+    })
+  })
+
   describe('Business Rules', () => {
     it('should reject dates within advance notice window', async () => {
       // Use today's UTC date — its 9 AM NY (= 13:00 or 14:00 UTC) is at most ~24h

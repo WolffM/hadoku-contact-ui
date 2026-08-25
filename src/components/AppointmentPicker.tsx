@@ -1,18 +1,28 @@
 import { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react'
-import { format } from 'date-fns'
+import { endOfMonth, format, startOfMonth } from 'date-fns'
 import AppointmentCalendar from './AppointmentCalendar'
 import TimeSlotPicker from './TimeSlotPicker'
 import DurationSelector from './DurationSelector'
 import MeetingPlatformSelector from './MeetingPlatformSelector'
-import { fetchAvailableSlots, fetchBookingWindow, AppointmentAPIError } from '../api/appointments'
+import {
+  fetchAvailability,
+  fetchAvailableSlots,
+  fetchBookingWindow,
+  AppointmentAPIError
+} from '../api/appointments'
 import { isDateBookable } from '../../api/utils/booking-window'
 import type {
   AppointmentSlot,
+  AvailabilityResponse,
   BookingWindowConfig,
   AppointmentSelection,
   TimeSlotDuration,
   MeetingPlatform
 } from '../types'
+
+/** Identifies which month and duration a set of counts describes. */
+const availabilityKey = (month: Date, duration: TimeSlotDuration) =>
+  `${format(month, 'yyyy-MM')}|${duration}`
 
 interface AppointmentPickerProps {
   onAppointmentChange: (selection: AppointmentSelection) => void
@@ -38,6 +48,20 @@ const AppointmentPicker = forwardRef<AppointmentPickerRef, AppointmentPickerProp
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)
     const [bookingWindow, setBookingWindow] = useState<BookingWindowConfig | null>(null)
+    // Stamped with the month and duration it describes. Without the stamp, paging
+    // to a new month would grey out every date in it — none of them appear in the
+    // PREVIOUS month's counts — until the fetch landed, which reads as "nothing is
+    // available here" for as long as the request takes.
+    const [availability, setAvailability] = useState<{
+      key: string
+      dates: AvailabilityResponse['dates']
+    } | null>(null)
+    const [visibleMonth, setVisibleMonth] = useState<Date>(
+      () => initialSelection?.date ?? new Date()
+    )
+    // Bumped when the slots endpoint refuses a day the calendar still offered,
+    // which forces the counts to be refetched.
+    const [staleAvailability, setStaleAvailability] = useState(0)
 
     // Load the server's booking window once. A failure is deliberately silent:
     // the calendar falls back to offering every future date and the slots
@@ -57,17 +81,46 @@ const AppointmentPicker = forwardRef<AppointmentPickerRef, AppointmentPickerProp
       }
     }, [])
 
+    // Free-slot counts for the month on screen, refetched when the user pages or
+    // changes the duration. This — not the window rules — is what greys dates
+    // out, because a day can clear every rule and still be booked solid.
+    const loadAvailability = useCallback(async (month: Date, slotDuration: TimeSlotDuration) => {
+      const first = startOfMonth(month)
+      const last = endOfMonth(month)
+      try {
+        const response = await fetchAvailability(
+          slotDuration,
+          format(first, 'yyyy-MM-dd'),
+          format(last, 'yyyy-MM-dd')
+        )
+        setAvailability({ key: availabilityKey(month, slotDuration), dates: response.dates })
+      } catch {
+        // Leave the previous counts alone rather than greying the whole month on
+        // a transient failure. The slots endpoint still refuses what it must.
+      }
+    }, [])
+
+    useEffect(() => {
+      void loadAvailability(visibleMonth, duration)
+    }, [visibleMonth, duration, staleAvailability, loadAvailability])
+
     // A longer meeting needs an earlier start, so raising the duration can push
     // the selected date out of the window. Drop it rather than let the slots
     // fetch answer with a whole-day error about a date the calendar has just
     // greyed out underneath the user.
     useEffect(() => {
-      if (!bookingWindow || !selectedDate) return
-      if (!isDateBookable(format(selectedDate, 'yyyy-MM-dd'), duration, bookingWindow)) {
+      if (!selectedDate) return
+      const key = format(selectedDate, 'yyyy-MM-dd')
+      const current =
+        availability?.key === availabilityKey(selectedDate, duration) ? availability.dates : null
+      const stillOffered = current
+        ? current[key] !== undefined
+        : !bookingWindow || isDateBookable(key, duration, bookingWindow)
+      if (!stillOffered) {
         setSelectedDate(null)
         setSelectedSlot(null)
       }
-    }, [bookingWindow, selectedDate, duration])
+    }, [availability, bookingWindow, selectedDate, duration])
 
     // Notify parent of selection changes
     useEffect(() => {
@@ -100,7 +153,14 @@ const AppointmentPicker = forwardRef<AppointmentPickerRef, AppointmentPickerProp
             return null
           })
         } catch (err) {
-          if (err instanceof AppointmentAPIError) {
+          const dayRefused = err instanceof AppointmentAPIError && err.type === 'validation'
+          if (dayRefused) {
+            // The calendar's greying was stale — the day filled up, or the notice
+            // cutoff rolled past it, while the user was looking at it. Re-grey it
+            // rather than repeating the server's rule at someone who cannot act
+            // on it; TimeSlotPicker's empty state says the useful half.
+            setStaleAvailability(n => n + 1)
+          } else if (err instanceof AppointmentAPIError) {
             setError(err.message)
           } else {
             setError('Failed to load available time slots. Please try again.')
@@ -178,7 +238,13 @@ const AppointmentPicker = forwardRef<AppointmentPickerRef, AppointmentPickerProp
               selectedDate={selectedDate}
               onDateChange={handleDateChange}
               bookingWindow={bookingWindow}
+              availability={
+                availability?.key === availabilityKey(visibleMonth, duration)
+                  ? availability.dates
+                  : null
+              }
               duration={duration}
+              onVisibleMonthChange={setVisibleMonth}
               disabled={disabled}
             />
           </div>

@@ -65,6 +65,22 @@ export interface FetchSlotsResponse {
   timezone: string
 }
 
+/**
+ * Free-slot counts per date, from `GET /appointments/availability`.
+ *
+ * Only dates with something left on them appear. The calendar greys out every
+ * date absent from `dates` — weekends, days inside the notice window, days past
+ * the far bound and days booked solid are all just "not in here", so the UI
+ * never has to re-derive the reason a date is unavailable, nor explain it.
+ */
+export interface AvailabilityResponse {
+  duration: number
+  from: string
+  to: string
+  timezone: string
+  dates: Record<string, number>
+}
+
 export interface SubmitContactRequest {
   name: string
   email: string

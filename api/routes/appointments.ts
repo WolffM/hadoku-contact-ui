@@ -7,11 +7,22 @@ import { validateSlotFetchRequest } from '../validation'
 import {
   getAppointmentConfig,
   getAppointmentsByDate,
+  getBookedSlotIdsInRange,
   parseIntList,
   toBookingWindow
 } from '../storage'
-import { zonedDateToUtc } from '../utils/timezone'
-import { advanceBounds, rejectDate } from '../utils/booking-window'
+import {
+  advanceBounds,
+  datesBetween,
+  rejectDate,
+  slotId,
+  slotStarts,
+  type BookingWindow
+} from '../utils/booking-window'
+
+/** Guards the range so one request cannot ask the calendar to scan a decade. */
+const MAX_AVAILABILITY_DAYS = 62
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
 interface Env {
   DB: D1Database
@@ -103,14 +114,7 @@ export function createAppointmentsRoutes() {
           )
       }
 
-      const allSlots = await generateTimeSlots(
-        db,
-        requestDate,
-        requestDuration,
-        config.business_hours_start,
-        config.business_hours_end,
-        config.timezone
-      )
+      const allSlots = await generateTimeSlots(db, requestDate, requestDuration, bookingWindow)
 
       // Drop the individual slots outside the window. Dropped rather than marked
       // unavailable: `available: false` means "someone already booked this", and
@@ -163,48 +167,99 @@ export function createAppointmentsRoutes() {
     }
   })
 
+  /**
+   * How many slots each date in a range still has free.
+   *
+   * This is what the calendar greys dates out with. The window alone is not
+   * enough to answer "can I book that day": a date can clear every bound and
+   * still be full, and a date the user can click but that has nothing behind it
+   * is the same dead end as the one that started all this — the notice is
+   * useless, the date should simply be unclickable.
+   *
+   * Only dates with at least one free slot appear in `dates`. Everything else —
+   * weekends, days inside the notice window, days past the far bound, and days
+   * booked solid — is absent, so the client greys out anything it does not find
+   * here rather than having to re-derive why.
+   */
+  app.get('/appointments/availability', async c => {
+    const db = c.env.DB
+
+    try {
+      const duration = parseInt(c.req.query('duration') ?? '', 10)
+      const from = c.req.query('from') ?? ''
+      const to = c.req.query('to') ?? ''
+
+      if (!DATE_PATTERN.test(from) || !DATE_PATTERN.test(to) || from > to) {
+        return c.json({ message: 'from and to must be YYYY-MM-DD, with from <= to' }, 400)
+      }
+
+      const config = await getAppointmentConfig(db)
+      if (!config) {
+        return c.json({ message: 'Appointment system not configured' }, 500)
+      }
+
+      if (!parseIntList(config.slot_duration_options).includes(duration)) {
+        return c.json({ message: `Duration ${c.req.query('duration')} not available` }, 400)
+      }
+
+      const dateList = datesBetween(from, to)
+      if (dateList.length > MAX_AVAILABILITY_DAYS) {
+        return c.json(
+          { message: `Range too wide — ask for at most ${MAX_AVAILABILITY_DAYS} days` },
+          400
+        )
+      }
+
+      const bookingWindow = toBookingWindow(config)
+      const now = new Date()
+      const { earliest, latest } = advanceBounds(bookingWindow, now)
+      const bookedSlotIds = await getBookedSlotIdsInRange(db, from, to)
+
+      const dates: Record<string, number> = {}
+      for (const date of dateList) {
+        if (rejectDate(date, duration, bookingWindow, now)) continue
+
+        const free = slotStarts(date, duration, bookingWindow).filter(
+          start => start >= earliest && start <= latest && !bookedSlotIds.has(slotId(date, start))
+        ).length
+
+        if (free > 0) dates[date] = free
+      }
+
+      return c.json({ duration, from, to, timezone: config.timezone, dates })
+    } catch (error) {
+      console.error('Error fetching appointment availability:', error)
+      return c.json({ message: 'Failed to fetch availability' }, 500)
+    }
+  })
+
   return app
 }
 
+/**
+ * The day's slots, each marked with whether it is still free.
+ *
+ * Built on `slotStarts` so this and the availability endpoint count the same
+ * grid — the two used to derive it separately, which is exactly the kind of
+ * split that lets a calendar offer a date its own slot list then comes back
+ * empty for.
+ */
 async function generateTimeSlots(
   db: D1Database,
   date: string,
   duration: number,
-  businessHoursStart: string,
-  businessHoursEnd: string,
-  timezone: string
+  window: BookingWindow
 ): Promise<{ id: string; startTime: string; endTime: string; available: boolean }[]> {
   const existingAppointments = await getAppointmentsByDate(db, date)
   const bookedSlotIds = new Set(existingAppointments.map(apt => apt.slot_id))
-
-  const [startHour, startMinute] = businessHoursStart.split(':').map(Number)
-  const [endHour, endMinute] = businessHoursEnd.split(':').map(Number)
-
-  let currentTime = zonedDateToUtc(date, startHour, startMinute, timezone)
-  const endTime = zonedDateToUtc(date, endHour, endMinute, timezone)
-  const slots = []
-
-  while (currentTime < endTime) {
-    const slotStart = new Date(currentTime)
-    const slotEnd = new Date(currentTime.getTime() + duration * 60 * 1000)
-
-    if (slotEnd > endTime) {
-      break
-    }
-
-    const slotId = `slot-${date}-${slotStart.toISOString()}`
-    const available = !bookedSlotIds.has(slotId)
-
-    slots.push({
-      id: slotId,
-      startTime: slotStart.toISOString(),
-      endTime: slotEnd.toISOString(),
-      available
-    })
-
-    currentTime = slotEnd
-  }
-
   const now = new Date()
-  return slots.filter(slot => new Date(slot.startTime) > now)
+
+  return slotStarts(date, duration, window)
+    .filter(start => start > now)
+    .map(start => ({
+      id: slotId(date, start),
+      startTime: start.toISOString(),
+      endTime: new Date(start.getTime() + duration * 60 * 1000).toISOString(),
+      available: !bookedSlotIds.has(slotId(date, start))
+    }))
 }

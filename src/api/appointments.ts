@@ -1,4 +1,5 @@
 import type {
+  AvailabilityResponse,
   BookingWindowConfig,
   FetchSlotsResponse,
   SubmitContactRequest,
@@ -7,6 +8,7 @@ import type {
   TimeSlotDuration
 } from '../types'
 import {
+  mockFetchAvailability,
   mockFetchAvailableSlots,
   mockFetchBookingWindow,
   mockSubmitContactWithAppointment,
@@ -58,6 +60,41 @@ export async function fetchBookingWindow(): Promise<BookingWindowConfig> {
 }
 
 /**
+ * Which dates in `[from, to]` still have a slot free, and how many.
+ *
+ * The calendar greys out everything this does not name. It is the only question
+ * whose answer is "can the user click this day" — the booking window alone
+ * cannot tell you, because a day can clear every rule and still be full.
+ */
+export async function fetchAvailability(
+  duration: TimeSlotDuration,
+  from: string,
+  to: string
+): Promise<AvailabilityResponse> {
+  if (shouldUseMockAPI()) {
+    return mockFetchAvailability(duration, from, to)
+  }
+
+  const params = new URLSearchParams({ duration: duration.toString(), from, to })
+  const response = await fetch(`${API_BASE_URL}/appointments/availability?${params}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+
+  if (!response.ok) {
+    throw new AppointmentAPIError(
+      'network',
+      `Failed to load availability: ${response.statusText}`,
+      true
+    )
+  }
+
+  return (await response.json()) as AvailabilityResponse
+}
+
+/**
  * Fetch available appointment slots for a given date and duration
  */
 export async function fetchAvailableSlots(
@@ -92,10 +129,16 @@ export async function fetchAvailableSlots(
       }
 
       const errorData = await response.json().catch(() => ({}))
+
+      // A 400 here is the day itself being refused — outside the notice window,
+      // past the far bound, or not a working day. That is not something to show
+      // the user: the calendar should already have greyed the date, so the
+      // caller treats this as "nothing on this day" and refreshes the greying
+      // rather than surfacing a rule they cannot act on.
       throw new AppointmentAPIError(
-        'network',
+        response.status === 400 ? 'validation' : 'network',
         errorData.message || `Failed to fetch slots: ${response.statusText}`,
-        true
+        response.status !== 400
       )
     }
 
