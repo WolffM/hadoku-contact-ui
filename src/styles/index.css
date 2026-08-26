@@ -577,11 +577,8 @@ body {
   letter-spacing: 0.01em;
 }
 
-.react-calendar__navigation button:enabled:hover,
-.react-calendar__navigation button:enabled:focus-visible {
-  background-color: var(--color-primary-bg);
-  color: var(--color-on-primary-bg);
-}
+/* Hover and keyboard focus for these live with the neutraliser below — a copy
+   here would be dead weight, outranked by it. */
 
 .react-calendar__navigation button:disabled {
   opacity: 0.3;
@@ -645,13 +642,24 @@ body {
 .appointment-calendar .react-calendar__tile--active:enabled:hover,
 .appointment-calendar .react-calendar__tile--active:enabled:focus,
 .appointment-calendar .react-calendar__navigation button,
-.appointment-calendar .react-calendar__navigation button:disabled {
+.appointment-calendar .react-calendar__navigation button:disabled,
+.appointment-calendar .react-calendar__navigation button:enabled:hover,
+.appointment-calendar .react-calendar__navigation button:enabled:focus {
   background: none;
   border: none;
 }
 
-/* The nav hover tint is re-applied here rather than in the Navigation block
-   above, because the neutraliser outranks that block and would erase it. */
+/* Re-applied here rather than in the Navigation block above, because the
+ * neutraliser outranks that block and would erase it. Equal specificity to the
+ * neutraliser, so source order decides and this has to stay below it.
+ *
+ * `:focus-visible`, never plain `:focus`. react-calendar paints #e6e6e6 behind
+ * `:enabled:focus`, and the nav buttons were the one place that was not
+ * neutralised — so after CLICKING the month title (which leaves the button
+ * focused but not focus-visible) it kept a hardcoded near-white block. On a
+ * dark card the year picker's title read as a solid white bar. A mouse click
+ * now leaves no mark at all; a keyboard tab still gets the tint.
+ */
 .appointment-calendar .react-calendar__navigation button:enabled:hover,
 .appointment-calendar .react-calendar__navigation button:enabled:focus-visible {
   background-color: var(--color-primary-bg);
