@@ -41,6 +41,7 @@ import {
   logEmailFailed,
   logAppointmentBooked,
   logAppointmentConflict,
+  logMeetingLinkFailed,
   logSubmissionCreated
 } from '../telemetry'
 
@@ -270,6 +271,23 @@ export function createSubmitRoutes(rateLimitOverrides?: {
           },
           c.env
         )
+
+        // A link that failed to generate must not fail the booking — the slot
+        // is still reserved and the operator can send a link by hand. But it
+        // was previously invisible: the only trace was a null `meeting_link`
+        // column that no admin view renders, which is how a Google Meet
+        // integration that had never once produced a link went unnoticed.
+        if (!meetingLinkResult.success) {
+          console.error(
+            `Meeting link generation failed for ${appointmentData.platform}:`,
+            meetingLinkResult.error
+          )
+          logMeetingLinkFailed(
+            c.env,
+            appointmentData.platform,
+            meetingLinkResult.error ?? 'Unknown error'
+          )
+        }
 
         const config = await getAppointmentConfig(db)
         const timezone = config?.timezone ?? APPOINTMENT_CONFIG.DEFAULT_TIMEZONE

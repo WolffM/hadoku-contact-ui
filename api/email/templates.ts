@@ -77,19 +77,32 @@ Reply to this email to reach me directly at matthaeus@hadoku.me.`
   return { subject, text }
 }
 
+// What the confirmation says when link generation FAILED. It used to promise
+// "I'll send you a <platform> link shortly" — a promise nothing in the system
+// keeps: no retry, no queue, no alert to the operator, and the booking looks
+// entirely successful from the admin side. It fired on every Google booking,
+// because the Calendar OAuth secrets have never been provisioned.
+//
+// Asking for a reply is the honest version and the useful one: it routes the
+// failure to a human through the inbox that already exists, instead of leaving
+// the booker waiting on a message nobody knows to send.
+function missingLinkNotice(platformLabel: string): string {
+  return `I wasn't able to generate the ${platformLabel} link automatically. Reply to this email and I'll send it over before the meeting.`
+}
+
 function getPlatformInstructions(platform: string, meetingLink?: string): string {
   switch (platform.toLowerCase()) {
     case 'discord':
-      return `We'll meet on Discord. ${meetingLink ? `Use this invite link:\n${meetingLink}\n\nMake sure you have Discord installed and an account set up before the meeting time.` : "I'll send you a Discord invite link shortly."}`
+      return `We'll meet on Discord. ${meetingLink ? `Use this invite link:\n${meetingLink}\n\nMake sure you have Discord installed and an account set up before the meeting time.` : missingLinkNotice('Discord invite')}`
 
     case 'google':
-      return `We'll meet via Google Meet. ${meetingLink ? `Click the meeting link above to join at the scheduled time.\n\nYou can join from your browser (Chrome recommended) or the Google Meet app.` : "I'll send you a Google Meet link shortly."}`
+      return `We'll meet via Google Meet. ${meetingLink ? `Click the meeting link above to join at the scheduled time.\n\nYou can join from your browser (Chrome recommended) or the Google Meet app.` : missingLinkNotice('Google Meet')}`
 
     case 'teams':
-      return `We'll meet via Microsoft Teams. ${meetingLink ? `Click the meeting link above to join at the scheduled time.\n\nYou can join from your browser or the Microsoft Teams app.` : "I'll send you a Microsoft Teams meeting link shortly."}`
+      return `We'll meet via Microsoft Teams. ${meetingLink ? `Click the meeting link above to join at the scheduled time.\n\nYou can join from your browser or the Microsoft Teams app.` : missingLinkNotice('Microsoft Teams')}`
 
     case 'jitsi':
-      return `We'll meet via Jitsi Meet (free, no account required). ${meetingLink ? `Click the meeting link above to join at the scheduled time.\n\nJitsi works in any modern browser - no installation needed!` : "I'll send you a Jitsi Meet link shortly."}`
+      return `We'll meet via Jitsi Meet (free, no account required). ${meetingLink ? `Click the meeting link above to join at the scheduled time.\n\nJitsi works in any modern browser - no installation needed!` : missingLinkNotice('Jitsi Meet')}`
 
     default:
       return 'Meeting details will be provided shortly.'

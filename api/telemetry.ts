@@ -17,6 +17,11 @@ export const EventType = {
   EMAIL_FAILED: 'email_failed',
   APPOINTMENT_BOOKED: 'appt_booked',
   APPOINTMENT_CONFLICT: 'appt_conflict',
+  // A booking that stored no meeting link. Nothing reported this, which is how
+  // Google Meet stayed broken unnoticed: the booking 201s, the confirmation
+  // sends, the admin row looks complete, and only the `meeting_link` column —
+  // which no view surfaces — says anything went wrong.
+  MEETING_LINK_FAILED: 'meeting_link_failed',
   SUBMISSION_CREATED: 'submit_created'
 } as const
 
@@ -179,6 +184,20 @@ export function logAppointmentBooked(env: TelemetryEnv, platform: string, durati
     severity: Severity.INFO,
     value: duration,
     context: platform
+  })
+}
+
+export function logMeetingLinkFailed(
+  env: TelemetryEnv,
+  platform: string,
+  errorMessage: string
+): void {
+  logEvent(env, {
+    eventType: EventType.MEETING_LINK_FAILED,
+    severity: Severity.ERROR,
+    value: 1,
+    context: platform,
+    detail: errorMessage.substring(0, 100)
   })
 }
 

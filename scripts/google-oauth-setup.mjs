@@ -12,9 +12,16 @@
  * Usage:
  *   GOOGLE_OAUTH_CLIENT_ID=... GOOGLE_OAUTH_CLIENT_SECRET=... node scripts/google-oauth-setup.mjs
  *
- * The script opens a browser, you grant calendar.events scope, and it prints
- * a refresh token to stdout. Store it as a worker secret:
- *   wrangler secret put GOOGLE_OAUTH_REFRESH_TOKEN
+ * GRANT AS meeting@hadoku.me, not a personal account. Every booking writes a
+ * calendar event — carrying a stranger's email as an attendee — onto whichever
+ * account authorizes here. That is not incidental: the event is what makes
+ * Google mint the Meet link, so there is no version of this that does not write.
+ *
+ * The script opens a browser, you grant calendar.events scope, and it prints a
+ * refresh token to stdout. It goes in the VAULT, not `wrangler secret put` —
+ * the broker is the only writer of worker secrets in this ecosystem. Full
+ * procedure, including the manifest entry that must come after:
+ *   ../hadoku_site/docs/operations/google-meet-setup.md
  */
 
 import http from 'node:http'
@@ -85,9 +92,14 @@ const server = http.createServer(async (req, res) => {
 
     console.log('\n=== REFRESH TOKEN ===')
     console.log(data.refresh_token)
-    console.log('\nStore as worker secret:')
-    console.log(`  wrangler secret put GOOGLE_OAUTH_REFRESH_TOKEN`)
-    console.log('  (paste the token above)\n')
+    console.log('\nStore in the VAULT as MEETING_GOOGLE_REFRESH_TOKEN (not `wrangler')
+    console.log('secret put` — the broker is the only writer of worker secrets):')
+    console.log(`  curl -X POST "$MGMT_API_BASE/api/secrets/admin/set-many" \\`)
+    console.log(`       -H 'Content-Type: application/json' \\`)
+    console.log(`       -H "X-Admin-Key: $HADOKU_ADMIN_KEY" \\`)
+    console.log(`       -d '{"items": {"MEETING_GOOGLE_REFRESH_TOKEN": "<token above>"}}'`)
+    console.log('\nThen see ../hadoku_site/docs/operations/google-meet-setup.md')
+    console.log('for the manifest entry and the push — in that order.\n')
 
     server.close()
     process.exit(0)
