@@ -76,10 +76,13 @@ describe('Meeting Platform Integration', () => {
       expect(apt!.meeting_link).toMatch(/^https:\/\/discord\.gg\//)
       expect(apt!.meeting_id).toMatch(/^discord-/)
     })
+    // DISCORD_INVITE_URL taking precedence is pinned in
+    // api/test/unit/meeting-links.test.ts — SELF.fetch runs the worker with the
+    // bindings from wrangler.test.toml, so mutating `env` here does not reach it.
   })
 
   describe('Jitsi (URL construction)', () => {
-    it('constructs a meet.jit.si room URL deterministic on slot_id', async () => {
+    it('constructs a meet.jit.si room URL', async () => {
       const { response, slotId } = await bookWithPlatform('jitsi', 11)
       expect(response.status).toBe(201)
 
@@ -87,7 +90,58 @@ describe('Meeting Platform Integration', () => {
         .bind(slotId)
         .first<{ meeting_link: string; meeting_id: string }>()
 
-      expect(apt!.meeting_link).toMatch(/^https:\/\/meet\.jit\.si\/hadoku-/)
+      expect(apt!.meeting_link).toMatch(/^https:\/\/meet\.jit\.si\/hadoku-[0-9a-z]+$/)
+      expect(apt!.meeting_id).toBe(apt!.meeting_link.split('/').pop())
+    })
+
+    // The room is the whole access control on meet.jit.si, and slot ids are
+    // published by the public GET /appointments/slots listing. A room derived
+    // from one is a room any reader of the calendar can walk into.
+    it('does not derive the room from the slot id', async () => {
+      const { response, slotId } = await bookWithPlatform('jitsi', 13)
+      expect(response.status).toBe(201)
+
+      const apt = await env.DB.prepare('SELECT * FROM appointments WHERE slot_id = ?')
+        .bind(slotId)
+        .first<{ meeting_link: string }>()
+
+      expect(apt!.meeting_link).not.toContain(slotId)
+      // The date is the coarsest thing the slot id leaks; not even that.
+      expect(apt!.meeting_link).not.toContain(slotId.slice(5, 15))
+    })
+
+    it('gives two bookings of the same slot different rooms', async () => {
+      const first = await bookWithPlatform('jitsi', 15, 'a-jitsi@example.com')
+      expect(first.response.status).toBe(201)
+
+      await env.DB.prepare('DELETE FROM appointments WHERE slot_id = ?').bind(first.slotId).run()
+      const keys = await env.RATE_LIMIT_KV.list()
+      for (const key of keys.keys) await env.RATE_LIMIT_KV.delete(key.name)
+
+      const second = await bookWithPlatform('jitsi', 15, 'b-jitsi@example.com')
+      expect(second.response.status).toBe(201)
+
+      const apt = await env.DB.prepare('SELECT meeting_link FROM appointments WHERE slot_id = ?')
+        .bind(second.slotId)
+        .first<{ meeting_link: string }>()
+
+      expect(apt!.meeting_link).toMatch(/^https:\/\/meet\.jit\.si\/hadoku-[0-9a-z]+$/)
+      expect(apt!.meeting_link).not.toBe(
+        (await first.response.clone().json<{ meetingLink?: string }>()).meetingLink
+      )
+    })
+  })
+
+  describe('/submit response carries the link', () => {
+    // The browser has no other route to it: the confirmation email is the only
+    // other copy, and it is the one that can be delayed or filtered.
+    it('returns meetingLink alongside the booking', async () => {
+      const { response } = await bookWithPlatform('jitsi', 16)
+      expect(response.status).toBe(201)
+
+      const body = await response.json<{ meetingLink?: string; appointmentId?: string }>()
+      expect(body.appointmentId).toBeTruthy()
+      expect(body.meetingLink).toMatch(/^https:\/\/meet\.jit\.si\/hadoku-/)
     })
   })
 

@@ -112,6 +112,12 @@ export interface SubmitContactResponse {
   message?: string
   error?: string
   errors?: string[]
+  // The join URL, when the submission booked a slot AND the platform produced
+  // one. Absent for a message with no booking, and absent when link generation
+  // failed — a Google Meet booking made while OAuth is unconfigured still
+  // succeeds, it just has no link. The form must treat this as optional and
+  // never gate the success message on it.
+  meetingLink?: string
   // For conflict scenarios
   conflict?: {
     reason: 'slot_taken' | 'rate_limit' | 'invalid_slot'

@@ -1015,6 +1015,39 @@ body {
   opacity: 0.8;
 }
 
+/* Join link inside the success alert. Sits on --color-success-bg, so every
+   colour here is an on-success-bg token — the link included. A plain accent
+   colour fails AA against that tint. */
+.contact-alert__meeting-link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-success);
+}
+
+.contact-alert__meeting-link a {
+  font-weight: 600;
+  color: var(--color-on-success-bg);
+  text-decoration: underline;
+}
+
+/* The URL itself, spelled out so it can be read and copied off screen or out
+   of a screenshot. Long room tokens must wrap rather than widen the alert. */
+.contact-alert__meeting-url {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+  color: var(--color-on-success-bg);
+}
+
+.contact-alert__meeting-note {
+  font-size: 0.8125rem;
+  font-style: italic;
+  opacity: 0.8;
+}
+
 @keyframes pulse {
   0%,
   100% {

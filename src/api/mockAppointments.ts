@@ -191,7 +191,25 @@ export async function mockSubmitContactWithAppointment(
     success: true,
     message: request.appointment
       ? 'Your message has been sent and appointment booked!'
-      : 'Your message has been sent!'
+      : 'Your message has been sent!',
+    meetingLink: request.appointment ? mockMeetingLink(request.appointment.platform) : undefined
+  }
+}
+
+/**
+ * Stand-in for what generateMeetingLink returns, shaped per platform so the
+ * success banner is exercised in dev the way production renders it — including
+ * `google` returning nothing, which is the live behaviour until the Calendar
+ * OAuth secrets are provisioned on the worker.
+ */
+function mockMeetingLink(platform: string): string | undefined {
+  switch (platform) {
+    case 'jitsi':
+      return 'https://meet.jit.si/hadoku-0mock0room0token0'
+    case 'discord':
+      return 'https://discord.gg/Epchg7QQ'
+    default:
+      return undefined
   }
 }
 

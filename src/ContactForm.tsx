@@ -31,6 +31,7 @@ export default function ContactForm() {
     startTime: string
     duration: number
     platform: string
+    meetingLink?: string
   } | null>(null)
 
   // Field validators
@@ -135,7 +136,8 @@ export default function ContactForm() {
             date: appointmentSelection.date,
             startTime: appointmentSelection.selectedSlot.startTime,
             duration: appointmentSelection.duration,
-            platform: appointmentSelection.meetingPlatform
+            platform: appointmentSelection.meetingPlatform,
+            meetingLink: response.meetingLink
           })
         } else {
           setBookedAppointment(null)
@@ -255,6 +257,24 @@ export default function ContactForm() {
                 </>
               )}
               . I'll get back to you soon!
+              {/* The join URL, when the platform produced one. It is also in the
+                  confirmation email, but the email is the copy that can be
+                  delayed, filtered or bounced — before this the booker's only
+                  route to their own meeting was mail that had already left. A
+                  booking whose link generation failed (Google Meet with OAuth
+                  unconfigured) simply renders without this block; the success
+                  message above never depended on it. */}
+              {bookedAppointment?.meetingLink && (
+                <div className="contact-alert__meeting-link">
+                  <a href={bookedAppointment.meetingLink} target="_blank" rel="noopener noreferrer">
+                    Join link
+                  </a>
+                  <span className="contact-alert__meeting-url">
+                    {bookedAppointment.meetingLink}
+                  </span>
+                  <span className="contact-alert__meeting-note">Also sent to your email.</span>
+                </div>
+              )}
             </div>
           )}
 

@@ -34,6 +34,10 @@ export interface ContactEnv {
   // guarantee about the bindings it reads. Declaring them is what lets that
   // parameter be ContactEnv and a typo in a binding name be a compile error.
   JITSI_DOMAIN?: string
+  // The Discord invite handed to anyone who books that platform. A plain
+  // `[vars]` entry, not a secret — it is emailed and rendered in the browser.
+  // Unset falls back to the invite compiled into meeting-links.ts.
+  DISCORD_INVITE_URL?: string
   GOOGLE_OAUTH_CLIENT_ID?: string
   GOOGLE_OAUTH_CLIENT_SECRET?: string
   GOOGLE_OAUTH_REFRESH_TOKEN?: string
