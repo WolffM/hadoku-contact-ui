@@ -10,5 +10,8 @@
   "CLOUDFLARE_WORKER_FLUSH_TOKEN": "UI_CLOUDFLARE_WORKER_FLUSH_TOKEN",
   "ROUTE_CONFIG": "ROUTE_CONFIG",
   "CLOUDFLARE_ACCOUNT_ID": "CLOUDFLARE_ACCOUNT_ID",
-  "CLOUDFLARE_NAMESPACE_ID": "CLOUDFLARE_NAMESPACE_ID"
+  "CLOUDFLARE_NAMESPACE_ID": "CLOUDFLARE_NAMESPACE_ID",
+  "//google-meet": "Read by scripts/google-oauth-setup.mjs to mint and re-mint the Calendar refresh token. The LEFT names are what google-meet.ts reads at runtime; the RIGHT names are the vault items. Not needed by pnpm dev — the API does not run locally — only by the OAuth flow.",
+  "GOOGLE_OAUTH_CLIENT_ID": "HADOKU_MEETING_ORCHESTRATOR_GCP_CLIENTID",
+  "GOOGLE_OAUTH_CLIENT_SECRET": "HADOKU_MEETING_ORCHESTRATOR_GCP_CLIENT_SECRET"
 }
