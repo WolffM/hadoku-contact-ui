@@ -279,6 +279,26 @@ export function createAppointmentAdminRoutes() {
     }
   })
 
+  return app
+}
+
+/**
+ * `PATCH /appointments/:id/status` — the one route under /admin that is
+ * SERVICE tier, not admin. It lives in its own factory because that is how the
+ * lower gate is applied: routes/admin/index.ts mounts this behind
+ * requireTier('service') and everything else behind requireTier('admin'), and
+ * the two route sets stay disjoint so neither gate can start covering the
+ * other's paths by accident.
+ *
+ * Safe to lower because it discloses nothing — it takes an id and a status and
+ * answers with a boolean. It never returns appointment contents, which is the
+ * whole reason `GET /appointments` and `GET /appointments/:id` stayed above it.
+ * An automation closing out a no-show, or retiring a test booking, has no
+ * business also being able to read the operator's mail.
+ */
+export function createAppointmentStatusRoutes() {
+  const app = new Hono<AppContext>()
+
   app.patch('/appointments/:id/status', async c => {
     try {
       const id = c.req.param('id')
