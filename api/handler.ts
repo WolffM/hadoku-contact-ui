@@ -10,7 +10,7 @@ import { createCorsMiddleware, DEFAULT_HADOKU_ORIGINS } from './utils/cors'
 import { createEdgeAuth, tierAtLeast } from './utils/auth'
 import { createErrorHandlers } from './utils/error-handlers'
 import { createSubmitRoutes } from './routes/submit'
-import { createAdminRoutes } from './routes/admin'
+import { createAdminRoutes, createServiceRoutes } from './routes/admin'
 import { createInboundRoutes } from './routes/inbound'
 import { createAppointmentsRoutes } from './routes/appointments'
 import {
@@ -127,6 +127,12 @@ export function createContactHandler(basePath = '/contact/api', options?: Contac
 
   // Admin routes
   app.route('/admin', createAdminRoutes())
+  // The service-tier surface. A SEPARATE prefix, not a carve-out inside
+  // /admin — edge-router gates by prefix and cannot express a path pattern, so
+  // a service-tier route living under /admin could only be reached by lowering
+  // the edge rule for the whole admin prefix. See "Admin and service surfaces"
+  // in CLAUDE.md.
+  app.route('/service', createServiceRoutes())
 
   // Internal endpoint: daily maintenance.
   // Dispatched by mgmt-api's cron orchestrator with MGMT_CRON_KEY (service

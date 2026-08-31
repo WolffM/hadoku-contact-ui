@@ -87,6 +87,55 @@ invariant, not either half on its own.
 Widening what a user can book is a config change, not a code change:
 `PUT /admin/appointments/config` moves `advance_notice_hours`.
 
+## Admin and service surfaces
+
+**This section is the single source of truth for API tiering. Code comments
+point here; they must not restate it.** Two files enforce it and they live in
+different repos, so a rule written down twice is a rule that will disagree with
+itself.
+
+| Prefix                 | Tier      | Holds                                                      |
+| ---------------------- | --------- | ---------------------------------------------------------- |
+| `/contact/api/...`     | public    | submit, appointments, slots, availability, inbound, health |
+| `/contact/api/admin`   | **admin** | submissions, email, blocklist, templates, appointment CRUD |
+| `/contact/api/service` | service   | `PATCH /appointments/:id/status` — and nothing else, yet   |
+
+**The admission rule: a service route may ACT, it may not DISCLOSE.**
+`PATCH /appointments/:id/status` qualifies because it takes an id and a status
+and answers with a boolean. `GET /appointments` does not, and stays at admin —
+it returns names, emails and message bodies. Nor does anything that acts _as_
+the operator: `send-email` sends mail over their name. Service tier is held by
+every worker key in the ecosystem, so a route here is a route behind any of
+those keys, or behind a bug in any of them.
+
+**Two gates, and the edge one is primary.** Every request crosses
+`workers/edge-router/src/route-tiers.ts` in `../hadoku_site/` before it reaches
+this worker, and edge-router matches `exact` or `prefix` only — it cannot
+express a path pattern. That is the whole reason `/service` is a separate
+prefix rather than a carve-out inside `/admin`: a service-tier route living
+under `/admin` is unreachable unless the edge rule for the entire admin prefix
+is lowered, which would put appointment PII behind service tier at the edge and
+leave only the worker holding the line. Adding a route to `/service` therefore
+means editing both repos; adding one to `/admin` means editing neither.
+
+The worker is the BACKSTOP, not the gate. A 403 shaped
+`{"error":"forbidden","required":"admin"}` came from edge-router and never
+reached this code; the worker's own denial is
+`{"success":false,"error":"Forbidden","message":"... access required"}`. Telling
+them apart is how you know which repo to fix.
+
+`PATCH /appointments/:id/status` is mounted at BOTH prefixes from one factory
+(`createAppointmentStatusRoutes`) — service tier at `/service`, admin tier at
+`/admin`, because the command-station UI calls the admin path and predates the
+split. Cancelling through either retracts the mirrored task-calendar entry;
+there is no DELETE, and a cancelled row frees its slot because
+`isSlotAvailable` and the booked-slot query both filter `status = 'confirmed'`.
+
+Pinned by `api/test/e2e/admin-tier-split.test.ts`, which asserts the split in
+both directions: service can cancel, friend cannot (service is rank 2, friend
+1 — lowering a gate must not open it), and a service key gets 403 on every
+disclosing endpoint.
+
 ## Mail carries its booking
 
 A contact-form submission that booked a meeting is stored in two tables:

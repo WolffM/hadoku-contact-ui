@@ -50,36 +50,15 @@ function requireTier(minTier: 'service' | 'admin', label: string) {
 }
 
 /**
- * Everything under /admin is admin-tier with ONE exception, and the exception
- * is mounted as its own sub-app rather than punched through the gate.
+ * The admin surface. Uniformly admin-tier — no exceptions, no path carve-outs.
  *
- * `PATCH /appointments/:id/status` is service-tier. Cancelling a booking is an
- * operational act an automation should be able to perform — retiring a test
- * row, closing out a no-show — and it discloses nothing: it takes an id and a
- * status and returns a boolean. Everything else here is a different kind of
- * thing entirely. `createSubmissionRoutes` serves every message the contact
- * form has ever received, with names, addresses, IPs and user agents;
- * `createEmailRoutes` sends mail AS the operator; the blocklist and templates
- * are likewise operator state. Service tier is held by every worker key in the
- * ecosystem, so lowering the whole gate would put the operator's inbox behind
- * any one of them — or behind a bug in any one of them.
- *
- * The two sub-apps carry DISJOINT paths on purpose. A single router with a
- * path-exception in the middleware would work today and rot the moment a route
- * is added that happens to match the exception; two gates over two route sets
- * cannot develop that overlap silently, because a duplicate path would have to
- * be written into both files.
+ * The service-tier half of the API lives at a different PREFIX entirely
+ * (`createServiceRoutes`, mounted at /service), not as a hole in this gate.
+ * See "Admin and service surfaces" in CLAUDE.md for why, and for the rule
+ * governing what is allowed to live there.
  */
 export function createAdminRoutes() {
   const app = new Hono<AppContext>()
-
-  // Scoped to the exact path, NOT '*'. A '*' here runs the service gate over
-  // every /admin path on its way to the admin app — which still denies, because
-  // the admin gate is behind it, but denies with the wrong reason: a public
-  // caller asking for /submissions would be told "Service access required".
-  const serviceApp = new Hono<AppContext>()
-  serviceApp.use('/appointments/:id/status', requireTier('service', 'Service'))
-  serviceApp.route('/', createAppointmentStatusRoutes())
 
   const adminApp = new Hono<AppContext>()
   adminApp.use('*', requireTier('admin', 'Admin'))
@@ -88,9 +67,29 @@ export function createAdminRoutes() {
   adminApp.route('/', createBlocklistRoutes())
   adminApp.route('/', createAppointmentAdminRoutes())
   adminApp.route('/', createTemplateRoutes())
+  // Also reachable here, at admin tier: the command-station UI calls
+  // /admin/appointments/:id/status and predates the /service prefix.
+  adminApp.route('/', createAppointmentStatusRoutes())
 
-  app.route('/', serviceApp)
   app.route('/', adminApp)
+
+  return app
+}
+
+/**
+ * The service surface, mounted at /service. Everything here is service-tier
+ * and must satisfy the admission rule in CLAUDE.md ("Admin and service
+ * surfaces"): it may act, it may not disclose.
+ *
+ * `PATCH /appointments/:id/status` is the only member. The same handler is also
+ * reachable at the admin path — one factory, two mounts, two gates — so the
+ * command-station UI keeps the URL it already calls.
+ */
+export function createServiceRoutes() {
+  const app = new Hono<AppContext>()
+
+  app.use('*', requireTier('service', 'Service'))
+  app.route('/', createAppointmentStatusRoutes())
 
   return app
 }

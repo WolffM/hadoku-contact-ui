@@ -1,15 +1,14 @@
 /**
- * The /admin tier split.
+ * The admin/service tier split.
  *
- * PATCH /appointments/:id/status is SERVICE tier so an automation can retire a
- * test booking or close out a no-show. Everything else under /admin stays
- * ADMIN, because everything else either discloses the operator's mail or acts
- * as the operator.
+ * Rationale and the admission rule live in CLAUDE.md, "Admin and service
+ * surfaces". This file is the executable half: it pins the boundary in both
+ * directions so a later route cannot drift onto the service side unnoticed.
  *
- * These tests are the guard on that boundary. The risk being pinned is not
- * "does cancel work" — it is that some later route quietly ends up on the
- * service-tier side, which is exactly what a path-exception in one middleware
- * would have made easy.
+ * Note these tests exercise the WORKER gate only. Edge-router gates by prefix
+ * ahead of it and is not in the loop here, so a green run does not prove a
+ * route is reachable in production — that needs the matching rule in
+ * ../hadoku_site/workers/edge-router/src/route-tiers.ts.
  */
 import { env, SELF } from 'cloudflare:test'
 import { describe, it, expect, beforeEach } from 'vitest'
@@ -76,7 +75,7 @@ describe('/admin tier split', () => {
   describe('the one route that was lowered', () => {
     it('lets a SERVICE key cancel an appointment', async () => {
       const res = await SELF.fetch(
-        `https://test.com/contact/api/admin/appointments/${APPT_ID}/status`,
+        `https://test.com/contact/api/service/appointments/${APPT_ID}/status`,
         {
           method: 'PATCH',
           headers: SERVICE_HEADERS,
@@ -108,7 +107,7 @@ describe('/admin tier split', () => {
     // Service is rank 2; friend is 1. Lowering the gate must not open it.
     it('refuses a FRIEND key', async () => {
       const res = await SELF.fetch(
-        `https://test.com/contact/api/admin/appointments/${APPT_ID}/status`,
+        `https://test.com/contact/api/service/appointments/${APPT_ID}/status`,
         {
           method: 'PATCH',
           headers: FRIEND_HEADERS,
@@ -124,9 +123,30 @@ describe('/admin tier split', () => {
       expect(row!.status).toBe('confirmed')
     })
 
-    it('still validates the status value', async () => {
+    // Same handler, two mounts, two tiers. The /admin mount must NOT inherit
+    // the lower gate — otherwise the split is cosmetic and lowering the edge
+    // rule for /contact/api/admin would be enough to reach it.
+    it('refuses a SERVICE key on the ADMIN mount of the same handler', async () => {
       const res = await SELF.fetch(
         `https://test.com/contact/api/admin/appointments/${APPT_ID}/status`,
+        {
+          method: 'PATCH',
+          headers: SERVICE_HEADERS,
+          body: JSON.stringify({ status: 'cancelled' })
+        }
+      )
+
+      expect(res.status).toBe(403)
+
+      const row = await env.DB.prepare('SELECT status FROM appointments WHERE id = ?')
+        .bind(APPT_ID)
+        .first<{ status: string }>()
+      expect(row!.status).toBe('confirmed')
+    })
+
+    it('still validates the status value', async () => {
+      const res = await SELF.fetch(
+        `https://test.com/contact/api/service/appointments/${APPT_ID}/status`,
         {
           method: 'PATCH',
           headers: SERVICE_HEADERS,
