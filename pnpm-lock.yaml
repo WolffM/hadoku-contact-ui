@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@wolffm/logger':
-        specifier: ^1.3.3
-        version: 1.3.3
+        specifier: ^1.4.0
+        version: 1.4.0
       '@wolffm/prefs-client':
         specifier: ^1.0.11
         version: 1.0.11(react@19.2.0)(zod@4.1.12)
@@ -1593,8 +1593,8 @@ packages:
   '@wojtekmaj/date-utils@2.0.2':
     resolution: {integrity: sha512-Do66mSlSNifFFuo3l9gNKfRMSFi26CRuQMsDJuuKO/ekrDWuTTtE4ZQxoFCUOG+NgxnpSeBq/k5TY8ZseEzLpA==}
 
-  '@wolffm/logger@1.3.3':
-    resolution: {integrity: sha512-bpLT7LxpAXeFRdL0NLMhBgqABfvCodPACzGt4ZW1mNvdPaG/4EPMxQA0t26gbnB/Iu50zrZ5RTZ+YgVEhteuRg==, tarball: https://npm.pkg.github.com/download/@wolffm/logger/1.3.3/44fbe5ee39aed1cda9c551e48215b6a7e8136700}
+  '@wolffm/logger@1.4.0':
+    resolution: {integrity: sha512-JH84fEmaA/z0mC2UQcXupFoki9+u9cR6BIuD5aY6sV/KuYTLGdzX7BigzKCQ30jyRzi9WNRlIa/NEPcOh9uZYw==, tarball: https://npm.pkg.github.com/download/@wolffm/logger/1.4.0/975f8189fd42dcbc1d5bcf7be3d2c80bb5344043}
     engines: {node: '>=18'}
 
   '@wolffm/prefs-client@1.0.11':
@@ -4420,7 +4420,7 @@ snapshots:
 
   '@wojtekmaj/date-utils@2.0.2': {}
 
-  '@wolffm/logger@1.3.3': {}
+  '@wolffm/logger@1.4.0': {}
 
   '@wolffm/prefs-client@1.0.11(react@19.2.0)(zod@4.1.12)':
     dependencies:
