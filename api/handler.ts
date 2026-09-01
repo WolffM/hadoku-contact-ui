@@ -84,15 +84,24 @@ async function handleScheduled(env: ContactEnv): Promise<void> {
     }
   }
 
+  // An unreadable size is NOT zero. Reporting it as `0.0% (0.00 MB)` is what
+  // let a broken capacity check look healthy for months: the PRAGMA it used was
+  // refused by D1 on every call, the error was swallowed, and the alarm could
+  // never fire. Say "unknown", and never feed the placeholder to telemetry
+  // where it becomes a flat, reassuring line on a graph.
   const dbSize = await getDatabaseSize(env.DB)
-  console.log(
-    `Database capacity: ${dbSize.percentUsed.toFixed(1)}% (${(dbSize.sizeBytes / 1024 / 1024).toFixed(2)} MB)`
-  )
-  logDbCapacity(env, dbSize.percentUsed, dbSize.sizeBytes)
+  if (!dbSize.available) {
+    console.error('Database capacity: UNKNOWN — size read failed; the capacity alarm is blind')
+  } else {
+    console.log(
+      `Database capacity: ${dbSize.percentUsed.toFixed(1)}% (${(dbSize.sizeBytes / 1024 / 1024).toFixed(2)} MB)`
+    )
+    logDbCapacity(env, dbSize.percentUsed, dbSize.sizeBytes)
 
-  if (dbSize.warning) {
-    console.warn('WARNING: Database capacity threshold exceeded!')
-    console.warn('Consider archiving more aggressively or cleaning up old data')
+    if (dbSize.warning) {
+      console.warn('WARNING: Database capacity threshold exceeded!')
+      console.warn('Consider archiving more aggressively or cleaning up old data')
+    }
   }
 
   // The Google Calendar credential canary. Deliberately LAST: every retention

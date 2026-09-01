@@ -198,9 +198,16 @@ export function createSubmissionRoutes() {
       return adminOk(c, {
         submissions: stats,
         database: {
-          sizeBytes: dbSize.sizeBytes,
-          sizeMB: (dbSize.sizeBytes / (1024 * 1024)).toFixed(2),
-          percentUsed: dbSize.percentUsed.toFixed(2),
+          // `available: false` means the size could not be read — the numbers
+          // below are placeholders, not a measurement. Nulling them keeps the
+          // command station from rendering a confident "0.00 MB / 0.00%",
+          // which is what a refused PRAGMA displayed here for months. A client
+          // that predates this field still reads the old keys and now gets
+          // null instead of a fabricated zero.
+          available: dbSize.available,
+          sizeBytes: dbSize.available ? dbSize.sizeBytes : null,
+          sizeMB: dbSize.available ? (dbSize.sizeBytes / (1024 * 1024)).toFixed(2) : null,
+          percentUsed: dbSize.available ? dbSize.percentUsed.toFixed(2) : null,
           warning: dbSize.warning
         }
       })
