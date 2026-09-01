@@ -21,9 +21,16 @@ import {
   releaseQuarantinedSubmissions
 } from './storage'
 import { syncInboundEmails } from './services/resend-sync'
+import { checkCalendarCredential } from './services/google-meet'
 import { isWhitelistEnforced } from './services/inbound-ingest'
 import { RETENTION_CONFIG } from './constants'
-import { logDbCapacity, logArchive, logTrashPurge, logSpamPurge } from './telemetry'
+import {
+  logDbCapacity,
+  logArchive,
+  logTrashPurge,
+  logSpamPurge,
+  logMeetingLinkFailed
+} from './telemetry'
 import type { AppContext, ContactEnv, ContactHandlerOptions } from './types'
 
 async function handleScheduled(env: ContactEnv): Promise<void> {
@@ -86,6 +93,30 @@ async function handleScheduled(env: ContactEnv): Promise<void> {
   if (dbSize.warning) {
     console.warn('WARNING: Database capacity threshold exceeded!')
     console.warn('Consider archiving more aggressively or cleaning up old data')
+  }
+
+  // The Google Calendar credential canary. Deliberately LAST: every retention
+  // step above has already run and committed by the time this can throw, so a
+  // dead meeting credential never costs a night of archiving or purging.
+  //
+  // It throws rather than logging because throwing is the only thing here that
+  // reaches a human. logEvent() writes to console, and console goes to Workers
+  // Logs, which nobody is watching at 3am; a failed job, by contrast, is posted
+  // to /health/api/jobs and monitoring-api's job-alerts pages Discord off the
+  // `failed` state with no per-job wiring. The message therefore has to say
+  // plainly that this is the meeting credential and not the purge, because the
+  // alert it produces is titled with the job, not the step.
+  const credential = await checkCalendarCredential(env)
+  if (credential.configured && !credential.alive) {
+    logMeetingLinkFailed(env, 'google', credential.error)
+    throw new Error(
+      `Google Calendar credential is dead — retention steps all succeeded, this is ONLY the meeting-link credential. ` +
+        `Google Meet bookings are still succeeding but storing meeting_link = null. ` +
+        `Re-mint per docs/operations/google-meet-setup.md. Underlying error: ${credential.error}`
+    )
+  }
+  if (credential.configured) {
+    console.log('Google Calendar credential OK (refresh token exchanged)')
   }
 
   console.log('Scheduled tasks completed successfully')

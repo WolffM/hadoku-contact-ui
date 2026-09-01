@@ -136,6 +136,56 @@ both directions: service can cancel, friend cannot (service is rank 2, friend
 1 — lowering a gate must not open it), and a service key gets 403 on every
 disclosing endpoint.
 
+## Meeting links, and the credential that expires
+
+Three platforms, three failure profiles. Jitsi and Discord need no credential —
+Jitsi builds a room from 128 CSPRNG bits (never from `slotId`, which the public
+`/appointments/slots` listing publishes), Discord serves `DISCORD_INVITE_URL`.
+Google Meet needs OAuth, and that is the only part that can rot.
+
+**A meeting link never fails a booking.** `generateMeetingLink` returning
+unsuccessfully still stores the appointment, still sends the confirmation, and
+still 201s — with `meeting_link = null` in a column no admin view renders. That
+is not a bug to fix; a reserved slot is worth more than a link. It does mean the
+failure is invisible by construction, which is how Google Meet shipped in v1.1.9
+and produced nothing at all until 2026-08-27 without anyone noticing.
+
+Two things now make it visible:
+
+- `logMeetingLinkFailed` on every failed generation. Note this only reaches
+  Workers Logs — `logEvent` writes to `console`, it does **not** write to
+  Analytics Engine despite taking an `env`. Findable, not alerting.
+- **The canary in `handleScheduled`** — `checkCalendarCredential` exchanges the
+  refresh token daily. It is the alerting half, and it works by THROWING: a
+  thrown step makes `/internal/run-daily` return 500, mgmt-api records the
+  JobExecution as `failed`, and monitoring-api's `job-alerts` pages Discord off
+  that state with no per-job wiring. Throwing is the only path here that reaches
+  a human.
+
+The canary runs **last** on purpose, after every retention step has committed,
+so a dead meeting credential never costs a night of archiving or purging. Its
+error message says so explicitly, because the Discord alert is titled with the
+job and would otherwise read as a broken purge.
+
+It is also a **keepalive**: Google voids a refresh token after six months
+unused, and bookings here are sporadic enough to reach that. A daily exchange
+counts as use.
+
+`configured: false` (no Google secrets bound) is a first-class answer, not a
+failure — a deployment offering only Jitsi and Discord must not fail its nightly
+job over a feature it never enabled, and must not make an outbound call to find
+that out.
+
+**What kills the refresh token**, in likelihood order: the OAuth app sitting in
+"Testing" publishing status (Google voids tokens after 7 days), six months
+unused, an account password change, a manual revoke, or the client being
+deleted. Recovery is a re-mint and a secret push — no code change, no republish.
+Full procedure: `../hadoku_site/docs/operations/google-meet-setup.md`.
+
+Pinned by `api/test/e2e/credential-canary.test.ts` (dead credential fails the
+job; retention still ran) and `api/test/unit/credential-check.test.ts` (the
+configuration branching, which the e2e tests cannot reach).
+
 ## Mail carries its booking
 
 A contact-form submission that booked a meeting is stored in two tables:

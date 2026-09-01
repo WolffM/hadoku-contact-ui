@@ -88,6 +88,50 @@ async function getAccessToken(env: GoogleMeetEnv): Promise<string> {
   return data.access_token
 }
 
+export type CredentialCheck =
+  /** No OAuth secrets bound — this deployment does not offer Google Meet. */
+  | { configured: false }
+  | { configured: true; alive: true }
+  | { configured: true; alive: false; error: string }
+
+/**
+ * Is the Calendar refresh token still good?
+ *
+ * Exchanges the refresh token for an access token — the same first step every
+ * booking takes — and creates nothing: no event, no Meet link, no calendar
+ * write. Daily maintenance calls this so a dead credential is found by the
+ * fleet rather than by a stranger who booked and got no link.
+ *
+ * It is also a KEEPALIVE, which is the half that is easy to miss. Google voids
+ * a refresh token after six months unused, and bookings here are sporadic
+ * enough to reach that. A daily exchange counts as use, so the idle clock never
+ * gets near it.
+ *
+ * `configured: false` is a first-class answer, not an error. A deployment with
+ * no Google secrets bound is a deployment that offers Jitsi and Discord, and it
+ * must not start failing its nightly job over a feature it never turned on.
+ */
+export async function checkCalendarCredential(env: GoogleMeetEnv): Promise<CredentialCheck> {
+  if (
+    !env.GOOGLE_OAUTH_CLIENT_ID ||
+    !env.GOOGLE_OAUTH_CLIENT_SECRET ||
+    !env.GOOGLE_OAUTH_REFRESH_TOKEN
+  ) {
+    return { configured: false }
+  }
+
+  try {
+    await getAccessToken(env)
+    return { configured: true, alive: true }
+  } catch (error) {
+    return {
+      configured: true,
+      alive: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+}
+
 export async function createGoogleMeetEvent(
   input: GoogleMeetLinkInput,
   env: GoogleMeetEnv
