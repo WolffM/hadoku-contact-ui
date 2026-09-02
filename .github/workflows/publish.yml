@@ -19,7 +19,7 @@ jobs:
 
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - uses: WolffM/hadoku-actions/setup-pnpm@v1
         with:
@@ -40,10 +40,60 @@ jobs:
       - name: Build package
         run: pnpm run build
 
+      # What this PUSH introduced, as a diff range.
+      #
+      # `HEAD~1 HEAD` is the last COMMIT, and a push is not one commit. Push
+      # three commits where the source changes in the first and a chore lands
+      # last, and the publish is silently skipped — a green run that shipped
+      # nothing, because the gate, the version walk and the dispatch below all
+      # read the same wrong answer and therefore agree with each other.
+      #
+      # `github.event.before` is the tip before the push, the only base that
+      # covers every commit in it. hadoku-meet hit this on 2026-08-18 and
+      # hadoku-hopper on 2026-09-01, where a two-commit push stranded
+      # @wolffm/hopper-worker 0.1.8 and the site ran a new client against a
+      # month-old worker. hadoku_site's check:repo-policy has held every fleet
+      # publish workflow to this since 2026-09-02.
+      - name: Resolve the range this push introduced
+        id: range
+        env:
+          BEFORE: ${{ github.event.before }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          # A manual dispatch is an explicit "publish now". It exists to recover
+          # a publish that was skipped, so the change check must never veto it:
+          # diffing HEAD~1 here would skip the same thing the stranded push
+          # skipped, and the only way out would be a no-op commit.
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            echo "Manual dispatch: publishing unconditionally"
+            echo "publish_all=true" >> $GITHUB_OUTPUT
+            echo "base=HEAD~1" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "publish_all=false" >> $GITHUB_OUTPUT
+
+          base="$BEFORE"
+          # A branch's first push sends the all-zero sha; a force-push can name
+          # a commit that is no longer reachable. Fall back to the last commit
+          # in both cases — a narrower range than the truth, but never a broken
+          # one.
+          if [ -z "$base" ] \
+            || [ "$base" = "0000000000000000000000000000000000000000" ] \
+            || ! git cat-file -e "${base}^{commit}" 2>/dev/null; then
+            echo "No usable push base ('$base'); falling back to HEAD~1"
+            base="HEAD~1"
+          fi
+          echo "base=$base" >> $GITHUB_OUTPUT
+          echo "Comparing ${base}..HEAD:"
+          git diff --name-only "$base" HEAD
+
       - name: Check if package changed
         id: package_changed
+        env:
+          BASE: ${{ steps.range.outputs.base }}
+          PUBLISH_ALL: ${{ steps.range.outputs.publish_all }}
         run: |
-          if git diff --name-only HEAD~1 HEAD | grep -q .; then
+          if [ "$PUBLISH_ALL" = "true" ] || git diff --name-only "$BASE" HEAD | grep -q .; then
             echo "changed=true" >> $GITHUB_OUTPUT
             echo "✓ Package has changes"
           else
@@ -135,25 +185,29 @@ jobs:
             current_version="$new_version"
           }
 
-          # Check if version was bumped in the last commit
-          previous_version=$(git show HEAD~1:package.json 2>/dev/null | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8')).version" 2>/dev/null || echo "")
+          # Check if the version moved ACROSS THIS PUSH, on the same base the
+          # code check below uses. These two answers are paired — "code changed
+          # and the version did not" is what triggers a bump — so reading them
+          # from different ranges makes the pair incoherent on any multi-commit
+          # push: a version bumped two commits back would read as not bumped.
+          previous_version=$(git show "$BASE:package.json" 2>/dev/null | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8')).version" 2>/dev/null || echo "")
 
           if [ -n "$previous_version" ] && [ "$previous_version" != "$current_version" ]; then
-            echo "✓ Version was already bumped in last commit: $previous_version → $current_version"
+            echo "✓ Version was already bumped in this push: $previous_version → $current_version"
             version_was_bumped=true
           else
-            echo "ℹ️  Version was not bumped in last commit"
+            echo "ℹ️  Version was not bumped in this push"
             version_was_bumped=false
           fi
 
-          # Check if files that require version bump were changed in last commit
+          # Check if files that require version bump were changed across this push
           # (matching pre-commit hook logic: src/, package.json, vite.config., tsconfig.)
-          echo "Checking if version-bump-triggering files changed in last commit..."
-          if git diff --name-only HEAD~1 HEAD | grep -q -E "^(src/|vite\.config\.|tsconfig\.)"; then
-            echo "⚠️  Code or build config changes detected in last commit"
+          echo "Checking if version-bump-triggering files changed across this push..."
+          if [ "$PUBLISH_ALL" = "true" ] || git diff --name-only "$BASE" HEAD | grep -q -E "^(src/|vite\.config\.|tsconfig\.)"; then
+            echo "⚠️  Code or build config changes detected in this push"
             code_changed=true
           else
-            echo "ℹ️  No code or build config changes in last commit"
+            echo "ℹ️  No code or build config changes in this push"
             code_changed=false
           fi
 
@@ -182,6 +236,8 @@ jobs:
             bump_version "$bump_reason"
           fi
         env:
+          BASE: ${{ steps.range.outputs.base }}
+          PUBLISH_ALL: ${{ steps.range.outputs.publish_all }}
           NODE_AUTH_TOKEN: ${{ secrets.HADOKU_NPM_READ_TOKEN }}
 
       - name: Publish package
