@@ -14,5 +14,7 @@
   "//google-meet": "Calendar OAuth. LEFT names are what api/services/google-meet.ts reads at runtime; RIGHT names are the vault items (note CLIENTID has no underscore, CLIENT_SECRET does — that is real). Not needed by pnpm dev, since the API does not run locally. Used by scripts/google-oauth-setup.mjs to re-mint, and to check the refresh token is still alive without making a booking: the token is the part that expires. See ../hadoku_site/docs/operations/google-meet-setup.md.",
   "GOOGLE_OAUTH_CLIENT_ID": "HADOKU_MEETING_ORCHESTRATOR_GCP_CLIENTID",
   "GOOGLE_OAUTH_CLIENT_SECRET": "HADOKU_MEETING_ORCHESTRATOR_GCP_CLIENT_SECRET",
-  "GOOGLE_OAUTH_REFRESH_TOKEN": "HADOKU_MEETING_ORCHESTRATOR_GCP_REFRESH_TOKEN"
+  "GOOGLE_OAUTH_REFRESH_TOKEN": "HADOKU_MEETING_ORCHESTRATOR_GCP_REFRESH_TOKEN",
+  "//meeting-spaces": "HMAC secret for ArchiveBot's webhookServer /api/spaces/* (127.0.0.1:3004). Its OWN secret, not the events one: provisioning private channels and kicking members is a separate capability from creating guild events. Read here so the contact-api caller can be developed and tested locally; the deployed worker gets it through WORKER_CONFIGS['contact-api'] in ../hadoku_site/scripts/admin/update_cloudflare_secrets.py.",
+  "ARCHIVEBOT_SPACES_WEBHOOK_SECRET": "ARCHIVEBOT_SPACES_WEBHOOK_SECRET"
 }
