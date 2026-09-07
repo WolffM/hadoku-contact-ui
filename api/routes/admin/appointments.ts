@@ -27,7 +27,8 @@ import {
   pushAppointmentToCalendar,
   removeAppointmentFromCalendar
 } from '../../services/task-calendar'
-import type { AppContext } from '../../types'
+import { revokeMeetingSpace, isSpaceId } from '../../services/meeting-space'
+import type { AppContext, ContactEnv } from '../../types'
 
 interface AdminCreateAppointmentBody {
   name?: unknown
@@ -290,6 +291,31 @@ export function createAppointmentAdminRoutes() {
  * Rationale, and the rule for what else may be mounted at service tier:
  * "Admin and service surfaces" in CLAUDE.md. Do not restate it here.
  */
+/**
+ * Hand a cancelled booking's private Discord space back early.
+ *
+ * Best-effort and never throwing: the status change is already committed by
+ * the time this runs, and a failure here must not read as a failed cancel.
+ * Nothing is lost if it does fail — the space still expires on its TTL and
+ * ArchiveBot's sweep collects it. This only returns the channels sooner,
+ * which matters because a guild caps at 500 of them.
+ *
+ * Reads the appointment rather than taking the id on trust: only Discord
+ * bookings have a space, and only ones provisioned AFTER spaces shipped. The
+ * older rows carry `discord-<slotId>` in meeting_id, which isSpaceId rejects
+ * so it is never sent to the revoke route.
+ */
+async function revokeSpaceForAppointment(id: string, env: ContactEnv): Promise<void> {
+  const appointment = await getAppointmentById(env.DB, id)
+  if (!appointment || appointment.platform !== 'discord') return
+  if (!isSpaceId(appointment.meeting_id)) return
+
+  const result = await revokeMeetingSpace(appointment.meeting_id as string, env)
+  if (!result.ok) {
+    console.error(`Failed to revoke meeting space for appointment ${id}:`, result.error)
+  }
+}
+
 export function createAppointmentStatusRoutes() {
   const app = new Hono<AppContext>()
 
@@ -320,6 +346,7 @@ export function createAppointmentStatusRoutes() {
       // slot, so it stays on the calendar as a record of the day.
       if (body.status === 'cancelled') {
         mirrorInBackground(c, removeAppointmentFromCalendar(id, c.env))
+        mirrorInBackground(c, revokeSpaceForAppointment(id, c.env))
       }
 
       return adminOk(c, { success: true, message: 'Appointment status updated successfully' })

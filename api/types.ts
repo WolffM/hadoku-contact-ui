@@ -34,6 +34,18 @@ export interface ContactEnv {
   // guarantee about the bindings it reads. Declaring them is what lets that
   // parameter be ContactEnv and a typo in a binding name be a compile error.
   JITSI_DOMAIN?: string
+  // Private Discord meeting spaces via ArchiveBot (services/meeting-space.ts).
+  // Both must be set for spaces to be offered at all; with either absent a
+  // Discord booking falls back to DISCORD_INVITE_URL and no space is created.
+  // ARCHIVEBOT_BASE_URL is the webhook server's origin; the secret is its OWN,
+  // deliberately not the events one, so this worker cannot also create guild
+  // scheduled events.
+  ARCHIVEBOT_BASE_URL?: string
+  ARCHIVEBOT_SPACES_WEBHOOK_SECRET?: string
+  // Which guild spaces are carved out of. Optional: ArchiveBot falls back to
+  // its own default, but passing it explicitly keeps contact bookings off
+  // whichever guild meet-api happens to be pointed at.
+  ARCHIVEBOT_SPACE_GUILD_ID?: string
   // The Discord invite handed to anyone who books that platform. A plain
   // `[vars]` entry, not a secret — it is emailed and rendered in the browser.
   // Unset falls back to the invite compiled into meeting-links.ts.

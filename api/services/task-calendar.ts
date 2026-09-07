@@ -344,7 +344,12 @@ export async function deleteTaskFromCalendar(
  */
 export function mirrorInBackground(
   ctx: { executionCtx: { waitUntil(promise: Promise<unknown>): void } },
-  mirror: Promise<CalendarPushResult>
+  // Promise<unknown>, not Promise<CalendarPushResult>: this only fires and
+  // forgets, and the calendar mirror is no longer the sole background job —
+  // revoking a cancelled booking's Discord space rides the same path. Narrowing
+  // it to the calendar's own result type described the first caller rather than
+  // what the function does.
+  mirror: Promise<unknown>
 ): void {
   try {
     ctx.executionCtx.waitUntil(mirror)

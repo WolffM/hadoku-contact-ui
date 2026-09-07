@@ -14,6 +14,7 @@
  */
 
 import { createGoogleMeetEvent } from './google-meet'
+import { provisionMeetingSpace, spacesConfigured } from './meeting-space'
 import type { ContactEnv } from '../types'
 
 export type MeetingPlatform = 'discord' | 'jitsi' | 'google'
@@ -62,7 +63,41 @@ export async function generateMeetingLink(
 // deployments on the invite they already had when the var is unset.
 const DEFAULT_DISCORD_INVITE = 'https://discord.gg/Epchg7QQ'
 
-function generateDiscordLink(appointment: AppointmentDetails, env: ContactEnv): MeetingLinkResult {
+async function generateDiscordLink(
+  appointment: AppointmentDetails,
+  env: ContactEnv
+): Promise<MeetingLinkResult> {
+  // Where spaces are configured, every guest gets an ISOLATED one: a category
+  // only they and the operator can see, with a single-use invite that assigns
+  // the role on join. See services/meeting-space.ts.
+  if (spacesConfigured(env)) {
+    const space = await provisionMeetingSpace(
+      {
+        // The slot id is stable per appointment, so a retried submit reuses
+        // the space instead of burning three more channels of a 500 budget.
+        idempotencyKey: `contact-${appointment.slotId}`,
+        // Operator-facing only. ArchiveBot names the channels and role with an
+        // opaque token — a role list is visible to the guild and must not
+        // announce who booked.
+        label: `Contact booking ${appointment.startTime} (${appointment.email})`
+      },
+      env
+    )
+
+    if (space.ok) {
+      // meetingId carries the spaceId so a cancellation can revoke it. No
+      // schema change: the column already exists for external meeting ids.
+      return { success: true, meetingLink: space.inviteUrl, meetingId: space.spaceId }
+    }
+
+    // Deliberately NOT falling back to the shared invite. Handing a stranger
+    // the general server invite would drop them into the main guild — the
+    // exact thing spaces exist to prevent — so an outage degrades to "no link"
+    // rather than to a quieter privacy problem. submit.ts reports this through
+    // logMeetingLinkFailed and the confirmation email asks them to reply.
+    return { success: false, error: `space provisioning failed: ${space.error}` }
+  }
+
   return {
     success: true,
     meetingLink: env.DISCORD_INVITE_URL || DEFAULT_DISCORD_INVITE,

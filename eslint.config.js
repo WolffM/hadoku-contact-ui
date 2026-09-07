@@ -106,6 +106,12 @@ export default [
         // So `crypto.randomUUID()` is the only spelling that satisfies tsc, and
         // it needs to be declared here or no-undef rejects it.
         crypto: 'readonly',
+        // Web APIs the Workers runtime provides and @cloudflare/workers-types
+        // declares the same `declare const` way as crypto above — HMAC signing
+        // in services/meeting-space.ts needs all three.
+        TextEncoder: 'readonly',
+        TextDecoder: 'readonly',
+        AbortSignal: 'readonly',
         // Node.js
         __dirname: 'readonly'
       }
