@@ -216,3 +216,32 @@ export function isSpaceId(meetingId: string | null | undefined): boolean {
 }
 
 export { TIMESTAMP_WINDOW_NOTE }
+
+/**
+ * A link the OPERATOR can click, which is not the guest's invite.
+ *
+ * `meeting_link` on a Discord booking is a `maxUses: 1` invite minted for one
+ * guest. The command station rendered it as "Join Meeting", so the operator's
+ * own admin UI offered them the one link they must not use — at best it is
+ * useless to someone already in the guild, and it is the guest's only way in.
+ *
+ * This routes to the guild instead, which Discord opens in the viewer's own
+ * session. It is derived, not stored: no column, no migration, and nothing to
+ * fall out of sync with the space it points at.
+ *
+ * Returns null for anything that is not a Discord booking with a real space —
+ * a Jitsi or Meet link is already the right link for everyone, and a pre-space
+ * Discord booking has only the shared invite, which the operator can click
+ * harmlessly.
+ */
+export function operatorLinkFor(
+  // platform is NULLABLE on a stored appointment — migration 0009 made it
+  // optional for admin-created events that name no platform at all.
+  appointment: { platform: string | null; meeting_id?: string | null },
+  env: ContactEnv
+): string | null {
+  if (appointment.platform !== 'discord') return null
+  if (!isSpaceId(appointment.meeting_id)) return null
+  const guildId = env.ARCHIVEBOT_SPACE_GUILD_ID
+  return guildId ? `https://discord.com/channels/${guildId}` : null
+}

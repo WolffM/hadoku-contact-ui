@@ -27,7 +27,7 @@ import {
   pushAppointmentToCalendar,
   removeAppointmentFromCalendar
 } from '../../services/task-calendar'
-import { revokeMeetingSpace, isSpaceId } from '../../services/meeting-space'
+import { revokeMeetingSpace, isSpaceId, operatorLinkFor } from '../../services/meeting-space'
 import type { AppContext, ContactEnv } from '../../types'
 
 interface AdminCreateAppointmentBody {
@@ -251,8 +251,16 @@ export function createAppointmentAdminRoutes() {
 
       const appointments = await getAllAppointments(c.env.DB, limit, offset)
 
+      // operator_link is DERIVED per row, not stored: meeting_link on a Discord
+      // booking is the guest's single-use invite, which the admin UI must not
+      // offer the operator as their own way in. See operatorLinkFor.
+      const decorated = appointments.map(apt => ({
+        ...apt,
+        operator_link: operatorLinkFor(apt, c.env)
+      }))
+
       return adminOk(c, {
-        appointments,
+        appointments: decorated,
         pagination: {
           limit,
           offset
