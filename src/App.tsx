@@ -21,12 +21,18 @@ export default function App(props: ContactUIProps = {}) {
   const containerRef = useRef<HTMLDivElement>(null)
   return (
     <HadokuThemeRoot theme={props.theme} containerRef={containerRef}>
-      <ContactApp containerRef={containerRef} />
+      <ContactApp containerRef={containerRef} appName={props.appName} />
     </HadokuThemeRoot>
   )
 }
 
-function ContactApp({ containerRef }: { containerRef: React.RefObject<HTMLDivElement | null> }) {
+function ContactApp({
+  containerRef,
+  appName
+}: {
+  containerRef: React.RefObject<HTMLDivElement | null>
+  appName?: string
+}) {
   // isDarkTheme now follows the ACTIVE theme rather than the browser
   // preference, which is what the attribute was always meant to describe —
   // someone on `ocean-dark` under a light OS was previously reported as light.
@@ -39,7 +45,11 @@ function ContactApp({ containerRef }: { containerRef: React.RefObject<HTMLDivEle
       data-dark-theme={isDarkTheme ? 'true' : 'false'}
     >
       <div className="contact-ui">
-        <AppHeader title="Contact" />
+        {/* DERIVED, never written here: `appName` is the platform's answer from
+            spec/categories.json (registry props -> mount), and __HADOKU_APP_NAME__ is
+            the standalone fallback vite fills in from @wolffm/catalogue. Do not put a
+            string back. */}
+        <AppHeader title={appName ?? __HADOKU_APP_NAME__} />
         <ContactForm />
       </div>
     </div>
