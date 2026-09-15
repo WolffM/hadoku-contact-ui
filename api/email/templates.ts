@@ -26,6 +26,17 @@ export function renderTemplate(template: string, data: Record<string, unknown>):
   return result
 }
 
+/** "discord" -> "Discord", "google" -> "Google Meet". */
+function platformLabel(platform: string): string {
+  const named: Record<string, string> = {
+    discord: 'Discord',
+    jitsi: 'Jitsi Meet',
+    google: 'Google Meet',
+    teams: 'Microsoft Teams',
+  }
+  return named[platform.toLowerCase()] ?? platform.charAt(0).toUpperCase() + platform.slice(1)
+}
+
 export interface AppointmentEmailData {
   recipientName: string
   recipientEmail: string
@@ -37,6 +48,15 @@ export interface AppointmentEmailData {
   platform: string
   meetingLink?: string
   message?: string
+  /**
+   * True when the Discord link is a PRIVATE, single-use space invite rather
+   * than the shared server invite. It changes what the guest must be told:
+   * a space invite works once and is theirs alone, so "share it with anyone
+   * who should join" would be actively wrong. Derived at the call site from
+   * the meeting id, because only there is a space distinguishable from a
+   * legacy `discord-<slotId>` booking.
+   */
+  isPrivateSpace?: boolean
 }
 
 export function formatAppointmentConfirmation(data: AppointmentEmailData): {
@@ -47,32 +67,18 @@ export function formatAppointmentConfirmation(data: AppointmentEmailData): {
 
   const text = `Hi ${data.recipientName},
 
-Your appointment has been confirmed!
+Your meeting is confirmed.
 
-APPOINTMENT DETAILS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Date:     ${data.appointmentDate}
-Time:     ${data.startTime} - ${data.endTime} ${data.timezone}
-Duration: ${data.duration} minutes
-Platform: ${data.platform.charAt(0).toUpperCase() + data.platform.slice(1)}
-${data.meetingLink ? `\nMeeting Link:\n${data.meetingLink}\n` : ''}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ${data.appointmentDate}
+  ${data.startTime} - ${data.endTime} ${data.timezone} (${data.duration} min)
+  ${platformLabel(data.platform)}
+${data.meetingLink ? `\nJoin here:\n${data.meetingLink}\n` : ''}
+${getPlatformInstructions(data.platform, data.meetingLink, data.isPrivateSpace)}
+${data.message ? `\nYou wrote:\n${data.message}\n` : ''}
+Need to change or cancel? Just reply to this email.
 
-${data.message ? `YOUR MESSAGE:\n${data.message}\n\n` : ''}WHAT TO EXPECT
-${getPlatformInstructions(data.platform, data.meetingLink)}
-
-NEED TO RESCHEDULE?
-If you need to change or cancel this appointment, please reply to this email as soon as possible.
-
-Looking forward to speaking with you!
-
-Best regards,
-Matthaeus Wolf
-hadoku.me
-
----
-This confirmation was sent from an automated system.
-Reply to this email to reach me directly at matthaeus@hadoku.me.`
+- Matthaeus Wolff
+hadoku.me`
 
   return { subject, text }
 }
@@ -90,19 +96,32 @@ function missingLinkNotice(platformLabel: string): string {
   return `I wasn't able to generate the ${platformLabel} link automatically. Reply to this email and I'll send it over before the meeting.`
 }
 
-function getPlatformInstructions(platform: string, meetingLink?: string): string {
+function getPlatformInstructions(
+  platform: string,
+  meetingLink?: string,
+  isPrivateSpace?: boolean
+): string {
+  // NO LINK IN HERE. The link is printed once, above this, under "Join here".
+  // This block repeated it verbatim, so every confirmation carried the same URL
+  // twice — which reads as a mistake and made the mail longer than the booking.
+  if (!meetingLink) return missingLinkNotice(platformLabel(platform))
+
   switch (platform.toLowerCase()) {
     case 'discord':
-      return `We'll meet on Discord. ${meetingLink ? `Use this invite link:\n${meetingLink}\n\nMake sure you have Discord installed and an account set up before the meeting time.` : missingLinkNotice('Discord invite')}`
-
-    case 'google':
-      return `We'll meet via Google Meet. ${meetingLink ? `Click the meeting link above to join at the scheduled time.\n\nYou can join from your browser (Chrome recommended) or the Google Meet app.` : missingLinkNotice('Google Meet')}`
-
-    case 'teams':
-      return `We'll meet via Microsoft Teams. ${meetingLink ? `Click the meeting link above to join at the scheduled time.\n\nYou can join from your browser or the Microsoft Teams app.` : missingLinkNotice('Microsoft Teams')}`
+      // A space invite is single-use and belongs to one guest: telling them to
+      // pass it on would cost them their own way in.
+      return isPrivateSpace
+        ? 'That link opens a private space set up just for this meeting. It works once, so keep it to yourself.'
+        : 'Make sure you have Discord installed and an account set up before we meet.'
 
     case 'jitsi':
-      return `We'll meet via Jitsi Meet (free, no account required). ${meetingLink ? `Click the meeting link above to join at the scheduled time.\n\nJitsi works in any modern browser - no installation needed!` : missingLinkNotice('Jitsi Meet')}`
+      return 'Jitsi runs in any modern browser - no account or install needed.'
+
+    case 'google':
+      return 'You can join from your browser (Chrome recommended) or the Google Meet app.'
+
+    case 'teams':
+      return 'You can join from your browser or the Microsoft Teams app.'
 
     default:
       return 'Meeting details will be provided shortly.'
@@ -117,30 +136,18 @@ export function formatAppointmentReminder(data: AppointmentEmailData): {
 
   const text = `Hi ${data.recipientName},
 
-This is a friendly reminder about your upcoming appointment tomorrow.
+A reminder about your meeting tomorrow.
 
-APPOINTMENT DETAILS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Date:     ${data.appointmentDate}
-Time:     ${data.startTime} - ${data.endTime} ${data.timezone}
-Duration: ${data.duration} minutes
-Platform: ${data.platform.charAt(0).toUpperCase() + data.platform.slice(1)}
-${data.meetingLink ? `\nMeeting Link:\n${data.meetingLink}\n` : ''}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ${data.appointmentDate}
+  ${data.startTime} - ${data.endTime} ${data.timezone} (${data.duration} min)
+  ${platformLabel(data.platform)}
+${data.meetingLink ? `\nJoin here:\n${data.meetingLink}\n` : ''}
+${getPlatformInstructions(data.platform, data.meetingLink, data.isPrivateSpace)}
 
-${getPlatformInstructions(data.platform, data.meetingLink)}
+Need to reschedule? Just reply to this email.
 
-NEED TO RESCHEDULE?
-If something came up and you need to reschedule, please let me know as soon as possible.
-
-Looking forward to our conversation!
-
-Best regards,
-Matthaeus Wolf
-hadoku.me
-
----
-Reply to this email to reach me directly at matthaeus@hadoku.me.`
+- Matthaeus Wolff
+hadoku.me`
 
   return { subject, text }
 }
@@ -176,6 +183,8 @@ export function formatAppointmentDateTime(
   date: string
   startTime: string
   endTime: string
+  /** Human-facing abbreviation ("PDT"), not the IANA id. */
+  timezoneLabel: string
 } {
   const startDate = new Date(isoStartTime)
   const endDate = new Date(isoEndTime)
@@ -197,5 +206,21 @@ export function formatAppointmentDateTime(
   const startTime = startDate.toLocaleTimeString('en-US', timeOptions)
   const endTime = endDate.toLocaleTimeString('en-US', timeOptions)
 
-  return { date, startTime, endTime }
+  // "PDT", not "America/Los_Angeles". The IANA id is what the database stores
+  // and what the API speaks, but printing it at a guest reads like a leaked
+  // internal value — nobody says "2:45 PM America/Los_Angeles" out loud.
+  // Falls back to the IANA id if the runtime cannot produce an abbreviation,
+  // which is still better than no timezone at all on a meeting invitation.
+  let tzLabel = timezone
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      timeZoneName: 'short'
+    }).formatToParts(startDate)
+    tzLabel = parts.find(p => p.type === 'timeZoneName')?.value ?? timezone
+  } catch {
+    // Unknown zone — keep the id.
+  }
+
+  return { date, startTime, endTime, timezoneLabel: tzLabel }
 }

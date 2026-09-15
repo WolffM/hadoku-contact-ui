@@ -57,12 +57,20 @@ describe('appointment confirmation — link missing', () => {
     expect(text).toContain('2:00 PM')
   })
 
+  // The platform must be NAMED — "I couldn't generate the link" leaves the
+  // reader guessing which of three meeting types went wrong. Asserted on the
+  // display label rather than the old 'Discord invite' phrasing, which was
+  // copy rather than contract.
   it('names the platform that failed, so the reply is actionable', () => {
     expect(formatAppointmentConfirmation({ ...BASE, platform: 'google' }).text).toContain(
-      'Google Meet link'
+      'Google Meet'
     )
     expect(formatAppointmentConfirmation({ ...BASE, platform: 'discord' }).text).toContain(
-      'Discord invite'
+      'Discord'
+    )
+    // Still not a promise nothing keeps.
+    expect(formatAppointmentConfirmation({ ...BASE, platform: 'discord' }).text).not.toMatch(
+      /link shortly/
     )
   })
 })
