@@ -102,6 +102,26 @@ export interface ProvisionInput {
    *  generates opaque names precisely so a role list cannot leak who booked. */
   label: string
   ttlMs?: number
+  /**
+   * When the meeting starts, ISO 8601.
+   *
+   * ArchiveBot posts an intro into the space's chat carrying a Discord
+   * `<t:SECONDS:R>` tag, and pings five minutes before. Both render in the
+   * GUEST's timezone, which is the point — a space carries no time of its own
+   * and the confirmation email is written in the operator's.
+   *
+   * Optional on the wire: a caller with no time gets a space with no intro
+   * timestamp and no reminder, not an error.
+   */
+  startsAt?: string
+  /**
+   * Shown INSIDE the space, unlike `label`.
+   *
+   * Safe for the same reason the channels are — only the one guest holding the
+   * space role and the operator can read it. It must still never become a
+   * Discord object name; ArchiveBot enforces that, not this.
+   */
+  title?: string
 }
 
 /**
@@ -123,6 +143,8 @@ export async function provisionMeetingSpace(
     timestamp: Date.now(),
     label: input.label,
     ...(input.ttlMs ? { ttlMs: input.ttlMs } : {}),
+    ...(input.startsAt ? { startsAt: input.startsAt } : {}),
+    ...(input.title ? { title: input.title } : {}),
     ...(env.ARCHIVEBOT_SPACE_GUILD_ID ? { guild_id: env.ARCHIVEBOT_SPACE_GUILD_ID } : {}),
     source: 'contact-api'
   })

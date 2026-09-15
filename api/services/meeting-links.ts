@@ -61,6 +61,22 @@ export async function generateMeetingLink(
 // revoking a leaked invite, or moving servers, used to mean republishing the
 // package and waiting on a parent deploy. DEFAULT_DISCORD_INVITE keeps existing
 // deployments on the invite they already had when the var is unset.
+/**
+ * How long a booking's private space should live: until the meeting is over,
+ * plus a week for the conversation to finish afterwards.
+ *
+ * Floored at the grace period alone, so a meeting already in the past (an admin
+ * backfilling a row, a clock skew) still gets a usable space rather than a
+ * negative TTL that ArchiveBot would reject as invalid.
+ */
+const SPACE_GRACE_MS = 8 * 24 * 60 * 60 * 1000
+
+export function spaceTtlForMeeting(endTimeIso: string, now = Date.now()): number {
+  const end = Date.parse(endTimeIso)
+  if (!Number.isFinite(end)) return SPACE_GRACE_MS
+  return Math.max(SPACE_GRACE_MS, end - now + SPACE_GRACE_MS)
+}
+
 const DEFAULT_DISCORD_INVITE = 'https://discord.gg/Epchg7QQ'
 
 async function generateDiscordLink(
@@ -76,10 +92,27 @@ async function generateDiscordLink(
         // The slot id is stable per appointment, so a retried submit reuses
         // the space instead of burning three more channels of a 500 budget.
         idempotencyKey: `contact-${appointment.slotId}`,
+        // TTL RUNS FROM THE MEETING, NOT FROM NOW. ArchiveBot's default is 8
+        // days from provisioning, and the booking window allows 30 days out —
+        // so a month-ahead booking would have had its space swept 22 days
+        // BEFORE the meeting, killing the guest's invite and kicking them if
+        // they had already joined. Measuring from the end of the meeting keeps
+        // the "gone about a week later" behaviour for every booking regardless
+        // of how far ahead it was made.
+        ttlMs: spaceTtlForMeeting(appointment.endTime),
         // Operator-facing only. ArchiveBot names the channels and role with an
         // opaque token — a role list is visible to the guild and must not
         // announce who booked.
-        label: `Contact booking ${appointment.startTime} (${appointment.email})`
+        label: `Contact booking ${appointment.startTime} (${appointment.email})`,
+        // The space is the only place the guest sees the time in THEIR zone.
+        // ArchiveBot turns this into a `<t:SECONDS:R>` tag in the intro post
+        // and a ping five minutes before; the confirmation email can only ever
+        // state the operator's timezone.
+        startsAt: appointment.startTime,
+        // Shown inside the space, which only this guest and the operator can
+        // read — so it may name the meeting. It deliberately does NOT carry the
+        // email address `label` does; that is for the operator's eyes.
+        title: `Meeting with ${appointment.name}`
       },
       env
     )
