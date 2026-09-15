@@ -127,21 +127,78 @@ them apart is how you know which repo to fix.
 `PATCH /appointments/:id/status` is mounted at BOTH prefixes from one factory
 (`createAppointmentStatusRoutes`) — service tier at `/service`, admin tier at
 `/admin`, because the command-station UI calls the admin path and predates the
-split. Cancelling through either retracts the mirrored task-calendar entry;
-there is no DELETE, and a cancelled row frees its slot because
-`isSlotAvailable` and the booked-slot query both filter `status = 'confirmed'`.
+split. A cancelled row frees its slot because `isRangeAvailable` and the
+booked-interval query both filter `status = 'confirmed'`.
 
 Pinned by `api/test/e2e/admin-tier-split.test.ts`, which asserts the split in
 both directions: service can cancel, friend cannot (service is rank 2, friend
 1 — lowering a gate must not open it), and a service key gets 403 on every
 disclosing endpoint.
 
+## Ending a meeting
+
+**A booking is four things, and all four have to be undone together.** The
+`appointments` row holding the slot, the event mirrored into the operator's
+task calendar, and — for Discord — a private space in the guild (a category,
+two channels, a role, a live single-use invite, and a pending reminder).
+
+`retractMeetingArtifacts` in `api/services/appointment-cleanup.ts` is the
+**single definition** of the teardown. Every path that ends a meeting calls it;
+none of them re-implements a piece. It used to live inside the status route,
+which is exactly how the second path came to do none of it.
+
+| Path                                           | What ends                       | Calls                            |
+| ---------------------------------------------- | ------------------------------- | -------------------------------- |
+| `PATCH /appointments/:id/status` → `cancelled` | the meeting                     | `retractMeetingArtifacts`        |
+| `DELETE /admin/submissions/:id`                | the message **and** its meeting | `cancelAppointmentForSubmission` |
+
+`completed` and `no_show` retract nothing: they describe a meeting that still
+occupied the slot, so it stays on the calendar as a record of the day.
+
+**Deleting the message cancels the meeting.** That is a decision, not a side
+effect — it is what the command station's delete button means to an operator
+clearing something off their calendar. Trash is reversible for a MESSAGE and
+cannot be for a meeting: restoring cannot un-revoke a single-use Discord invite
+or rebuild a torn-down category. So a restored submission comes back as mail
+with its appointment left `cancelled` and its slot left free.
+
+Before this, deleting a submission soft-deleted the row and stopped. The
+appointment stayed `confirmed` so its slot stayed blocked — invisibly, since
+nothing in the Inbox renders a deleted row's booking — the calendar entry
+stayed, and the guest kept a working invite until the 8-day sweep reached it.
+
+The two external retractions are best-effort and cannot fail the delete; the
+database write is the part that must land, because a slot nobody can book is
+worse than a category that needs sweeping. Both converge on their own: a space
+expires on its TTL, and a stale calendar entry is visible to the one person who
+owns it.
+
+Pinned by `api/test/e2e/delete-cancels-meeting.test.ts`, which asserts the
+freed slot through the public slots endpoint rather than the row — the row is
+what was already right.
+
 ## Meeting links, and the credential that expires
 
 Three platforms, three failure profiles. Jitsi and Discord need no credential —
 Jitsi builds a room from 128 CSPRNG bits (never from `slotId`, which the public
-`/appointments/slots` listing publishes), Discord serves `DISCORD_INVITE_URL`.
-Google Meet needs OAuth, and that is the only part that can rot.
+`/appointments/slots` listing publishes), Discord serves a private space (or
+`DISCORD_INVITE_URL` where spaces are not configured). Google Meet needs OAuth,
+and that is the only part that can rot.
+
+**A Discord space's lifetime is measured from the MEETING, not from now.**
+`spaceTtlForMeeting` asks for `end of meeting + 8 days`; ArchiveBot's own
+default is 8 days from provisioning, which would have swept a month-ahead
+booking's space 22 days before the meeting. That TTL is capped at the far end by
+ArchiveBot's `MAX_TTL_MS` (45 days), and the two numbers are coupled: raising
+`max_advance_days` past ~37 makes the furthest booking exceed that ceiling, and
+ArchiveBot answers `ttl_too_long`. Because a meeting link never fails a booking,
+the symptom is a successful booking whose guest silently gets no space at all.
+
+The provision call also passes `startsAt` and a `title`. ArchiveBot uses them to
+post an intro in the space's chat carrying a Discord `<t:SECONDS:R>` tag and to
+ping five minutes before — both render in the GUEST's timezone, which the
+confirmation email cannot do. `title` is shown inside the space and so may name
+the meeting; `label` is operator-only and carries the email address.
 
 **A meeting link never fails a booking.** `generateMeetingLink` returning
 unsuccessfully still stores the appointment, still sends the confirmation, and

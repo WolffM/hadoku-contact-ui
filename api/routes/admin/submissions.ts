@@ -20,6 +20,7 @@ import {
   type StoredAppointment,
   type StoredSubmission
 } from '../../storage'
+import { cancelAppointmentForSubmission } from '../../services/appointment-cleanup'
 import { resetRateLimit } from '../../rate-limit'
 import { RETENTION_CONFIG } from '../../constants'
 import { adminOk } from './index'
@@ -127,6 +128,21 @@ export function createSubmissionRoutes() {
     }
   })
 
+  /**
+   * Delete a submission — and cancel the meeting it booked, if it booked one.
+   *
+   * This is what the command station's delete button calls. It used to soft-
+   * delete the message and nothing else, which left three things running behind
+   * a row the operator had told the system to get rid of: the appointment stayed
+   * `confirmed` so the slot stayed blocked, the mirrored calendar event stayed,
+   * and a Discord booking's private space kept a live invite until its 8-day
+   * sweep happened to reach it.
+   *
+   * The cancellation is awaited, not backgrounded. It writes the row that frees
+   * the slot, and a response saying "deleted" before that lands would be the
+   * same lie in a smaller window. The two external retractions inside it are
+   * best-effort and cannot fail the delete — see services/appointment-cleanup.ts.
+   */
   app.delete('/submissions/:id', async c => {
     try {
       const id = c.req.param('id')
@@ -137,7 +153,15 @@ export function createSubmissionRoutes() {
         return notFound(c, 'Submission not found')
       }
 
-      return adminOk(c, { success: true, message: 'Submission moved to trash' })
+      const cancelledAppointment = await cancelAppointmentForSubmission(id, c.env)
+
+      return adminOk(c, {
+        success: true,
+        message: cancelledAppointment
+          ? 'Submission moved to trash and its meeting cancelled'
+          : 'Submission moved to trash',
+        cancelledAppointment
+      })
     } catch (error) {
       console.error('Error deleting submission:', error)
       return serverError(c, 'Failed to delete submission')
