@@ -214,14 +214,35 @@ export async function createAppointment(
   return result
 }
 
-export async function isSlotAvailable(db: D1Database, slotId: string): Promise<boolean> {
+/**
+ * Is this time RANGE free?
+ *
+ * Overlap, not slot-id equality. `slot_id` is `slot-<date>-<startISO>` and
+ * carries no duration, so a 60-minute booking at 14:00 and a 15-minute booking
+ * at 14:00 share an id while 14:15 gets a different one entirely. Matching on
+ * the id therefore blocked only an exact same-start rebooking: a confirmed
+ * 15-minute meeting at 21:45 left BOTH the 21:30-22:00 and 21:00-22:00 slots
+ * offered, and the submit path agreed, so a stranger could book straight over
+ * it. Verified against production on 2026-09-15 before this was changed.
+ *
+ * Half-open comparison (`start < existingEnd AND end > existingStart`) so
+ * back-to-back meetings do not count as overlapping — 14:00-14:15 and
+ * 14:15-14:30 are adjacent, not a conflict.
+ */
+export async function isRangeAvailable(
+  db: D1Database,
+  startIso: string,
+  endIso: string
+): Promise<boolean> {
   const result = await db
     .prepare(
       `SELECT id FROM appointments
-			WHERE slot_id = ? AND status = 'confirmed'
+			WHERE status = 'confirmed'
+			  AND start_time < ?
+			  AND end_time > ?
 			LIMIT 1`
     )
-    .bind(slotId)
+    .bind(endIso, startIso)
     .first()
 
   return result === null
@@ -267,20 +288,44 @@ export async function getAppointmentsByDate(
  * each of ~31 dates has anything left on it, and doing that a day at a time
  * would be 31 round-trips to answer one screen.
  */
-export async function getBookedSlotIdsInRange(
+export interface BookedInterval {
+  startMs: number
+  endMs: number
+}
+
+/**
+ * Confirmed bookings in a date range, as INTERVALS.
+ *
+ * Returned as times rather than slot ids because availability is an overlap
+ * question — see isRangeAvailable. A set of ids can only answer "is this exact
+ * start taken", which silently offers every longer slot that straddles a
+ * shorter booking.
+ */
+export async function getBookedIntervalsInRange(
   db: D1Database,
   from: string,
   to: string
-): Promise<Set<string>> {
+): Promise<BookedInterval[]> {
   const result = await db
     .prepare(
-      `SELECT slot_id FROM appointments
+      `SELECT start_time, end_time FROM appointments
 			 WHERE date BETWEEN ? AND ? AND status = 'confirmed'`
     )
     .bind(from, to)
-    .all<{ slot_id: string }>()
+    .all<{ start_time: string; end_time: string }>()
 
-  return new Set((result.results ?? []).map(row => row.slot_id))
+  return (result.results ?? [])
+    .map(row => ({ startMs: Date.parse(row.start_time), endMs: Date.parse(row.end_time) }))
+    .filter(iv => Number.isFinite(iv.startMs) && Number.isFinite(iv.endMs))
+}
+
+/** Does [startMs, endMs) overlap any booked interval? Half-open, so adjacent is free. */
+export function overlapsBooked(
+  startMs: number,
+  endMs: number,
+  booked: BookedInterval[]
+): boolean {
+  return booked.some(iv => startMs < iv.endMs && endMs > iv.startMs)
 }
 
 export async function getAppointmentsBySubmissionIds(

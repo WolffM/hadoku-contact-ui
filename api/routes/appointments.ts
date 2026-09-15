@@ -7,7 +7,8 @@ import { validateSlotFetchRequest } from '../validation'
 import {
   getAppointmentConfig,
   getAppointmentsByDate,
-  getBookedSlotIdsInRange,
+  getBookedIntervalsInRange,
+  overlapsBooked,
   parseIntList,
   toBookingWindow
 } from '../storage'
@@ -213,14 +214,19 @@ export function createAppointmentsRoutes() {
       const bookingWindow = toBookingWindow(config)
       const now = new Date()
       const { earliest, latest } = advanceBounds(bookingWindow, now)
-      const bookedSlotIds = await getBookedSlotIdsInRange(db, from, to)
+      const booked = await getBookedIntervalsInRange(db, from, to)
 
       const dates: Record<string, number> = {}
       for (const date of dateList) {
         if (rejectDate(date, duration, bookingWindow, now)) continue
 
+        // Overlap, not id equality — a longer slot straddling a shorter
+        // booking must not be counted free. See isRangeAvailable.
         const free = slotStarts(date, duration, bookingWindow).filter(
-          start => start >= earliest && start <= latest && !bookedSlotIds.has(slotId(date, start))
+          start =>
+            start >= earliest &&
+            start <= latest &&
+            !overlapsBooked(start.getTime(), start.getTime() + duration * 60 * 1000, booked)
         ).length
 
         if (free > 0) dates[date] = free
@@ -251,15 +257,23 @@ async function generateTimeSlots(
   window: BookingWindow
 ): Promise<{ id: string; startTime: string; endTime: string; available: boolean }[]> {
   const existingAppointments = await getAppointmentsByDate(db, date)
-  const bookedSlotIds = new Set(existingAppointments.map(apt => apt.slot_id))
+  // Intervals, not slot ids. A 15-minute booking at 21:45 shares no id with the
+  // 30- and 60-minute slots that straddle it, so matching ids offered both.
+  const booked = existingAppointments
+    .filter(apt => apt.status === 'confirmed')
+    .map(apt => ({ startMs: Date.parse(apt.start_time), endMs: Date.parse(apt.end_time) }))
+    .filter(iv => Number.isFinite(iv.startMs) && Number.isFinite(iv.endMs))
   const now = new Date()
 
   return slotStarts(date, duration, window)
     .filter(start => start > now)
-    .map(start => ({
-      id: slotId(date, start),
-      startTime: start.toISOString(),
-      endTime: new Date(start.getTime() + duration * 60 * 1000).toISOString(),
-      available: !bookedSlotIds.has(slotId(date, start))
-    }))
+    .map(start => {
+      const endMs = start.getTime() + duration * 60 * 1000
+      return {
+        id: slotId(date, start),
+        startTime: start.toISOString(),
+        endTime: new Date(endMs).toISOString(),
+        available: !overlapsBooked(start.getTime(), endMs, booked)
+      }
+    })
 }

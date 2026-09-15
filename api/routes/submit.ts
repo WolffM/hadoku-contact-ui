@@ -16,13 +16,14 @@ import {
   findBlockRule,
   addToWhitelist,
   createAppointment,
-  isSlotAvailable,
+  isRangeAvailable,
   getAppointmentsByDate,
   getAppointmentConfig,
   getEmailTemplate
 } from '../storage'
 import { checkRateLimit, recordSubmission } from '../rate-limit'
 import { generateMeetingLink } from '../services/meeting-links'
+import { isSpaceId } from '../services/meeting-space'
 import { mirrorInBackground, pushAppointmentToCalendar } from '../services/task-calendar'
 import { createEmailProvider } from '../email'
 import {
@@ -232,7 +233,14 @@ export function createSubmitRoutes(rateLimitOverrides?: {
           )
         }
 
-        const slotAvailable = await isSlotAvailable(db, appointmentData.slotId)
+        // Overlap check, not slot-id equality: a 60-minute booking and a
+        // 15-minute one inside it have different ids, so the id form let a
+        // longer meeting be booked straight over a shorter confirmed one.
+        const slotAvailable = await isRangeAvailable(
+          db,
+          appointmentData.startTime,
+          appointmentData.endTime
+        )
 
         if (!slotAvailable) {
           logAppointmentConflict(c.env, appointmentData.slotId)
@@ -332,10 +340,12 @@ export function createSubmitRoutes(rateLimitOverrides?: {
             appointmentDate: formattedDateTime.date,
             startTime: formattedDateTime.startTime,
             endTime: formattedDateTime.endTime,
-            timezone,
+            // The abbreviation ("PDT"), not the IANA id the row stores.
+            timezone: formattedDateTime.timezoneLabel,
             duration: appointmentData.duration,
             platform: appointmentData.platform,
             meetingLink: meetingLinkResult.success ? meetingLinkResult.meetingLink : undefined,
+            isPrivateSpace: isSpaceId(meetingLinkResult.meetingId),
             message: sanitized.message
           })
 
@@ -359,10 +369,11 @@ export function createSubmitRoutes(rateLimitOverrides?: {
               appointmentDate: formattedDateTime.date,
               startTime: formattedDateTime.startTime,
               endTime: formattedDateTime.endTime,
-              timezone,
+              timezone: formattedDateTime.timezoneLabel,
               duration: appointmentData.duration,
               platform: appointmentData.platform,
               meetingLink: meetingLinkResult.success ? meetingLinkResult.meetingLink : undefined,
+              isPrivateSpace: isSpaceId(meetingLinkResult.meetingId),
               message: sanitized.message
             })
             subject = emailContent.subject
