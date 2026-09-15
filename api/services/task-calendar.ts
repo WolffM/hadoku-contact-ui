@@ -1,15 +1,25 @@
 /**
  * Task-calendar bridge
  *
- * Writes contact-api events into the owner's unified hadoku task calendar as
- * Tasks, ONCE at creation time, and removes them again when the underlying
- * record goes away (an appointment is cancelled, an admin mail record is
- * trashed). In between, task-api is the source of truth — we never re-push or
- * re-sync, so the owner's local edits always win.
+ * Writes booked appointments into the owner's unified hadoku task calendar as
+ * timed Tasks, ONCE at creation time, and removes them again when the booking
+ * is cancelled. In between, task-api is the source of truth — we never re-push
+ * or re-sync, so the owner's local edits always win.
  *
- * Two event sources, one contract:
- *   - appointments (booked meetings)  → timed events,   source "contact"
- *   - admin outbound mail             → all-day events,  source "admin-mail"
+ * One event source: appointments → timed events, source "contact".
+ *
+ * The booking detail goes into the task's `notes` as markdown, not only into
+ * `metadata`. Metadata is machine-readable and the task board does not render
+ * it, so a metadata-only mirror produced a task called "Meeting: <name>" whose
+ * every useful field — who booked, the join link, their message — was visible
+ * only on the calendar page's expanded event. `notes` is the field the board
+ * shows. Both are still written: notes for the human, metadata for anything
+ * reading the mirror programmatically.
+ *
+ * Admin outbound mail was mirrored here too until 2026-09-15 (all-day events,
+ * source "admin-mail"). It was removed rather than reshaped: a sent email is
+ * not a calendar event and not a task, so every send duplicated a mail record
+ * onto the board as "Mail: <subject>" with nothing to do about it.
  *
  * Routing: we call task-api over the public edge as OURSELVES (`X-User-Key:
  * <CONTACTUI_SERVICE_KEY>`, this worker's own service-tier identity). The target
@@ -39,7 +49,6 @@
  */
 
 import type { StoredAppointment } from '../storage/appointments'
-import type { StoredSubmission } from '../storage/submissions'
 
 // Production create endpoint, reachable from a Worker subrequest via the edge.
 const DEFAULT_TASK_API_URL = 'https://hadoku.me/task/api'
@@ -69,12 +78,6 @@ function toIso(epochMs: number): string {
   return new Date(epochMs).toISOString()
 }
 
-/** Canonical UTC calendar day (YYYY-MM-DD) for an all-day event. */
-function toUtcDate(epochMs: number): string {
-  return new Date(epochMs).toISOString().slice(0, 10)
-}
-
-export const MAIL_SOURCE = 'admin-mail'
 export const APPOINTMENT_SOURCE = 'contact'
 
 /**
@@ -89,6 +92,80 @@ export function calendarTaskId(source: string, recordId: string): string {
   return `${source}-${recordId}`
 }
 
+/**
+ * The booking rendered as the markdown body of the task.
+ *
+ * Only fields that are actually set appear — an admin-created entry has no
+ * platform, link or message, and printing "Platform: —" three times over is
+ * worse than printing nothing. The guest's message goes last, under its own
+ * `##` heading, because it is the one free-text field and task-api's notes
+ * renderer splits sections on `##`.
+ *
+ * Kept deliberately plain: that renderer handles headings, lists and inline
+ * emphasis, and passes anything else through as text, so the join link is
+ * written bare rather than as `[text](url)`.
+ */
+export function buildAppointmentNotes(appt: StoredAppointment): string {
+  const facts: string[] = [
+    `- **When** ${formatLocalRange(appt)}`,
+    `- **Booked by** ${appt.name} (${appt.email})`,
+    `- **Booked at** ${toIso(appt.created_at)}`
+  ]
+  if (appt.platform) facts.push(`- **Platform** ${appt.platform}`)
+  if (appt.meeting_link) facts.push(`- **Join** ${appt.meeting_link}`)
+  if (appt.meeting_id) facts.push(`- **Meeting id** \`${appt.meeting_id}\``)
+  facts.push(`- **Status** ${appt.status}`)
+
+  const message = appt.message?.trim()
+  return message ? `${facts.join('\n')}\n\n## Message\n\n${message}` : facts.join('\n')
+}
+
+/**
+ * "Mon, Sep 7, 1:00 PM – 1:30 PM PDT (30 min)" — the slot in the BOOKING's
+ * timezone, which is the one both parties agreed to. The task board renders
+ * startTime/endTime in the viewer's timezone instead, so this is the line that
+ * stays true when the owner reads the task from somewhere else.
+ *
+ * `Intl` throws on a timezone it does not know; a mirrored booking is not worth
+ * losing over a formatting call, so an unusable zone degrades to the duration.
+ */
+function formatLocalRange(appt: StoredAppointment): string {
+  try {
+    const startFmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: appt.timezone,
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZoneName: 'short'
+    })
+    // The zone abbreviation belongs on the range, not on each end of it.
+    const endFmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: appt.timezone,
+      hour: 'numeric',
+      minute: '2-digit'
+    })
+    const start = startFmt.format(new Date(appt.start_time))
+    const end = endFmt.format(new Date(appt.end_time))
+    return `${stripZone(start)} – ${end}${zoneSuffix(start)} (${appt.duration} min)`
+  } catch {
+    return `${appt.duration} min, ${appt.timezone}`
+  }
+}
+
+/** The trailing zone abbreviation Intl appended, e.g. " PDT" — "" if it appended none. */
+const ZONE_TAIL = /,? ([A-Z]{2,5})$/
+
+function zoneSuffix(formattedStart: string): string {
+  const zone = ZONE_TAIL.exec(formattedStart)
+  return zone ? ` ${zone[1]}` : ''
+}
+
+function stripZone(formattedStart: string): string {
+  return formattedStart.replace(ZONE_TAIL, '')
+}
+
 /** Map a booked appointment onto a task-api CreateTaskInput body (timed event). */
 export function buildTaskFromAppointment(
   appt: StoredAppointment,
@@ -97,6 +174,7 @@ export function buildTaskFromAppointment(
   return {
     id: calendarTaskId(source, appt.id),
     title: `Meeting: ${appt.name}`,
+    notes: buildAppointmentNotes(appt),
     startTime: appt.start_time,
     endTime: appt.end_time,
     tag: 'contact',
@@ -114,37 +192,6 @@ export function buildTaskFromAppointment(
       timezone: appt.timezone,
       duration: appt.duration,
       status: appt.status
-    }
-  }
-}
-
-/**
- * Map an admin outbound-mail submission onto a CreateTaskInput body. Mail has no
- * time slot, so this is an ALL-DAY event: send `date`, omit startTime/endTime
- * (the server keys it to that UTC day). Deterministic id `admin-mail-<id>`.
- */
-export function buildTaskFromMail(
-  sub: StoredSubmission,
-  opts: { source?: string; sentBy?: string } = {}
-): Record<string, unknown> {
-  const source = opts.source ?? MAIL_SOURCE
-  return {
-    id: calendarTaskId(source, sub.id),
-    // `name` carries the email subject for outbound admin mail.
-    title: `Mail: ${sub.name}`,
-    date: toUtcDate(sub.created_at),
-    tag: 'mail',
-    source,
-    sourceId: sub.id,
-    createdAt: toIso(sub.created_at),
-    metadata: {
-      subject: sub.name,
-      to: sub.email,
-      from: sub.recipient ?? undefined,
-      message: sub.message,
-      direction: sub.direction,
-      sentBy: opts.sentBy ?? undefined,
-      sentAt: toIso(sub.created_at)
     }
   }
 }
@@ -367,15 +414,6 @@ export function pushAppointmentToCalendar(
   return postTaskToCalendar(buildTaskFromAppointment(appt, source), env)
 }
 
-/** Mirror an admin outbound-mail submission into the owner's calendar (all-day). */
-export function pushMailToCalendar(
-  sub: StoredSubmission,
-  env: TaskCalendarEnv,
-  opts: { source?: string; sentBy?: string } = {}
-): Promise<CalendarPushResult> {
-  return postTaskToCalendar(buildTaskFromMail(sub, opts), env)
-}
-
 /**
  * Remove a cancelled appointment's mirrored event. Takes the appointment id
  * (not the row) — a cancellation only ever has the id to hand.
@@ -386,13 +424,4 @@ export function removeAppointmentFromCalendar(
   source = APPOINTMENT_SOURCE
 ): Promise<CalendarPushResult> {
   return deleteTaskFromCalendar(calendarTaskId(source, appointmentId), env)
-}
-
-/** Remove a trashed admin-mail submission's mirrored event. */
-export function removeMailFromCalendar(
-  submissionId: string,
-  env: TaskCalendarEnv,
-  source = MAIL_SOURCE
-): Promise<CalendarPushResult> {
-  return deleteTaskFromCalendar(calendarTaskId(source, submissionId), env)
 }

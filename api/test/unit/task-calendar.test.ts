@@ -9,15 +9,13 @@
 import { fetchMock } from 'cloudflare:test'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import {
+  buildAppointmentNotes,
   buildTaskFromAppointment,
-  buildTaskFromMail,
   pushAppointmentToCalendar,
   removeAppointmentFromCalendar,
-  removeMailFromCalendar,
   __resetCalendarBoardCache
 } from '../../services/task-calendar'
 import type { StoredAppointment } from '../../storage/appointments'
-import type { StoredSubmission } from '../../storage/submissions'
 
 const SAMPLE: StoredAppointment = {
   id: 'appt-123',
@@ -70,42 +68,48 @@ describe('buildTaskFromAppointment', () => {
     expect(body.id).toBe('meeting-orchestrator-appt-123')
     expect(body.source).toBe('meeting-orchestrator')
   })
+
+  it('carries the booking detail in notes, not only in metadata', () => {
+    // The board renders `notes` and never renders `metadata` — a field that
+    // appears only in metadata is invisible to the person reading the task.
+    const notes = String(buildTaskFromAppointment(SAMPLE).notes)
+    expect(notes).toContain('John Doe (john@example.com)')
+    expect(notes).toContain('google')
+    expect(notes).toContain('https://meet.google.com/abc-defg-hij')
+    expect(notes).toContain('abc-defg-hij')
+    expect(notes).toContain('confirmed')
+    expect(notes).toContain('## Message')
+    expect(notes).toContain('Looking forward to it')
+  })
 })
 
-const SAMPLE_MAIL: StoredSubmission = {
-  id: 'sub-789',
-  name: 'Re: project kickoff',
-  email: 'client@example.com',
-  message: 'Thanks for reaching out — here are the details.',
-  status: 'read',
-  created_at: 1718000000000,
-  deleted_at: null,
-  ip_address: null,
-  user_agent: null,
-  referrer: null,
-  recipient: 'matthaeus@hadoku.me',
-  direction: 'outbound'
-}
+describe('buildAppointmentNotes', () => {
+  it('renders the slot in the BOOKING timezone, not UTC', () => {
+    // 14:00Z on 2026-06-15 is 07:00 in Los Angeles — a UTC render would say 2 PM.
+    const notes = buildAppointmentNotes(SAMPLE)
+    expect(notes).toContain('7:00 AM')
+    expect(notes).toContain('7:30 AM')
+    expect(notes).toContain('(30 min)')
+  })
 
-describe('buildTaskFromMail', () => {
-  it('maps an outbound mail submission to an all-day CreateTaskInput body', () => {
-    const body = buildTaskFromMail(SAMPLE_MAIL, { sentBy: 'admin-key-1' })
-    expect(body.id).toBe('admin-mail-sub-789')
-    expect(body.title).toBe('Mail: Re: project kickoff')
-    // All-day: a `date` and NO start/end times.
-    expect(body.date).toBe('2024-06-10')
-    expect(body.startTime).toBeUndefined()
-    expect(body.endTime).toBeUndefined()
-    expect(body.tag).toBe('mail')
-    expect(body.source).toBe('admin-mail')
-    expect(body.sourceId).toBe('sub-789')
-    expect(body.metadata).toMatchObject({
-      subject: 'Re: project kickoff',
-      to: 'client@example.com',
-      from: 'matthaeus@hadoku.me',
-      direction: 'outbound',
-      sentBy: 'admin-key-1'
+  it('omits the fields an admin-created entry does not have', () => {
+    const bare = buildAppointmentNotes({
+      ...SAMPLE,
+      platform: null,
+      meeting_link: null,
+      meeting_id: null,
+      message: null
     })
+    expect(bare).not.toContain('Platform')
+    expect(bare).not.toContain('Join')
+    expect(bare).not.toContain('Meeting id')
+    expect(bare).not.toContain('## Message')
+    expect(bare).toContain('**Booked by** John Doe')
+  })
+
+  it('degrades to the duration rather than throwing on an unusable timezone', () => {
+    const notes = buildAppointmentNotes({ ...SAMPLE, timezone: 'Mars/Olympus_Mons' })
+    expect(notes).toContain('30 min, Mars/Olympus_Mons')
   })
 })
 
@@ -286,13 +290,13 @@ describe('removing a mirrored event', () => {
     fetchMock
       .get('https://task.test')
       .intercept({
-        path: '/api/admin-mail-sub-789',
+        path: '/api/contact-appt-123',
         query: { boardId: 'MRY93H8LG7ZCSK998165RCUBHW' },
         method: 'DELETE'
       })
-      .reply(404, { error: 'Task admin-mail-sub-789 not found', code: 'TASK_NOT_FOUND' })
+      .reply(404, { error: 'Task contact-appt-123 not found', code: 'TASK_NOT_FOUND' })
 
-    const result = await removeMailFromCalendar(SAMPLE_MAIL.id, ENV)
+    const result = await removeAppointmentFromCalendar(SAMPLE.id, ENV)
     expect(result.ok).toBe(true)
     expect(result.status).toBe(404)
   })
