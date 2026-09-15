@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useImperativeHandle, forwardRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useImperativeHandle, forwardRef } from 'react'
 import { addMonths, endOfMonth, format, isAfter, startOfMonth } from 'date-fns'
 import AppointmentCalendar from './AppointmentCalendar'
 import TimeSlotPicker from './TimeSlotPicker'
@@ -30,6 +30,40 @@ const parseLocalDate = (date: string): Date => {
 /** Identifies which month and duration a set of counts describes. */
 const availabilityKey = (month: Date, duration: TimeSlotDuration) =>
   `${format(month, 'yyyy-MM')}|${duration}`
+
+/**
+ * How long a cached answer is trusted before it is fetched again.
+ *
+ * Switching 15 -> 30 -> 60 fired two round trips EVERY time, so the times
+ * blanked to a spinner on a question the page had already asked. The durations
+ * are not derived on the client from the 15-minute grid, tempting as that is:
+ * the grid, the business-hours edge and the advance window are the server's
+ * rules, and this file already exists because the calendar once kept its own
+ * copy of one of them and drifted. Asking early is the same answer without the
+ * second source of truth.
+ *
+ * Staleness is bounded rather than eliminated. A slot list going out of date is
+ * not a correctness problem — the booking itself is settled by an overlap check
+ * inside the submit transaction, which answers 409 no matter what the page
+ * believed — so this only has to be short enough that the list on screen still
+ * looks like the truth.
+ */
+const CACHE_TTL_MS = 60_000
+
+interface CacheEntry<T> {
+  at: number
+  value: T
+}
+
+function readCache<T>(cache: Map<string, CacheEntry<T>>, key: string): T | null {
+  const hit = cache.get(key)
+  if (!hit) return null
+  if (Date.now() - hit.at > CACHE_TTL_MS) {
+    cache.delete(key)
+    return null
+  }
+  return hit.value
+}
 
 interface AppointmentPickerProps {
   onAppointmentChange: (selection: AppointmentSelection) => void
@@ -66,6 +100,10 @@ const AppointmentPicker = forwardRef<AppointmentPickerRef, AppointmentPickerProp
     const [visibleMonth, setVisibleMonth] = useState<Date>(
       () => initialSelection?.date ?? new Date()
     )
+    // Answers already fetched, so changing the duration does not re-ask for what
+    // is on screen. Refs, not state: a cache hit must not itself cause a render.
+    const slotCache = useRef(new Map<string, CacheEntry<AppointmentSlot[]>>())
+    const availabilityCache = useRef(new Map<string, CacheEntry<AvailabilityResponse['dates']>>())
     // Bumped when the slots endpoint refuses a day the calendar still offered,
     // which forces the counts to be refetched.
     const [staleAvailability, setStaleAvailability] = useState(0)
@@ -99,21 +137,32 @@ const AppointmentPicker = forwardRef<AppointmentPickerRef, AppointmentPickerProp
     // Free-slot counts for the month on screen, refetched when the user pages or
     // changes the duration. This — not the window rules — is what greys dates
     // out, because a day can clear every rule and still be booked solid.
-    const loadAvailability = useCallback(async (month: Date, slotDuration: TimeSlotDuration) => {
-      const first = startOfMonth(month)
-      const last = endOfMonth(month)
-      try {
-        const response = await fetchAvailability(
-          slotDuration,
-          format(first, 'yyyy-MM-dd'),
-          format(last, 'yyyy-MM-dd')
-        )
-        setAvailability({ key: availabilityKey(month, slotDuration), dates: response.dates })
-      } catch {
-        // Leave the previous counts alone rather than greying the whole month on
-        // a transient failure. The slots endpoint still refuses what it must.
-      }
+    const fetchMonthCounts = useCallback(async (month: Date, slotDuration: TimeSlotDuration) => {
+      const key = availabilityKey(month, slotDuration)
+      const cached = readCache(availabilityCache.current, key)
+      if (cached) return cached
+
+      const response = await fetchAvailability(
+        slotDuration,
+        format(startOfMonth(month), 'yyyy-MM-dd'),
+        format(endOfMonth(month), 'yyyy-MM-dd')
+      )
+      availabilityCache.current.set(key, { at: Date.now(), value: response.dates })
+      return response.dates
     }, [])
+
+    const loadAvailability = useCallback(
+      async (month: Date, slotDuration: TimeSlotDuration) => {
+        try {
+          const dates = await fetchMonthCounts(month, slotDuration)
+          setAvailability({ key: availabilityKey(month, slotDuration), dates })
+        } catch {
+          // Leave the previous counts alone rather than greying the whole month on
+          // a transient failure. The slots endpoint still refuses what it must.
+        }
+      },
+      [fetchMonthCounts]
+    )
 
     useEffect(() => {
       void loadAvailability(visibleMonth, duration)
@@ -194,22 +243,44 @@ const AppointmentPicker = forwardRef<AppointmentPickerRef, AppointmentPickerProp
       onAppointmentChange
     ])
 
+    /**
+     * The day's slots at one duration, from cache when it is still fresh.
+     *
+     * Only successes are cached. A day the server refuses at this duration
+     * (400 — the calendar's greying went stale) must reach `loadSlots`, which
+     * re-greys the calendar rather than repeating the rule at the user; caching
+     * an empty list in its place would swallow that and leave the date clickable.
+     */
+    const fetchDaySlots = useCallback(async (date: Date, slotDuration: TimeSlotDuration) => {
+      const dateStr = format(date, 'yyyy-MM-dd')
+      const key = `${dateStr}|${slotDuration}`
+      const cached = readCache(slotCache.current, key)
+      if (cached) return cached
+
+      const response = await fetchAvailableSlots(dateStr, slotDuration)
+      slotCache.current.set(key, { at: Date.now(), value: response.slots })
+      return response.slots
+    }, [])
+
     // Fetch slots when date or duration changes
     const loadSlots = useCallback(
       async (date: Date, slotDuration: TimeSlotDuration) => {
-        setLoading(true)
+        // Only show the spinner for a question we actually have to ask. A cache
+        // hit repaints in the same frame, so flashing "Loading..." at it would
+        // invent the wait this cache exists to remove.
+        const warm = readCache(slotCache.current, `${format(date, 'yyyy-MM-dd')}|${slotDuration}`)
+        if (!warm) setLoading(true)
         setError(null)
 
         try {
-          const dateStr = format(date, 'yyyy-MM-dd')
-          const response = await fetchAvailableSlots(dateStr, slotDuration)
+          const slots = await fetchDaySlots(date, slotDuration)
 
-          setAvailableSlots(response.slots)
+          setAvailableSlots(slots)
 
           // Clear selected slot if it's no longer available
           setSelectedSlot(prev => {
             if (prev) {
-              const stillAvailable = response.slots.find(s => s.id === prev.id && s.available)
+              const stillAvailable = slots.find(s => s.id === prev.id && s.available)
               return stillAvailable ? prev : null
             }
             return null
@@ -221,6 +292,14 @@ const AppointmentPicker = forwardRef<AppointmentPickerRef, AppointmentPickerProp
             // cutoff rolled past it, while the user was looking at it. Re-grey it
             // rather than repeating the server's rule at someone who cannot act
             // on it; TimeSlotPicker's empty state says the useful half.
+            //
+            // Emptied here rather than in an effect on `staleAvailability`: the
+            // effect that refetches the counts is declared first and would run
+            // first, so the "refetch" would be served by the entry that just
+            // turned out to be wrong. Every cached answer is suspect, not only
+            // this duration's — the server has contradicted the whole picture.
+            slotCache.current.clear()
+            availabilityCache.current.clear()
             setStaleAvailability(n => n + 1)
           } else if (err instanceof AppointmentAPIError) {
             setError(err.message)
@@ -233,7 +312,7 @@ const AppointmentPicker = forwardRef<AppointmentPickerRef, AppointmentPickerProp
           setLoading(false)
         }
       },
-      [] // No dependencies - we use setters with callbacks
+      [fetchDaySlots]
     )
 
     useEffect(() => {
@@ -244,6 +323,47 @@ const AppointmentPicker = forwardRef<AppointmentPickerRef, AppointmentPickerProp
         setSelectedSlot(null)
       }
     }, [selectedDate, duration, loadSlots])
+
+    /**
+     * Warm the OTHER durations for what is on screen.
+     *
+     * This is the whole point: the durations are three buttons sitting above the
+     * times, so the next thing a user does is very often press one, and the two
+     * requests that answer it can be in flight long before then. Fired after the
+     * visible duration has been asked for, so it never competes with it.
+     *
+     * Failures are swallowed on purpose. Nothing on screen depends on a warmed
+     * entry — a miss just means the switch pays for its own fetch, which is what
+     * every switch used to do.
+     */
+    useEffect(() => {
+      const durations = bookingWindow?.slotDurations
+      if (!durations) return
+
+      let cancelled = false
+      const others = durations.filter(d => d !== duration) as TimeSlotDuration[]
+
+      const warm = window.setTimeout(() => {
+        for (const other of others) {
+          if (cancelled) continue
+          void fetchMonthCounts(visibleMonth, other).catch(() => {})
+          if (selectedDate) void fetchDaySlots(selectedDate, other).catch(() => {})
+        }
+      }, 150)
+
+      return () => {
+        cancelled = true
+        window.clearTimeout(warm)
+      }
+    }, [
+      bookingWindow,
+      duration,
+      visibleMonth,
+      selectedDate,
+      staleAvailability,
+      fetchMonthCounts,
+      fetchDaySlots
+    ])
 
     const handleDateChange = (date: Date) => {
       setSelectedDate(date)
@@ -272,7 +392,13 @@ const AppointmentPicker = forwardRef<AppointmentPickerRef, AppointmentPickerProp
     }
 
     // Public method for parent to refresh slots (e.g., after conflict)
+    //
+    // Empties both caches first. This is called when the server has just told
+    // the form its picture was wrong — a 409 on submit — so every cached answer
+    // is suspect, not only the one for the duration on screen.
     const refreshSlots = useCallback(() => {
+      slotCache.current.clear()
+      availabilityCache.current.clear()
       if (selectedDate) {
         loadSlots(selectedDate, duration)
       }
