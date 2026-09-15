@@ -352,6 +352,28 @@ body {
   gap: 1rem;
 }
 
+/* Only the list of times may give up height. Everything else is fixed chrome.
+ *
+ * The desktop cap below (`max-height: calc(100dvh - 10rem)`) puts the picker
+ * under shrink pressure, and a flex item's default `flex-shrink: 1` means
+ * EVERY child volunteers. `.appointment-picker__content` carries `min-height: 0`
+ * so the times can scroll, which also lets it be squeezed to near-zero — and
+ * because its overflow is visible, the calendar then painted straight out of
+ * the bottom of a collapsed box while the summary, laid out immediately after
+ * that box, rode up on top of it. The reported symptom was the "Selected: ..."
+ * bar sitting over the calendar with the dates showing through.
+ *
+ * With these pinned, the only slack in the column is `.time-slot-grid` between
+ * its 15rem cap and its 6rem floor. Past that the picker overflows and the page
+ * scrolls, which is the honest outcome the cap's own comment describes.
+ */
+.appointment-picker__header,
+.appointment-picker__calendar,
+.appointment-picker__selectors,
+.appointment-picker__summary {
+  flex-shrink: 0;
+}
+
 .appointment-picker__calendar {
   width: 100%;
 }
@@ -946,6 +968,13 @@ body {
   align-content: start;
   /* Room for the scrollbar so it never sits on top of the last column. */
   padding-right: 0.25rem;
+  /* Room for the hover lift. `.time-slot:hover` raises the button 2px and adds
+     a shadow, and this box clips to its padding edge — so the top row's lift
+     was sliced off against the "Available Times" label above it and the bottom
+     row's against the edge below. Padding is part of a scroll container's
+     scrollable area, so this buys the room without moving the grid. */
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
   overscroll-behavior: contain;
 }
 
