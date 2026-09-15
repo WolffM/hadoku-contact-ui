@@ -320,11 +320,7 @@ export async function getBookedIntervalsInRange(
 }
 
 /** Does [startMs, endMs) overlap any booked interval? Half-open, so adjacent is free. */
-export function overlapsBooked(
-  startMs: number,
-  endMs: number,
-  booked: BookedInterval[]
-): boolean {
+export function overlapsBooked(startMs: number, endMs: number, booked: BookedInterval[]): boolean {
   return booked.some(iv => startMs < iv.endMs && endMs > iv.startMs)
 }
 

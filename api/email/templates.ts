@@ -32,7 +32,7 @@ function platformLabel(platform: string): string {
     discord: 'Discord',
     jitsi: 'Jitsi Meet',
     google: 'Google Meet',
-    teams: 'Microsoft Teams',
+    teams: 'Microsoft Teams'
   }
   return named[platform.toLowerCase()] ?? platform.charAt(0).toUpperCase() + platform.slice(1)
 }
