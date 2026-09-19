@@ -54,7 +54,7 @@ function requireTier(minTier: 'service' | 'admin', label: string) {
  *
  * The service-tier half of the API lives at a different PREFIX entirely
  * (`createServiceRoutes`, mounted at /service), not as a hole in this gate.
- * See "Admin and service surfaces" in CLAUDE.md for why, and for the rule
+ * See "Admin and service surfaces" in AGENTS.md for why, and for the rule
  * governing what is allowed to live there.
  */
 export function createAdminRoutes() {
@@ -78,7 +78,7 @@ export function createAdminRoutes() {
 
 /**
  * The service surface, mounted at /service. Everything here is service-tier
- * and must satisfy the admission rule in CLAUDE.md ("Admin and service
+ * and must satisfy the admission rule in AGENTS.md ("Admin and service
  * surfaces"): it may act, it may not disclose.
  *
  * `PATCH /appointments/:id/status` is the only member. The same handler is also

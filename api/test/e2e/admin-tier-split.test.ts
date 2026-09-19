@@ -1,7 +1,7 @@
 /**
  * The admin/service tier split.
  *
- * Rationale and the admission rule live in CLAUDE.md, "Admin and service
+ * Rationale and the admission rule live in AGENTS.md, "Admin and service
  * surfaces". This file is the executable half: it pins the boundary in both
  * directions so a later route cannot drift onto the service side unnoticed.
  *

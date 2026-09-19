@@ -86,3 +86,13 @@ export {
 } from './templates'
 
 export { type DatabaseSize, getDatabaseSize, isDatabaseNearCapacity } from './database'
+
+export {
+  type MailfeedMessage,
+  type MailfeedPage,
+  type MailfeedQuery,
+  encodeCursor,
+  decodeCursor,
+  splitStoredMessage,
+  queryMailfeed
+} from './mailfeed'

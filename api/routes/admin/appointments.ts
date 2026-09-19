@@ -298,7 +298,7 @@ export function createAppointmentAdminRoutes() {
  * so the two can never diverge in behaviour, only in who may reach them.
  *
  * Rationale, and the rule for what else may be mounted at service tier:
- * "Admin and service surfaces" in CLAUDE.md. Do not restate it here.
+ * "Admin and service surfaces" in AGENTS.md. Do not restate it here.
  */
 export function createAppointmentStatusRoutes() {
   const app = new Hono<AppContext>()

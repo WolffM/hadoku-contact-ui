@@ -2,6 +2,8 @@
  * Contact API types
  */
 
+import type { MailfeedScope } from './services/mailfeed-scope'
+
 export interface ContactEnv {
   DB: D1Database
   RATE_LIMIT_KV: KVNamespace
@@ -18,6 +20,12 @@ export interface ContactEnv {
   // Inbox instead of Filtered; anything else (including unset) enforces it.
   // The BLOCKLIST is unaffected either way — see isWhitelistEnforced().
   INBOUND_WHITELIST_MODE?: string
+  // Who may read the scoped mail feed, and which senders they may see. A JSON
+  // object keyed by the caller's registry userId — see
+  // services/mailfeed-scope.ts for the shape and for why it is a plain [vars]
+  // entry rather than a secret. UNSET closes the feed to everyone, which is the
+  // correct default for a deployment that has not granted anybody access.
+  MAILFEED_SCOPES?: string
   RESEND_API_KEY?: string
   RESEND_WEBHOOK_SECRET?: string
   // Inbound forwarding — scraper (pickleball waitlist trigger, etc.)
@@ -73,5 +81,9 @@ export interface AppContext {
   Bindings: ContactEnv
   Variables: {
     authContext: HadokuAuthContext
+    // Set by the /mailfeed gate once, and read by every route behind it. It is
+    // only ever present on a request that already cleared both halves of that
+    // gate, so a route reading it cannot accidentally serve an unscoped query.
+    mailfeedScope: MailfeedScope
   }
 }

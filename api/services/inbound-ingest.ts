@@ -18,7 +18,7 @@
  * isWhitelistEnforced(). The blocklist half is not, and never should be.
  */
 
-import { EMAIL_CONFIG } from '../constants'
+import { EMAIL_CONFIG, MAILFEED_INBOUND_USER_AGENT } from '../constants'
 import {
   isEmailWhitelisted,
   findBlockRule,
@@ -201,7 +201,7 @@ export async function ingestInboundEmail(
     email: senderEmail,
     message: `Subject: ${input.subject}\n\n${messageBody ?? '(No message body)'}`,
     ip_address: null,
-    user_agent: 'Resend Inbound Email',
+    user_agent: MAILFEED_INBOUND_USER_AGENT,
     referrer: null,
     recipient,
     resend_email_id: input.emailId,

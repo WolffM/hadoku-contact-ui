@@ -73,6 +73,20 @@ export const FORWARD_RECIPIENTS = {
   }
 } as const
 
+/**
+ * The `user_agent` every Resend-ingested mail carries, and the ONLY marker that
+ * tells inbound mail apart from an outbound send or a web-form submission once
+ * a row has been archived.
+ *
+ * `contact_submissions_archive` was created by migration 0001 and never gained
+ * the columns added after it — no `direction`, no `recipient`, no
+ * `filtered_reason`. `user_agent` is in that original set, so it survives the
+ * move; `direction` does not. Anything reading across both tables (the scoped
+ * mail feed) must discriminate on this, which is why the literal lives here
+ * instead of inside `ingestInboundEmail` where it was written.
+ */
+export const MAILFEED_INBOUND_USER_AGENT = 'Resend Inbound Email'
+
 export type ForwardRecipient = keyof typeof FORWARD_RECIPIENTS
 
 // Site configuration

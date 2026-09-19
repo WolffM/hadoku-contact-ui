@@ -94,13 +94,14 @@ point here; they must not restate it.** Two files enforce it and they live in
 different repos, so a rule written down twice is a rule that will disagree with
 itself.
 
-| Prefix                 | Tier      | Holds                                                      |
-| ---------------------- | --------- | ---------------------------------------------------------- |
-| `/contact/api/...`     | public    | submit, appointments, slots, availability, inbound, health |
-| `/contact/api/admin`   | **admin** | submissions, email, blocklist, templates, appointment CRUD |
-| `/contact/api/service` | service   | `PATCH /appointments/:id/status` — and nothing else, yet   |
+| Prefix                  | Tier                        | Holds                                                      |
+| ----------------------- | --------------------------- | ---------------------------------------------------------- |
+| `/contact/api/...`      | public                      | submit, appointments, slots, availability, inbound, health |
+| `/contact/api/admin`    | **admin**                   | submissions, email, blocklist, templates, appointment CRUD |
+| `/contact/api/service`  | service                     | `PATCH /appointments/:id/status` — and nothing else, yet   |
+| `/contact/api/mailfeed` | service **+ a named scope** | the scoped mail feed — see below                           |
 
-**The admission rule: a service route may ACT, it may not DISCLOSE.**
+**The admission rule for `/service`: a route there may ACT, it may not DISCLOSE.**
 `PATCH /appointments/:id/status` qualifies because it takes an id and a status
 and answers with a boolean. `GET /appointments` does not, and stays at admin —
 it returns names, emails and message bodies. Nor does anything that acts _as_
@@ -123,6 +124,84 @@ The worker is the BACKSTOP, not the gate. A 403 shaped
 reached this code; the worker's own denial is
 `{"success":false,"error":"Forbidden","message":"... access required"}`. Telling
 them apart is how you know which repo to fix.
+
+### `/mailfeed` — the one disclosing read, and what pays for it
+
+A third prefix, because it is gated by a **third** policy. `/service` admits any
+service key by design; `/mailfeed` admits none of them without an explicit
+per-identity grant. Those cannot share a prefix — edge-router matches
+exact-or-prefix, so one rule would have to serve both policies and the weaker
+one would win.
+
+The feed exists so an ecosystem service can read the mail ONE CLASS OF SENDERS
+writes to this mailbox, without holding a credential that could read the rest of
+it. jobplatform is the first consumer: it applies to jobs as
+`matthaeus@hadoku.me`, so the ATS confirmations that tell it whether an
+application was really sent arrive here, and it is the only independent evidence
+in that pipeline.
+
+**The `/service` rule is answered, not waived.** That rule's reason is that
+service tier is held by every worker key in the fleet, so a disclosing route
+there is a route behind any of them. Here the tier is necessary and NOT
+sufficient — the caller must also be named in `MAILFEED_SCOPES` with a list of
+sender domains, and what it can read is that subset and nothing else. A service
+key that is not named gets the same 403 a friend key does.
+
+| Half  | Header                         | Answers                          |
+| ----- | ------------------------------ | -------------------------------- |
+| tier  | `X-Hadoku-Tier` (edge-stamped) | is the caller a service at all?  |
+| scope | `X-User-Id` (edge-injected)    | WHICH service, and allowed what? |
+
+`X-User-Id` is trustworthy for exactly the reason the tier is: edge-router
+strips any client-supplied value and re-injects it from the KV key registry
+under the same `X-Edge-Auth` seal. That requires **`injectUserId: true` on the
+/mailfeed mount** in `../hadoku_site/workers/edge-router/src/index.ts`. Without
+it the header never arrives, `resolveMailfeedScope` returns
+`unidentified_caller`, and every request 403s — which is the right way for that
+mistake to fail, but it does mean a green test suite here does not prove the
+route works in production.
+
+**`MAILFEED_SCOPES` is a plain `[vars]` entry, not a secret.** A userId is not a
+credential; it is what edge-router resolves a credential INTO, and the domain
+list is a policy statement that belongs in a reviewable diff next to the worker
+it governs. Everything in `services/mailfeed-scope.ts` fails closed — unset
+binding, unparseable JSON, unknown caller, an entry with no domains, a domain
+containing anything but `[a-z0-9.-]`. There is deliberately no way to express
+"all senders".
+
+**One invalid domain drops the WHOLE entry.** Narrowing a grant to the survivors
+would leave a feed that still returns mail, so a typo would present to the
+consumer as "that sender never writes to us" — the exact silent miss this feed
+exists to detect.
+
+**The query is the access control.** `storage/mailfeed.ts` expresses every
+exclusion as SQL, because a post-fetch filter is a filter that can be forgotten
+on one code path. It reads `contact_submissions` and
+`contact_submissions_archive` together — the archive is half the mailbox after
+30 days, and a feed that read only the live table would show a consumer one
+month and call it the history. Four exclusions, and `mailfeed.test.ts` pins each
+one INDEPENDENTLY (each was mutation-tested to a distinct failure):
+
+| Excluded                      | Because                                                                              |
+| ----------------------------- | ------------------------------------------------------------------------------------ |
+| `direction != 'inbound'`      | an outbound row's `email` is the RECIPIENT, and its body is the operator's own words |
+| a non-Resend `user_agent`     | the archive has NO `direction` column, so this is the only discriminator there       |
+| `filtered_reason IS NOT NULL` | otherwise a blocked sender reaches a consumer by forging a From domain               |
+| `status = 'deleted'`          | a trashed mail is one the operator took back                                         |
+
+A sender matches a granted domain exactly or as a subdomain of it. The
+subdomain half builds a LIKE pattern as `'%.' || ?`, which is why the domain
+validation is load-bearing rather than hygiene: a `%` reaching that
+concatenation matches every sender in the mailbox.
+
+**Paging is ascending, and that is what makes a backfill free.** A consumer with
+no state calls `/messages` with no cursor and walks the mailbox from its first
+message to its last; the same loop run tomorrow from its last cursor is the
+incremental poll. There is no separate import path, because a separate import
+path is a second implementation of the same matching rules. The cursor is
+`<created_at>:<id>` — the id tiebreak is not decoration, since two mails can
+share a millisecond and a timestamp-only cursor must then re-serve one or skip
+one.
 
 `PATCH /appointments/:id/status` is mounted at BOTH prefixes from one factory
 (`createAppointmentStatusRoutes`) — service tier at `/service`, admin tier at

@@ -12,6 +12,7 @@ import { createErrorHandlers } from './utils/error-handlers'
 import { createSubmitRoutes } from './routes/submit'
 import { createAdminRoutes, createServiceRoutes } from './routes/admin'
 import { createInboundRoutes } from './routes/inbound'
+import { createMailfeedRoutes } from './routes/mailfeed'
 import { createAppointmentsRoutes } from './routes/appointments'
 import {
   archiveOldSubmissions,
@@ -171,8 +172,14 @@ export function createContactHandler(basePath = '/contact/api', options?: Contac
   // /admin — edge-router gates by prefix and cannot express a path pattern, so
   // a service-tier route living under /admin could only be reached by lowering
   // the edge rule for the whole admin prefix. See "Admin and service surfaces"
-  // in CLAUDE.md.
+  // in AGENTS.md.
   app.route('/service', createServiceRoutes())
+  // The scoped read surface. A THIRD prefix rather than a route under /service,
+  // because the two are gated differently: /service is open to any service key
+  // by design, and /mailfeed is open to none of them without an explicit
+  // per-identity grant. Sharing a prefix would mean one edge rule for two
+  // policies, and the weaker one would win.
+  app.route('/mailfeed', createMailfeedRoutes())
 
   // Internal endpoint: daily maintenance.
   // Dispatched by mgmt-api's cron orchestrator with MGMT_CRON_KEY (service

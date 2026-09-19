@@ -18,6 +18,17 @@ export default defineWorkersConfig({
             // requests (X-Edge-Auth + X-Hadoku-Tier), not X-User-Key.
             EDGE_AUTH_SECRET: 'test-edge-secret',
             RESEND_API_KEY: 'test-resend-key',
+            // The scoped mail feed's grant table. A binding rather than a
+            // per-test override because the routes read it through the worker
+            // env, which SELF.fetch cannot vary. The unset / malformed /
+            // wildcard cases are covered as unit tests over
+            // parseMailfeedScopes, where they can be.
+            MAILFEED_SCOPES: JSON.stringify({
+              'user-jobplatform': {
+                label: 'jobplatform',
+                senderDomains: ['greenhouse.io', 'ashbyhq.com']
+              }
+            }),
             // Google OAuth fakes — present so createGoogleMeetEvent makes
             // real HTTP calls (intercepted via fetchMock) instead of bailing
             // at the "not configured" check. Tests that book with
