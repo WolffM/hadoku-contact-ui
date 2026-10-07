@@ -14,5 +14,6 @@
   "GOOGLE_OAUTH_CLIENT_SECRET": "HADOKU_MEETING_ORCHESTRATOR_GCP_CLIENT_SECRET",
   "GOOGLE_OAUTH_REFRESH_TOKEN": "HADOKU_MEETING_ORCHESTRATOR_GCP_REFRESH_TOKEN",
   "//meeting-spaces": "HMAC secret for ArchiveBot's webhookServer /api/spaces/* (127.0.0.1:3004). Its OWN secret, not the events one: provisioning private channels and kicking members is a separate capability from creating guild events. Read here so the contact-api caller can be developed and tested locally; the deployed worker gets it through WORKER_CONFIGS['contact-api'] in ../hadoku_site/scripts/admin/update_cloudflare_secrets.py.",
-  "ARCHIVEBOT_SPACES_WEBHOOK_SECRET": "ARCHIVEBOT_SPACES_WEBHOOK_SECRET"
+  "ARCHIVEBOT_SPACES_WEBHOOK_SECRET": "ARCHIVEBOT_SPACES_WEBHOOK_SECRET",
+  "HADOKU_NPM_READ_TOKEN": "HADOKU_NPM_READ_TOKEN"
 }
