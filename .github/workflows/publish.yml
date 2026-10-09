@@ -22,20 +22,22 @@ jobs:
           fetch-depth: 0
 
       - uses: WolffM/hadoku-actions/setup-pnpm@v1
+        id: pnpm
         with:
           npm-token: ${{ secrets.HADOKU_NPM_READ_TOKEN }}
+          vault-key: ${{ secrets.KEY_SERVICE_CONTACT_UI }}
 
       - name: Configure npm for GitHub Packages
         run: |
           echo '//npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}' > ~/.npmrc
           echo "@wolffm:registry=https://npm.pkg.github.com" >> ~/.npmrc
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.HADOKU_NPM_READ_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ steps.pnpm.outputs.npm-token }}
 
       - name: Install dependencies
         run: pnpm --config.store-dir=${{ runner.tool_cache }}/pnpm-store install --frozen-lockfile
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.HADOKU_NPM_READ_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ steps.pnpm.outputs.npm-token }}
 
       - name: Build package
         run: pnpm run build
@@ -238,7 +240,7 @@ jobs:
         env:
           BASE: ${{ steps.range.outputs.base }}
           PUBLISH_ALL: ${{ steps.range.outputs.publish_all }}
-          NODE_AUTH_TOKEN: ${{ secrets.HADOKU_NPM_READ_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ steps.pnpm.outputs.npm-token }}
 
       - name: Publish package
         if: steps.package_changed.outputs.changed == 'true'
@@ -260,7 +262,7 @@ jobs:
           fi
           echo "✓ Verified ${package_name}@${version} on registry"
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.HADOKU_NPM_READ_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ steps.pnpm.outputs.npm-token }}
 
       # Notify parent app to update dependencies
       - name: Notify parent about package update
