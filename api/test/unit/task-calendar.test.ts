@@ -124,7 +124,7 @@ describe('pushAppointmentToCalendar', () => {
     fetchMock.deactivate()
   })
 
-  it('skips (no fetch) when CONTACTUI_SERVICE_KEY is unset', async () => {
+  it('skips (no fetch) when HADOKU_SERVICE_KEY is unset', async () => {
     const result = await pushAppointmentToCalendar(SAMPLE, {})
     expect(result).toEqual({ ok: false, skipped: true })
   })
@@ -152,7 +152,7 @@ describe('pushAppointmentToCalendar', () => {
       })
 
     const result = await pushAppointmentToCalendar(SAMPLE, {
-      CONTACTUI_SERVICE_KEY: 'contactui-key-uuid',
+      HADOKU_SERVICE_KEY: 'contactui-key-uuid',
       TASK_API_URL: 'https://task.test/api'
     })
     expect(result.ok).toBe(true)
@@ -167,7 +167,7 @@ describe('pushAppointmentToCalendar', () => {
       .reply(200, { boards: [{ id: 'main', name: 'main', access: 'owner' }] })
 
     const result = await pushAppointmentToCalendar(SAMPLE, {
-      CONTACTUI_SERVICE_KEY: 'contactui-key-uuid',
+      HADOKU_SERVICE_KEY: 'contactui-key-uuid',
       TASK_API_URL: 'https://task.test/api'
     })
     expect(result).toEqual({ ok: false, skipped: true })
@@ -186,7 +186,7 @@ describe('pushAppointmentToCalendar', () => {
       })
 
     const result = await pushAppointmentToCalendar(SAMPLE, {
-      CONTACTUI_SERVICE_KEY: 'contactui-key-uuid',
+      HADOKU_SERVICE_KEY: 'contactui-key-uuid',
       TASK_API_URL: 'https://task.test/api'
     })
     expect(result).toEqual({ ok: false, skipped: true })
@@ -208,7 +208,7 @@ describe('pushAppointmentToCalendar', () => {
       })
 
     const result = await pushAppointmentToCalendar(SAMPLE, {
-      CONTACTUI_SERVICE_KEY: 'contactui-key-uuid',
+      HADOKU_SERVICE_KEY: 'contactui-key-uuid',
       TASK_CALENDAR_BOARD: 'MRY93H8LG7ZCSK998165RCUBHW',
       TASK_API_URL: 'https://task.test/api'
     })
@@ -230,7 +230,7 @@ describe('pushAppointmentToCalendar', () => {
       .reply(403, 'forbidden')
 
     const result = await pushAppointmentToCalendar(SAMPLE, {
-      CONTACTUI_SERVICE_KEY: 'contactui-key-uuid',
+      HADOKU_SERVICE_KEY: 'contactui-key-uuid',
       TASK_CALENDAR_BOARD: 'MRY93H8LG7ZCSK998165RCUBHW',
       TASK_API_URL: 'https://task.test/api'
     })
@@ -242,7 +242,7 @@ describe('pushAppointmentToCalendar', () => {
 
 describe('removing a mirrored event', () => {
   const ENV = {
-    CONTACTUI_SERVICE_KEY: 'contactui-key-uuid',
+    HADOKU_SERVICE_KEY: 'contactui-key-uuid',
     TASK_CALENDAR_BOARD: 'MRY93H8LG7ZCSK998165RCUBHW',
     TASK_API_URL: 'https://task.test/api'
   }
@@ -257,7 +257,7 @@ describe('removing a mirrored event', () => {
     fetchMock.deactivate()
   })
 
-  it('skips (no fetch) when CONTACTUI_SERVICE_KEY is unset', async () => {
+  it('skips (no fetch) when HADOKU_SERVICE_KEY is unset', async () => {
     const result = await removeAppointmentFromCalendar('appt-123', {})
     expect(result).toEqual({ ok: false, skipped: true })
   })
@@ -352,7 +352,7 @@ describe('removing a mirrored event', () => {
       .reply(200, { ok: true, message: 'deleted' })
 
     const result = await removeAppointmentFromCalendar(SAMPLE.id, {
-      CONTACTUI_SERVICE_KEY: 'contactui-key-uuid',
+      HADOKU_SERVICE_KEY: 'contactui-key-uuid',
       TASK_API_URL: 'https://task.test/api'
     })
     expect(result.ok).toBe(true)

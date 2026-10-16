@@ -71,7 +71,7 @@ interface Env {
   EMAIL_PROVIDER?: string
   RESEND_API_KEY?: string
   // task-calendar bridge — see services/task-calendar.ts
-  CONTACTUI_SERVICE_KEY?: string
+  HADOKU_SERVICE_KEY?: string
   TASK_CALENDAR_BOARD?: string
   TASK_API_URL?: string
 }

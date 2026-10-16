@@ -33,7 +33,7 @@ export interface ContactEnv {
   SCRAPER_API_KEY?: string
   // task-calendar bridge — registered key identifying the calendar owner and an
   // optional endpoint override. See services/task-calendar.ts.
-  CONTACTUI_SERVICE_KEY?: string
+  HADOKU_SERVICE_KEY?: string
   TASK_CALENDAR_BOARD?: string
   TASK_API_URL?: string
   // Meeting-link generation (services/meeting-links.ts, services/google-meet.ts).

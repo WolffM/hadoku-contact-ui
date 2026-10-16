@@ -22,7 +22,7 @@
  * onto the board as "Mail: <subject>" with nothing to do about it.
  *
  * Routing: we call task-api over the public edge as OURSELVES (`X-User-Key:
- * <CONTACTUI_SERVICE_KEY>`, this worker's own service-tier identity). The target
+ * <HADOKU_SERVICE_KEY>`, this worker's own service-tier identity). The target
  * board is DISCOVERED, not configured: we ask task-api which boards we can see
  * and take the one shared with us. task-api then confirms the grant and writes
  * into the OWNER's rows. A contributor grant covers both create and delete —
@@ -58,7 +58,7 @@ export interface TaskCalendarEnv {
   // tier — only a board_shares grant from the calendar owner. When unset the
   // push is skipped so the originating action still succeeds (calendar
   // mirroring is best-effort, never load-bearing).
-  CONTACTUI_SERVICE_KEY?: string
+  HADOKU_SERVICE_KEY?: string
   // Optional tiebreak, only needed if more than one board is ever shared with
   // this worker. Normally unset — the board is discovered.
   TASK_CALENDAR_BOARD?: string
@@ -275,9 +275,9 @@ export async function postTaskToCalendar(
   body: Record<string, unknown>,
   env: TaskCalendarEnv
 ): Promise<CalendarPushResult> {
-  const key = env.CONTACTUI_SERVICE_KEY
+  const key = env.HADOKU_SERVICE_KEY
   if (!key) {
-    console.warn('[task-calendar] CONTACTUI_SERVICE_KEY not set; skipping calendar push')
+    console.warn('[task-calendar] HADOKU_SERVICE_KEY not set; skipping calendar push')
     return { ok: false, skipped: true }
   }
   const board = await resolveCalendarBoard(env, key)
@@ -347,9 +347,9 @@ export async function deleteTaskFromCalendar(
   taskId: string,
   env: TaskCalendarEnv
 ): Promise<CalendarPushResult> {
-  const key = env.CONTACTUI_SERVICE_KEY
+  const key = env.HADOKU_SERVICE_KEY
   if (!key) {
-    console.warn('[task-calendar] CONTACTUI_SERVICE_KEY not set; skipping calendar delete')
+    console.warn('[task-calendar] HADOKU_SERVICE_KEY not set; skipping calendar delete')
     return { ok: false, skipped: true }
   }
   const board = await resolveCalendarBoard(env, key)
