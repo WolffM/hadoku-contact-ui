@@ -1,0 +1,61 @@
+name: e2e
+
+# Fleet nightly e2e (hadoku_site programme 3). Dispatched by hadoku_site's
+# nightly-e2e.yml with nightly_run_id set, or run by hand for a first proof.
+# The suite itself is Miniflare-only (no network, no key) — only the results
+# report needs the service identity.
+on:
+  workflow_dispatch:
+    inputs:
+      nightly_run_id:
+        description: The orchestrator's run id, so results group by night
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  e2e:
+    name: e2e
+    runs-on: ${{ fromJSON(vars.CI_RUNNER) }}
+    # From e2e.json's timeoutMinutes.
+    timeout-minutes: 10
+    steps:
+      - name: Mark the start, so the reported duration is real
+        run: echo "JOB_STARTED_AT=$(date -u +%s)" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v6
+
+      - uses: WolffM/hadoku-actions/setup-pnpm@v1
+        id: pnpm
+        with:
+          npm-token: ${{ secrets.HADOKU_NPM_READ_TOKEN }}
+          vault-key: ${{ secrets.KEY_SERVICE_CONTACT_UI }}
+
+      - name: Install
+        env:
+          NODE_AUTH_TOKEN: ${{ steps.pnpm.outputs.npm-token }}
+        run: pnpm --config.store-dir=${{ runner.tool_cache }}/pnpm-store install --frozen-lockfile
+
+      - name: e2e (Miniflare, vitest-pool-workers — no network, no key)
+        run: pnpm test:e2e:ci
+
+      - name: Report results to the fleet e2e store
+        if: always()
+        uses: WolffM/hadoku-actions/report-e2e@v1
+        with:
+          report: e2e-report.json
+          runner: vitest
+          app: contact-ui
+          nightly-run-id: ${{ inputs.nightly_run_id }}
+          key: ${{ secrets.KEY_SERVICE_CONTACT_UI }}
+
+      - name: Report the outcome so a silent failure can't hide
+        if: always()
+        uses: WolffM/hadoku-actions/report-job@v1
+        with:
+          job-name: contact-ui:e2e
+          service-key: ${{ secrets.KEY_SERVICE_CONTACT_UI }}
+          started-at: ${{ env.JOB_STARTED_AT }}

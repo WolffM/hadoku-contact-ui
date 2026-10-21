@@ -1,0 +1,7 @@
+{
+  "mode": "local",
+  "runner": "vitest",
+  "command": "pnpm test:e2e:ci",
+  "report": "e2e-report.json",
+  "timeoutMinutes": 10
+}

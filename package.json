@@ -1,6 +1,6 @@
 {
   "name": "@wolffm/contact-ui",
-  "version": "2.13.1",
+  "version": "2.13.2",
   "description": "Contact form micro-frontend for hadoku.me",
   "type": "module",
   "packageManager": "pnpm@11.5.0",
@@ -31,6 +31,7 @@
     "build:ui": "vite build && tsc -p tsconfig.build.json",
     "build:api": "tsup",
     "test:api": "vitest run --config vitest.config.api.ts",
+    "test:e2e:ci": "vitest run --config vitest.config.api.ts api/test/e2e --reporter=json --outputFile=e2e-report.json",
     "test:ui": "vitest run --config vitest.config.ui.ts",
     "test": "pnpm test:api && pnpm test:ui",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.api.json --noEmit",
