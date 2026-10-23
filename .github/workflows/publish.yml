@@ -264,45 +264,18 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ steps.pnpm.outputs.npm-token }}
 
-      # Notify parent app to update dependencies
-      - name: Notify parent about package update
+      # hadoku_site is told through mgmt-api with this repo's own service key
+      # (hadoku-actions/repo-action), so this repo holds no token that can
+      # write to hadoku_site. A refused or unanswered notify FAILS this job:
+      # the old curl only warned, and a dropped dispatch means a release that
+      # never reaches the site.
+      - name: Notify hadoku_site (packages_updated)
         if: steps.package_changed.outputs.changed == 'true'
-        env:
-          HADOKU_SITE_TOKEN: ${{ secrets.HADOKU_SITE_TOKEN }}
-        run: |
-          echo "Notifying hadoku_site about package update..."
-
-          if [ -z "$HADOKU_SITE_TOKEN" ]; then
-            echo "⚠️  Warning: HADOKU_SITE_TOKEN not available, skipping notification"
-            exit 0
-          fi
-
-          payload=$(cat <<EOF
-            {
-              "event_type": "packages_updated",
-              "client_payload": {
-                "packages": ["@wolffm/contact-ui"],
-                "sha": "${{ github.sha }}",
-                "ref": "${{ github.ref }}"
-              }
-            }
-          EOF
-          )
-
-          status_code=$(curl -sS \
-            -o /dev/null \
-            -w "%{http_code}" \
-            -X POST "https://api.github.com/repos/WolffM/hadoku_site/dispatches" \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer $HADOKU_SITE_TOKEN" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            -d "$payload")
-
-          if [ "$status_code" = "204" ]; then
-            echo "✅ Notified hadoku_site about package update"
-          else
-            echo "⚠️  Failed to notify hadoku_site (HTTP $status_code)"
-          fi
+        uses: WolffM/hadoku-actions/repo-action@v1
+        with:
+          verb: notify
+          body: '{"event_type":"packages_updated","client_payload":{"packages":["@wolffm/contact-ui"],"sha":"${{ github.sha }}"}}'
+          service-key: ${{ secrets.KEY_SERVICE_CONTACT_UI }}
 
       # A red run is seen by nobody unless it says so itself: nothing polls
       # these repos. `always()` so RECOVERIES report too -- without the success
