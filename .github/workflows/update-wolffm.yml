@@ -54,6 +54,11 @@ jobs:
           service-key: ${{ secrets.KEY_SERVICE_CONTACT_UI }}
           npm-token: ${{ secrets.HADOKU_NPM_READ_TOKEN }}
           recursive: 'false'
+          # The theme-token gate against the packages just bumped, before anything
+          # is pushed. Nothing else checks a bump before main moves, and a new
+          # @wolffm/themes can tighten check-usage: themes 5.12.6 landed 40
+          # violations on hadoku_site main with every check green.
+          verify: pnpm run lint:css
 
       # A red run is seen by nobody unless it says so itself: nothing polls
       # these repos. `always()` so RECOVERIES report too -- without the success
