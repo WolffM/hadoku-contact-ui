@@ -59,3 +59,6 @@ jobs:
           job-name: contact-ui:e2e
           service-key: ${{ secrets.KEY_SERVICE_CONTACT_UI }}
           started-at: ${{ env.JOB_STARTED_AT }}
+          # The job's own limit: a timeout kill arrives as `cancelled`, and only
+          # this tells report-job it was a failure rather than a superseded run.
+          timeout-minutes: 10
