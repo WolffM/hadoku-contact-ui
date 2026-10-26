@@ -58,7 +58,7 @@
     "@typescript-eslint/eslint-plugin": "^8.47.0",
     "@typescript-eslint/parser": "^8.47.0",
     "@vitejs/plugin-react": "^5.1.1",
-    "@wolffm/catalogue": "^1.0.7",
+    "@wolffm/catalogue": "^1.0.8",
     "@wolffm/task-ui-components": "^4.20.0",
     "@wolffm/themes": "^5.12.12",
     "eslint": "^9.39.1",
