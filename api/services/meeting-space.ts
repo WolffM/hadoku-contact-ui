@@ -16,7 +16,7 @@
  * no nonce, so every body carries a `timestamp` ArchiveBot rejects outside ten
  * minutes, and writes add an idempotency key on top.
  *
- * Mirrors hadoku-meet's `worker/src/lib/archivebot.ts`, which is the same
+ * Mirrors hadoku-rally's `worker/src/lib/archivebot.ts`, which is the same
  * scheme against the same server. It is not imported: that lives in
  * @wolffm/worker-utils' orbit and this package deliberately carries no
  * worker-utils dependency (see api/utils/auth.ts). If the signing scheme

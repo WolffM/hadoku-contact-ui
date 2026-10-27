@@ -52,7 +52,7 @@ export interface ContactEnv {
   ARCHIVEBOT_SPACES_WEBHOOK_SECRET?: string
   // Which guild spaces are carved out of. Optional: ArchiveBot falls back to
   // its own default, but passing it explicitly keeps contact bookings off
-  // whichever guild meet-api happens to be pointed at.
+  // whichever guild rally-api happens to be pointed at.
   ARCHIVEBOT_SPACE_GUILD_ID?: string
   // The Discord invite handed to anyone who books that platform. A plain
   // `[vars]` entry, not a secret — it is emailed and rendered in the browser.
