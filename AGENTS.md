@@ -413,3 +413,29 @@ If your code reads a new `process.env.X` that isn't in `.devvault.json` yet:
 Operator-only operations (set / lock / audit / grant) use `HADOKU_ADMIN_KEY`. Don't try to escalate: service tier can't write, and there is no key list to add yourself to — auth resolves from the edge-router key registry, which only an admin can write.
 
 Lost or rotating your key? Operator: `python scripts/administration.py key-generate --tier service --repo ../<repo> --name <your-name>-<repo>` then drop the new UUID in `.devvault.local.json`.
+
+## Telemetry: where your app's data lives
+
+What a visitor did is in monitoring-api's D1, readable with this repo's own
+service key. Query it. Don't use Cloudflare Workers Logs (a normal
+`wrangler login` can't read them), and don't ask the operator what a visitor
+saw. If the log can't answer, add telemetry.
+
+```sh
+K=$(node -p "require('./.devvault.local.json').key")
+curl -s -A "Mozilla/5.0 hadoku-agent" -H "X-User-Key: $K" \
+  "https://hadoku.me/health/api/logs/query?path=/contact&since=2026-10-27T00:00:00Z&limit=200"
+```
+
+- Events your code posts go to `service_events`: `POST /health/api/telemetry`
+  with `context.service: "contact"`, read back with
+  `GET /health/api/service-events?service=contact`. Not `console.log`.
+  Browser events: POST to your own `/contact/api/*` route and relay from
+  the backend, which holds the key.
+- Only finished requests that reach the edge are logged. A UI app's page
+  is served by GitHub Pages, so only its `/contact/api/*` calls show up; a
+  tunnel app's whole prefix does.
+- `user_id c8c59a87-f8af-4da7-9c99-d9e536b3fca8` is the daily automated tour
+  (~09:2x UTC), not a visitor.
+
+Params, write format, caveats: `../hadoku_site/docs/child-apps/TELEMETRY.md`.
