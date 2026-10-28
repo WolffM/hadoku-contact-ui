@@ -84,7 +84,7 @@ const AppointmentPicker = forwardRef<AppointmentPickerRef, AppointmentPickerProp
       initialSelection?.selectedSlot || null
     )
     const [meetingPlatform, setMeetingPlatform] = useState<MeetingPlatform | null>(
-      initialSelection?.meetingPlatform || 'jitsi' // Default to Jitsi Meet
+      initialSelection?.meetingPlatform || 'discord'
     )
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState<string | null>(null)

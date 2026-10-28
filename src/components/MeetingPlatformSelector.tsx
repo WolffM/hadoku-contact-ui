@@ -14,8 +14,8 @@ const PLATFORMS: {
   label: string
   Icon: React.ComponentType<{ className?: string }>
 }[] = [
-  { value: 'jitsi', label: 'Jitsi Meet', Icon: JitsiIcon },
   { value: 'discord', label: 'Discord', Icon: DiscordIcon },
+  { value: 'jitsi', label: 'Jitsi Meet', Icon: JitsiIcon },
   { value: 'google', label: 'Google Meet', Icon: GoogleMeetIcon }
 ]
 
