@@ -1,10 +1,19 @@
 /**
- * Test setup — applies D1 migrations once before all tests.
+ * Test setup — rebuilds D1 from the migrations and empties both KV namespaces
+ * before EVERY test.
+ *
+ * This is the isolation vitest-pool-workers' `isolatedStorage` used to provide,
+ * done in-process instead. That option snapshots storage by copying the `.sqlite`
+ * files on disk around each test, and asserts the directory holds nothing else
+ * when it does. D1 runs SQLite in WAL mode, so if the D1 object has not finished
+ * closing when the copy starts — which happens on a loaded CI host — a
+ * `.sqlite-shm` is still there and the whole run dies (issue #27). Rebuilding
+ * through the binding never touches the files, so there is nothing to race.
  *
  * SQL files are imported as strings via the sql-loader Vite plugin.
- * Only runs migrations if tables don't exist yet (idempotent).
  */
 import { env } from 'cloudflare:test'
+import { beforeEach } from 'vitest'
 
 // @ts-expect-error — .sql imports handled by vite plugin
 import migration0001 from '../migrations/0001_create_contact_tables.sql'
@@ -38,68 +47,60 @@ import migration0009 from '../migrations/0009_platform_optional.sql'
  * wrongly too. No migration has one, and the ones that come closest (0005's
  * seeded template bodies) contain no semicolons.
  */
-async function applyMigration(db: D1Database, sql: string) {
-  const statements = sql
+function splitStatements(sql: string): string[] {
+  return sql
     .replace(/--[^\n]*/g, '')
     .split(';')
     .map(s => s.trim())
     .filter(s => s.length > 0)
-
-  for (const stmt of statements) {
-    await db.prepare(stmt).run()
-  }
 }
 
-// Check if migrations already applied (singleWorker mode persists D1)
-const existing = await env.DB.prepare(
-  "SELECT name FROM sqlite_master WHERE type='table' AND name='appointment_config'"
-).first()
+const migrations = [
+  migration0001,
+  migration0002,
+  migration0003,
+  migration0004,
+  migration0005,
+  migration0006,
+  migration0007,
+  migration0008,
+  migration0009
+]
+const migrationStatements = migrations.flatMap(splitStatements)
 
-if (!existing) {
-  const migrations = [
-    migration0001,
-    migration0002,
-    migration0003,
-    migration0004,
-    migration0005,
-    migration0006,
-    migration0007,
-    migration0008,
-    migration0009
-  ]
-  for (const sql of migrations) {
-    await applyMigration(env.DB, sql)
-  }
-} else {
-  // Apply incremental migrations for existing databases
-  const hasDirection = await env.DB.prepare(
-    "SELECT 1 FROM pragma_table_info('contact_submissions') WHERE name='direction'"
-  ).first()
-  if (!hasDirection) {
-    await applyMigration(env.DB, migration0006)
-  }
+/**
+ * Drop every table and replay the migrations, so each test starts from exactly
+ * what a fresh deployment has — seeded config and templates included.
+ *
+ * Tables are dropped newest-first, and foreign keys are deferred for the batch,
+ * because `appointments` references `contact_submissions`. `sqlite_` and `_cf_`
+ * tables belong to SQLite and D1 and are not ours to drop.
+ */
+async function resetDatabase(db: D1Database) {
+  const { results } = await db
+    .prepare(
+      `SELECT name FROM sqlite_master
+       WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'
+       ORDER BY rowid DESC`
+    )
+    .all<{ name: string }>()
 
-  const hasResendEmailId = await env.DB.prepare(
-    "SELECT 1 FROM pragma_table_info('contact_submissions') WHERE name='resend_email_id'"
-  ).first()
-  if (!hasResendEmailId) {
-    await applyMigration(env.DB, migration0007)
-  }
-
-  const hasSpammedAt = await env.DB.prepare(
-    "SELECT 1 FROM pragma_table_info('contact_submissions') WHERE name='spammed_at'"
-  ).first()
-  if (!hasSpammedAt) {
-    await applyMigration(env.DB, migration0008)
-  }
-
-  // Probe the COLUMN, not a table's existence: 0009 changes `platform` from
-  // NOT NULL to nullable in place, so the only durable evidence that it ran is
-  // pragma_table_info's `notnull` flag for that column.
-  const platformNullable = await env.DB.prepare(
-    `SELECT 1 FROM pragma_table_info('appointments') WHERE name='platform' AND "notnull"=0`
-  ).first()
-  if (!platformNullable) {
-    await applyMigration(env.DB, migration0009)
-  }
+  await db.batch([
+    db.prepare('PRAGMA defer_foreign_keys = on'),
+    ...results.map(({ name }) => db.prepare(`DROP TABLE "${name}"`)),
+    ...migrationStatements.map(stmt => db.prepare(stmt))
+  ])
 }
+
+async function clearKv(kv: KVNamespace) {
+  let cursor: string | undefined
+  do {
+    const page = await kv.list({ cursor })
+    await Promise.all(page.keys.map(({ name }) => kv.delete(name)))
+    cursor = page.list_complete ? undefined : page.cursor
+  } while (cursor)
+}
+
+beforeEach(async () => {
+  await Promise.all([resetDatabase(env.DB), clearKv(env.RATE_LIMIT_KV), clearKv(env.TEMPLATES_KV)])
+})

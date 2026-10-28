@@ -39,7 +39,10 @@ export default defineWorkersConfig({
             GOOGLE_OAUTH_REFRESH_TOKEN: 'test-refresh-token'
           }
         },
-        singleWorker: true
+        singleWorker: true,
+        // Off on purpose: api/test/setup.ts rebuilds storage before every test.
+        // The on-disk snapshotting this option does is what flaked (#27).
+        isolatedStorage: false
       }
     }
   },
