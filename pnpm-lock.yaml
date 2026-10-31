@@ -56,10 +56,10 @@ importers:
         version: 1.0.11
       '@wolffm/task-ui-components':
         specifier: ^4.22.1
-        version: 4.22.1(@wolffm/themes@5.13.6(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+        version: 4.22.1(@wolffm/themes@5.13.7(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       '@wolffm/themes':
-        specifier: ^5.13.6
-        version: 5.13.6(react@19.2.0)
+        specifier: ^5.13.7
+        version: 5.13.7(react@19.2.0)
       eslint:
         specifier: ^9.39.1
         version: 9.39.1
@@ -1619,8 +1619,8 @@ packages:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
 
-  '@wolffm/themes@5.13.6':
-    resolution: {integrity: sha512-1hTIunVMxMMvXrjW1IR7BXKEmD+zm7Lz4Wj/zazpqhZQrNAYfJWdU9hTP6JmsqvX9lJ9z1vEJ5x4wuQF6C0KgA==, tarball: https://npm.pkg.github.com/download/@wolffm/themes/5.13.6/29237baec788ba56e555bab631361b0336e06964}
+  '@wolffm/themes@5.13.7':
+    resolution: {integrity: sha512-UqHb7SbU9qhi80YOmZ2L2a2nUKW1bXJDNg6mxB+JoM/2K1PuWRE4Si1y6i2oQx567E48yhvR80HWHGW+PA/h4A==, tarball: https://npm.pkg.github.com/download/@wolffm/themes/5.13.7/d25f9041ebe0cf54d334349aadf641df94cd880b}
     hasBin: true
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
@@ -4438,13 +4438,13 @@ snapshots:
       react: 19.2.0
       zod: 4.1.12
 
-  '@wolffm/task-ui-components@4.22.1(@wolffm/themes@5.13.6(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)':
+  '@wolffm/task-ui-components@4.22.1(@wolffm/themes@5.13.7(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)':
     dependencies:
-      '@wolffm/themes': 5.13.6(react@19.2.0)
+      '@wolffm/themes': 5.13.7(react@19.2.0)
       react: 19.2.0
       react-dom: 19.2.0(react@19.2.0)
 
-  '@wolffm/themes@5.13.6(react@19.2.0)':
+  '@wolffm/themes@5.13.7(react@19.2.0)':
     dependencies:
       '@wolffm/prefs-client': 1.1.6(react@19.2.0)(zod@4.1.12)
       react: 19.2.0
