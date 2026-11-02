@@ -367,9 +367,7 @@ Read `node_modules/@wolffm/themes/THEME_USAGE_GUIDE.md` before writing styles.
 
 ## Version management
 
-- Pre-commit hook auto-bumps patch version when `src/`, `api/`, `package.json`, or build config files change
-- Patch rolls over at `.20` to bump minor (e.g., `1.1.20` -> `1.2.0`)
-- Publish workflow has fallback bump if the hook was bypassed
+The version is CI's, never a commit's — nobody edits it and no hook bumps it. The publish workflow's `Version` step (`WolffM/hadoku-actions/next-version@v1`) sets it to one patch above the registry's newest, in the CI workspace only, and nothing is committed back. A committed version above the registry is kept, so a deliberate major/minor bump stays possible.
 
 ## Does NOT
 

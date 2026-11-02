@@ -39,15 +39,12 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ steps.pnpm.outputs.npm-token }}
 
-      - name: Build package
-        run: pnpm run build
-
       # What this PUSH introduced, as a diff range.
       #
       # `HEAD~1 HEAD` is the last COMMIT, and a push is not one commit. Push
       # three commits where the source changes in the first and a chore lands
       # last, and the publish is silently skipped — a green run that shipped
-      # nothing, because the gate, the version walk and the dispatch below all
+      # nothing, because the gate, the Version step and the dispatch below all
       # read the same wrong answer and therefore agree with each other.
       #
       # `github.event.before` is the tip before the push, the only base that
@@ -103,147 +100,26 @@ jobs:
             echo "✗ No changes in package"
           fi
 
-      - name: Check and bump version if needed
+      # The version is CI's, never a commit's (operator, 2026-11-01): one patch
+      # above the registry's newest, written to package.json in this workspace
+      # only and never committed back. A committed version above the registry
+      # is kept, so a deliberate minor/major bump still works. An unreadable
+      # registry FAILS here rather than guess.
+      - name: Version
+        id: version
         if: steps.package_changed.outputs.changed == 'true'
-        run: |
-          # Get package name and current version from package.json
-          package_name=$(node -p "require('./package.json').name")
-          current_version=$(node -p "require('./package.json').version")
-          echo "Current version: $current_version"
-
-          # Function to calculate next version from a given version
-          calculate_next_version() {
-            local version="$1"
-            major=$(echo "$version" | cut -d. -f1)
-            minor=$(echo "$version" | cut -d. -f2)
-            patch=$(echo "$version" | cut -d. -f3)
-
-            # Rollover at .20 to keep patch numbers manageable (matching pre-commit hook)
-            if [ "$patch" -ge 20 ]; then
-              new_minor=$((minor + 1))
-              echo "$major.$new_minor.0"
-            else
-              new_patch=$((patch + 1))
-              echo "$major.$minor.$new_patch"
-            fi
-          }
-
-          # Function to check if a version exists in the registry
-          version_exists() {
-            local version="$1"
-            if npm view "${package_name}@${version}" version --registry=https://npm.pkg.github.com 2>/dev/null; then
-              return 0  # exists
-            else
-              return 1  # doesn't exist
-            fi
-          }
-
-          # Function to bump version, ensuring the new version doesn't exist
-          bump_version() {
-            local reason="$1"
-            echo "$reason"
-
-            local original_version="$current_version"
-
-            # Walk from the registry's latest, not the committed version: CI
-            # bumps are published but never committed back, so the committed
-            # version only falls behind and this walk used to replay the whole
-            # gap one version at a time (tenhands died at attempt 99 of exactly
-            # that on 2026-08-05). From latest, one step suffices.
-            local latest_published
-            latest_published=$(npm view "${package_name}" version --registry=https://npm.pkg.github.com 2>/dev/null || echo "")
-            if [ -n "$latest_published" ]; then
-              current_version=$(printf '%s\n%s\n' "$current_version" "$latest_published" | sort -V | tail -1)
-              echo "Registry latest: $latest_published; walking from $current_version"
-            fi
-            new_version=$(calculate_next_version "$current_version")
-
-            # Keep bumping until we find a version that doesn't exist
-            # Add safety limit to prevent infinite loops
-            local max_attempts=10
-            local attempts=0
-            while version_exists "$new_version"; do
-              echo "⚠️  Version $new_version already exists, trying next version..."
-              attempts=$((attempts + 1))
-              if [ $attempts -ge $max_attempts ]; then
-                echo "❌ Error: Reached maximum version bump attempts ($max_attempts)"
-                echo "This suggests a systematic issue. Last tried: $new_version"
-                exit 1
-              fi
-              new_version=$(calculate_next_version "$new_version")
-            done
-
-            echo "✓ Version $new_version is available"
-
-            # Update package.json with new version
-            node -e "const fs = require('fs'); const p = 'package.json'; const src = fs.readFileSync(p, 'utf8'); const next = src.replace(/(\"version\"\s*:\s*\")[^\"]*(\")/, (m, a, b) => a + process.argv[1] + b); if (next === src) { console.error('could not patch version in ' + p); process.exit(1); } fs.writeFileSync(p, next);" "$new_version"
-
-            echo "✅ Version bumped: $original_version → $new_version"
-
-            # Update lock file
-            pnpm --config.store-dir=${{ runner.tool_cache }}/pnpm-store install --lockfile-only
-
-            # Update current_version for any subsequent checks
-            current_version="$new_version"
-          }
-
-          # Check if the version moved ACROSS THIS PUSH, on the same base the
-          # code check below uses. These two answers are paired — "code changed
-          # and the version did not" is what triggers a bump — so reading them
-          # from different ranges makes the pair incoherent on any multi-commit
-          # push: a version bumped two commits back would read as not bumped.
-          previous_version=$(git show "$BASE:package.json" 2>/dev/null | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin', 'utf8')).version" 2>/dev/null || echo "")
-
-          if [ -n "$previous_version" ] && [ "$previous_version" != "$current_version" ]; then
-            echo "✓ Version was already bumped in this push: $previous_version → $current_version"
-            version_was_bumped=true
-          else
-            echo "ℹ️  Version was not bumped in this push"
-            version_was_bumped=false
-          fi
-
-          # Check if files that require version bump were changed across this push
-          # (matching pre-commit hook logic: src/, package.json, vite.config., tsconfig.)
-          echo "Checking if version-bump-triggering files changed across this push..."
-          if [ "$PUBLISH_ALL" = "true" ] || git diff --name-only "$BASE" HEAD | grep -q -E "^(src/|vite\.config\.|tsconfig\.)"; then
-            echo "⚠️  Code or build config changes detected in this push"
-            code_changed=true
-          else
-            echo "ℹ️  No code or build config changes in this push"
-            code_changed=false
-          fi
-
-          # Determine if we need to bump
-          should_bump=false
-
-          # Case 1: Code changed but version wasn't bumped (pre-commit hook was bypassed)
-          if [ "$code_changed" = true ] && [ "$version_was_bumped" = false ]; then
-            should_bump=true
-            bump_reason="⚠️  Code changed but version was not bumped (pre-commit hook bypassed), bumping now..."
-          fi
-
-          # Case 2: Current version already exists in registry
-          if [ "$should_bump" = false ]; then
-            echo "Checking if version $current_version exists in registry..."
-            if version_exists "$current_version"; then
-              should_bump=true
-              bump_reason="⚠️  Version $current_version already published, bumping version..."
-            else
-              echo "✓ Version $current_version is not published yet"
-            fi
-          fi
-
-          # Perform the bump if needed
-          if [ "$should_bump" = true ]; then
-            bump_version "$bump_reason"
-          fi
+        uses: WolffM/hadoku-actions/next-version@v1
         env:
-          BASE: ${{ steps.range.outputs.base }}
-          PUBLISH_ALL: ${{ steps.range.outputs.publish_all }}
           NODE_AUTH_TOKEN: ${{ steps.pnpm.outputs.npm-token }}
 
-      - name: Publish package
+      - name: Build package
         if: steps.package_changed.outputs.changed == 'true'
+        run: pnpm run build
+
+      # `published` is true only when the registry's newest version was
+      # published by this very commit: a re-run, so skip to what follows.
+      - name: Publish package
+        if: steps.package_changed.outputs.changed == 'true' && steps.version.outputs.published != 'true'
         run: pnpm publish --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
