@@ -28,9 +28,6 @@ export interface ContactEnv {
   MAILFEED_SCOPES?: string
   RESEND_API_KEY?: string
   RESEND_WEBHOOK_SECRET?: string
-  // Inbound forwarding — scraper (pickleball waitlist trigger, etc.)
-  SCRAPER_API_URL?: string
-  SCRAPER_API_KEY?: string
   // task-calendar bridge — registered key identifying the calendar owner and an
   // optional endpoint override. See services/task-calendar.ts.
   HADOKU_SERVICE_KEY?: string

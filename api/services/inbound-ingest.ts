@@ -28,7 +28,6 @@ import {
   type FilteredReason,
   type InboundSource
 } from '../storage'
-import { maybeForwardInboundEmail, isForwardRecipient } from '../routes/inbound-forwarders'
 import type { ContactEnv } from '../types'
 
 export interface InboundEmailInput {
@@ -45,14 +44,12 @@ export interface InboundEmailInput {
 
 export interface IngestResult {
   processed: boolean
-  outcome: 'stored' | 'filtered' | 'forwarded' | 'forward_skipped' | 'error'
+  outcome: 'stored' | 'filtered' | 'error'
   submissionId?: string
   filteredReason?: FilteredReason
   /** True when an existing row was stamped rather than a new one inserted. */
   adopted?: boolean
   message: string
-  forwardStatus?: number | null
-  forwardError?: string | null
 }
 
 /** `Matt <matt@example.com>` -> `matt@example.com`; a bare address passes through. */
@@ -99,50 +96,6 @@ export async function ingestInboundEmail(
   const senderEmail = extractAddress(input.from)
   const recipient = input.to[0]?.toLowerCase() ?? null
   const messageBody = input.text ?? input.html ?? null
-
-  // Recipient-based forwarders are trusted routes keyed on the destination
-  // mailbox, so they bypass the whitelist entirely.
-  if (isForwardRecipient(recipient)) {
-    // ...but only the LIVE webhook may fire them. The sweep runs minutes to
-    // days after the fact, and these forwards trigger real actions in other
-    // services (the pickleball waitlist claims a spot). Replaying one from a
-    // reconciliation pass would act on stale information.
-    if (source !== 'webhook') {
-      console.log(`[inbound] ${input.emailId}: forwarder recipient ${recipient} — not replaying`)
-      await recordInboundEmail(db, {
-        resendEmailId: input.emailId,
-        source,
-        outcome: 'forward_skipped'
-      })
-      return {
-        processed: false,
-        outcome: 'forward_skipped',
-        message: `Forwarder recipient ${recipient} not replayed by reconciliation`
-      }
-    }
-
-    const forwardResult = await maybeForwardInboundEmail(env, {
-      recipient,
-      senderEmail,
-      subject: input.subject,
-      body: messageBody,
-      emailId: input.emailId
-    })
-
-    await recordInboundEmail(db, {
-      resendEmailId: input.emailId,
-      source,
-      outcome: 'forwarded'
-    })
-
-    return {
-      processed: forwardResult.ok ?? false,
-      outcome: 'forwarded',
-      message: `Forwarded to ${forwardResult.label}`,
-      forwardStatus: forwardResult.status ?? null,
-      forwardError: forwardResult.error ?? null
-    }
-  }
 
   // A mail the webhook already stored under a different id-less row: stamp it
   // rather than inserting a twin. Only the sweep can hit this — the webhook is

@@ -137,9 +137,7 @@ export function createInboundRoutes() {
         emailId,
         processed: result.processed,
         submissionId: result.submissionId,
-        filteredReason: result.filteredReason,
-        forwardStatus: result.forwardStatus ?? null,
-        forwardError: result.forwardError ?? null
+        filteredReason: result.filteredReason
       })
     } catch (error) {
       console.error('Error processing inbound email:', error)

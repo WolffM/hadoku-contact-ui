@@ -327,33 +327,6 @@ describe('syncInboundEmails', () => {
     expect(ledger?.submission_id).toBe(stored.id)
   })
 
-  it('does NOT replay a forwarder recipient', async () => {
-    // Firing a "new open spot" trigger from a reconciliation pass would act on
-    // stale information in another service.
-    const { fetchImpl } = makeResend([
-      {
-        id: 'em_fwd',
-        from: 'noreply@pickleballkingdom.com',
-        to: ['pickleball-waitlist@hadoku.me'],
-        subject: 'A spot opened up',
-        created_at: recentIso(),
-        text: 'body'
-      }
-    ])
-
-    const result = await syncInboundEmails(testEnv(), fetchImpl)
-
-    expect(result.skipped).toBe(1)
-    expect(await countSubmissions()).toBe(0)
-
-    const ledger = await env.DB.prepare(
-      'SELECT outcome FROM inbound_email_ledger WHERE resend_email_id = ?'
-    )
-      .bind('em_fwd')
-      .first<{ outcome: string }>()
-    expect(ledger?.outcome).toBe('forward_skipped')
-  })
-
   it('leaves a failed retrieve unledgered so the next sweep retries it', async () => {
     const emails: ListItem[] = [
       {
