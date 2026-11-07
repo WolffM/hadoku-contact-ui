@@ -53,7 +53,11 @@ describe('createEdgeAuth', () => {
   })
 
   it('still passes every other known tier through unchanged', async () => {
-    for (const tier of ['friend', 'service', 'wife', 'admin']) {
+    // Derived from the ladder rather than hand-typed, so a tier added to it
+    // is covered here with no edit to this test. public and member are
+    // asserted on their own above, since public isn't passed-through-as-is
+    // (there's nothing to compare it to) and member is the new case.
+    for (const tier of Object.keys(TIER_RANK).filter(t => t !== 'public' && t !== 'member')) {
       expect((await whoami(tier)).userType).toBe(tier)
     }
   })
