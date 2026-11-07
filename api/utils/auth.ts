@@ -26,18 +26,23 @@ import type { HadokuAuthContext } from '../types'
  * @wolffm/worker-utils; this package keeps its own copy to preserve the
  * no-worker-utils-dependency posture described above.
  *
- * A tier missing from this list is not rejected — `resolveTier` rewrites it to
- * `public`, so the caller authenticates at the edge and then silently receives
- * public data. `wife` (2026-08-04) was exactly that case: it ranks above
- * service, and this worker would have served it the anonymous view with no 401,
- * no 403 and no log line. Keep it complete.
+ * A tier missing from this list is not rejected — `createEdgeAuth` rewrites it
+ * to `public` (see `TIERS` below), so the caller authenticates at the edge and
+ * then silently receives public data. `wife` (2026-08-04) was exactly that
+ * case: it ranks above service, and this worker would have served it the
+ * anonymous view with no 401, no 403 and no log line. `member` (added
+ * 2026-11-06) was the same gap: every route here floors at `service` or
+ * `admin`, so a member was refused either way, but it was refused as a
+ * mislabeled `public` caller rather than as the member it actually is. Keep it
+ * complete.
  */
-const TIER_RANK: Record<string, number> = {
+export const TIER_RANK: Record<string, number> = {
   public: 0,
-  friend: 1,
-  service: 2,
-  wife: 3,
-  admin: 4
+  member: 1,
+  friend: 2,
+  service: 3,
+  wife: 4,
+  admin: 5
 }
 
 const TIERS = new Set(Object.keys(TIER_RANK))

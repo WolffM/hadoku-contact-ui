@@ -70,7 +70,7 @@ export interface ContactHandlerOptions {
 }
 
 export interface HadokuAuthContext {
-  userType: 'admin' | 'wife' | 'service' | 'friend' | 'public'
+  userType: 'admin' | 'wife' | 'service' | 'friend' | 'member' | 'public'
   credential: string | null
 }
 
