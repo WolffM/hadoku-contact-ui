@@ -100,6 +100,12 @@ export default [
         // Cloudflare Workers runtime
         D1Database: 'readonly',
         KVNamespace: 'readonly',
+        // Mail push (api/push/mail-push.ts)
+        DurableObjectNamespace: 'readonly',
+        DurableObjectStub: 'readonly',
+        WebSocket: 'readonly',
+        WebSocketPair: 'readonly',
+        Headers: 'readonly',
         AnalyticsEngineDataset: 'readonly',
         Request: 'readonly',
         Response: 'readonly',

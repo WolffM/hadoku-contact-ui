@@ -7,7 +7,8 @@
 
 import { Hono } from 'hono'
 import { createCorsMiddleware, DEFAULT_HADOKU_ORIGINS } from './utils/cors'
-import { createEdgeAuth, tierAtLeast } from './utils/auth'
+import { createEdgeAuth, resolveEdgeAuth, tierAtLeast } from './utils/auth'
+import { handleMailPushUpgrade, isMailPushUpgrade } from './push/mail-push'
 import { createErrorHandlers } from './utils/error-handlers'
 import { createSubmitRoutes } from './routes/submit'
 import { createAdminRoutes, createServiceRoutes } from './routes/admin'
@@ -232,6 +233,22 @@ export function createContactHandler(basePath = '/contact/api', options?: Contac
   const { notFoundHandler, errorHandler } = createErrorHandlers()
   app.notFound(notFoundHandler)
   app.onError(errorHandler)
+
+  // The mail-push WebSocket upgrade is answered BEFORE Hono routes. A 101
+  // carries its socket in a non-standard `webSocket` field, and middleware that
+  // sets a header on it (CORS does) rebuilds the Response and loses the socket.
+  // So this path gets the edge-auth decision directly and nothing else.
+  const routeFetch = app.fetch
+  app.fetch = (request, env, executionCtx) => {
+    if (!isMailPushUpgrade(request, basePath)) return routeFetch(request, env, executionCtx)
+    // Hono types `env` as optional; the Workers runtime always passes it.
+    const bindings = (env ?? {}) as ContactEnv
+    return handleMailPushUpgrade(
+      request,
+      bindings,
+      tierAtLeast(resolveEdgeAuth(bindings, request.headers), 'admin')
+    )
+  }
 
   return app
 }

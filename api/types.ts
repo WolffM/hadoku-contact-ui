@@ -3,6 +3,7 @@
  */
 
 import type { MailfeedScope } from './services/mailfeed-scope'
+import type { MailPushHub } from './push/mail-push'
 
 export interface ContactEnv {
   DB: D1Database
@@ -28,6 +29,10 @@ export interface ContactEnv {
   MAILFEED_SCOPES?: string
   RESEND_API_KEY?: string
   RESEND_WEBHOOK_SECRET?: string
+  // Mail push (push/mail-push.ts): the Durable Object that tells open
+  // command-station tabs new mail arrived. Unset turns the channel off — the
+  // ticket route and the upgrade answer 503 and ingest skips the notify.
+  MAIL_PUSH?: DurableObjectNamespace<MailPushHub>
   // task-calendar bridge — registered key identifying the calendar owner and an
   // optional endpoint override. See services/task-calendar.ts.
   HADOKU_SERVICE_KEY?: string

@@ -17,6 +17,7 @@ import { createAppointmentAdminRoutes, createAppointmentStatusRoutes } from './a
 import { createTemplateRoutes } from './templates'
 import type { AppContext } from '../../types'
 import { tierAtLeast } from '../../utils/auth'
+import { fromMailPushOrigin, mintMailPushTicket } from '../../push/mail-push'
 
 /**
  * Admin API response helper - matches contact-admin client expectations
@@ -70,6 +71,24 @@ export function createAdminRoutes() {
   // Also reachable here, at admin tier: the command-station UI calls
   // /admin/appointments/:id/status and predates the /service prefix.
   adminApp.route('/', createAppointmentStatusRoutes())
+
+  // Mail push: a single-use ticket for opening the push socket. Origin must be
+  // exactly https://hadoku.me — the session cookie reaches this route from any
+  // *.hadoku.me subdomain, and CORS lets some of those read the answer. See
+  // push/mail-push.ts for the whole model.
+  adminApp.post('/push/ticket', async c => {
+    if (!fromMailPushOrigin(c.req.raw)) {
+      return c.json({ success: false, error: 'Forbidden', message: 'Origin not allowed' }, 403)
+    }
+    const minted = await mintMailPushTicket(c.env)
+    if ('refused' in minted) {
+      return minted.refused === 'too-many'
+        ? c.json({ success: false, error: 'Too many outstanding tickets' }, 429)
+        : c.json({ success: false, error: 'Mail push not configured' }, 503)
+    }
+    c.header('Cache-Control', 'no-store')
+    return adminOk(c, { ticket: minted.ticket })
+  })
 
   app.route('/', adminApp)
 

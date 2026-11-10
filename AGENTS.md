@@ -214,6 +214,40 @@ both directions: service can cancel, friend cannot (service is rank 2, friend
 1 — lowering a gate must not open it), and a service key gets 403 on every
 disclosing endpoint.
 
+## Mail push
+
+Open command-station tabs learn that mail arrived through a WebSocket to a
+Durable Object, `MailPushHub` (`api/push/mail-push.ts`). The socket is opened by
+an ADMIN session, so the channel is built to carry exactly one bit and accept
+nothing:
+
+| Rule                                                                                                                | Enforced in                  |
+| ------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| The only frame is `{"type":"mail"}` — no id, sender, subject or count. Tabs re-read the API.                        | `MAIL_PUSH_FRAME`            |
+| Receive-only: any client frame closes the socket with 1008                                                          | `webSocketMessage`           |
+| `POST /admin/push/ticket`: admin tier + `Origin` exactly `https://hadoku.me`                                        | `routes/admin/index.ts`      |
+| Ticket: 32 random bytes, single use, 30s, stored only as a SHA-256, at most 16 outstanding                          | `mintTicket` / `fetch`       |
+| Upgrade `GET /admin/push`: edge-sealed admin + same Origin + subprotocol exactly `[hadoku-mailpush.v1, t.<ticket>]` | `handleMailPushUpgrade`      |
+| At most 8 open sockets; each is closed with 4001 after 10 minutes and must re-auth                                  | `MAX_SOCKETS`, `alarm`       |
+| Only ingest notifies, and never for a blocked sender                                                                | `services/inbound-ingest.ts` |
+
+The Origin check is the load-bearing one. The session cookie is
+`SameSite=Strict`, but SameSite is per site, so every `*.hadoku.me` subdomain
+sends it, and CORS lets `task-api.hadoku.me` read responses. The ticket is
+defence in depth: a page that cannot read the ticket response cannot open a
+socket even if an Origin check were wrong.
+
+The upgrade is answered BEFORE Hono routes (`handler.ts` wraps `app.fetch`),
+because middleware that sets a header on the 101 rebuilds the Response and loses
+its `webSocket`. edge-router forwards that path through its own handler with an
+allowlist of headers, so the session cookie and admin key never reach the worker
+on it (`workers/edge-router` in hadoku_site).
+
+**The consuming worker** must export `MailPushHub` from its entry and bind it as
+`MAIL_PUSH` (sqlite-backed `new_sqlite_classes` migration). Unbound, the ticket
+route and the upgrade answer 503 and ingest skips the notify; nothing else
+changes.
+
 ## Ending a meeting
 
 **A booking is four things, and all four have to be undone together.** The

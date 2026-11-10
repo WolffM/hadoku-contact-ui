@@ -13,6 +13,8 @@ export default defineWorkersConfig({
           compatibilityFlags: ['nodejs_compat'],
           d1Databases: ['DB'],
           kvNamespaces: ['RATE_LIMIT_KV', 'TEMPLATES_KV'],
+          // The mail-push hub (api/push/mail-push.ts), exported from test-entry.
+          durableObjects: { MAIL_PUSH: { className: 'MailPushHub', useSQLite: true } },
           bindings: {
             // Edge-auth: tests authenticate the way edge-router stamps
             // requests (X-Edge-Auth + X-Hadoku-Tier), not X-User-Key.

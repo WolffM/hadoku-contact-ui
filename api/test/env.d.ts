@@ -5,6 +5,8 @@ declare module 'cloudflare:test' {
     TEMPLATES_KV: KVNamespace
     EMAIL_PROVIDER: string
     RESEND_API_KEY: string
+    RESEND_WEBHOOK_SECRET: string
+    MAIL_PUSH: DurableObjectNamespace<import('../push/mail-push').MailPushHub>
   }
 }
 

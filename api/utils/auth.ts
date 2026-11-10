@@ -75,23 +75,28 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0
 }
 
+/**
+ * The edge-auth decision on its own, for the one path that is answered before
+ * Hono routes (the mail-push WebSocket upgrade, see push/mail-push.ts).
+ */
+export function resolveEdgeAuth(
+  env: { EDGE_AUTH_SECRET?: string },
+  headers: Headers
+): HadokuAuthContext {
+  const secret = env.EDGE_AUTH_SECRET
+  const provided = headers.get('X-Edge-Auth') ?? ''
+  if (!secret || !timingSafeEqual(provided, secret)) {
+    // No provenance → public. Never trust an unverified X-Hadoku-Tier.
+    return { userType: 'public', credential: null }
+  }
+  const rawTier = headers.get('X-Hadoku-Tier') ?? 'public'
+  const userType = (TIERS.has(rawTier) ? rawTier : 'public') as HadokuAuthContext['userType']
+  return { userType, credential: headers.get('X-User-Key') ?? null }
+}
+
 export function createEdgeAuth(): MiddlewareHandler {
   return async (c: Context, next: Next) => {
-    const secret = (c.env as { EDGE_AUTH_SECRET?: string }).EDGE_AUTH_SECRET
-    const provided = c.req.header('X-Edge-Auth') ?? ''
-    const trusted = !!secret && timingSafeEqual(provided, secret)
-
-    let authContext: HadokuAuthContext
-    if (trusted) {
-      const rawTier = c.req.header('X-Hadoku-Tier') ?? 'public'
-      const userType = (TIERS.has(rawTier) ? rawTier : 'public') as HadokuAuthContext['userType']
-      authContext = { userType, credential: c.req.header('X-User-Key') ?? null }
-    } else {
-      // No provenance → public. Never trust an unverified X-Hadoku-Tier.
-      authContext = { userType: 'public', credential: null }
-    }
-
-    c.set('authContext', authContext)
+    c.set('authContext', resolveEdgeAuth(c.env as { EDGE_AUTH_SECRET?: string }, c.req.raw.headers))
     await next()
   }
 }

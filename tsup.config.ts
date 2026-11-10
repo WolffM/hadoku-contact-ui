@@ -9,6 +9,6 @@ export default defineConfig({
   dts: true,
   tsconfig: 'tsconfig.api.json',
   clean: true,
-  external: ['hono'],
+  external: ['hono', 'cloudflare:workers'],
   target: 'es2022'
 })

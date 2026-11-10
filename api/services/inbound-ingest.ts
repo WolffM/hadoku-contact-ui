@@ -29,6 +29,7 @@ import {
   type InboundSource
 } from '../storage'
 import type { ContactEnv } from '../types'
+import { notifyMailPush } from '../push/mail-push'
 
 export interface InboundEmailInput {
   emailId: string
@@ -176,6 +177,10 @@ export async function ingestInboundEmail(
     source: source === 'webhook' ? 'webhook' : 'sync',
     outcome: filteredReason ? 'filtered' : 'stored'
   })
+
+  // Open tabs refresh now. Not for a blocked sender: blocking is how the
+  // operator stops being told about someone, so the push stays quiet too.
+  if (!blockRule) await notifyMailPush(env)
 
   // Name the rule that fired, not just the verdict: "blocked by @cerebras.net"
   // and "blocked by info@cerebras.net" are the difference between a domain block
