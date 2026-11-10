@@ -18,6 +18,9 @@ export default defineWorkersConfig({
             // requests (X-Edge-Auth + X-Hadoku-Tier), not X-User-Key.
             EDGE_AUTH_SECRET: 'test-edge-secret',
             RESEND_API_KEY: 'test-resend-key',
+            // Svix's published reference secret, so the signer in the webhook
+            // tests can be checked against Svix's own vector.
+            RESEND_WEBHOOK_SECRET: 'whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw',
             // The scoped mail feed's grant table. A binding rather than a
             // per-test override because the routes read it through the worker
             // env, which SELF.fetch cannot vary. The unset / malformed /

@@ -9,6 +9,7 @@ import { env, SELF, fetchMock } from 'cloudflare:test'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { addToWhitelist, findBlockRule } from '../../storage'
 import { EMAIL_CONFIG } from '../../constants'
+import { postWebhook } from './webhook-helpers'
 
 const ADMIN_HEADERS = {
   'Content-Type': 'application/json',
@@ -39,19 +40,6 @@ function mockRetrieve(emailId: string, body: Record<string, unknown>) {
     .get('https://api.resend.com')
     .intercept({ path: `/emails/receiving/${emailId}`, method: 'GET' })
     .reply(200, JSON.stringify(body))
-}
-
-async function postWebhook(data: {
-  email_id: string
-  from: string
-  to: string[]
-  subject: string
-}) {
-  return SELF.fetch('https://test.com/contact/api/inbound', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'email.received', created_at: new Date().toISOString(), data })
-  })
 }
 
 async function rowFor(emailId: string): Promise<SubmissionRow | null> {

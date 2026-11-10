@@ -116,6 +116,10 @@ export default [
         TextEncoder: 'readonly',
         TextDecoder: 'readonly',
         AbortSignal: 'readonly',
+        // Svix webhook signatures are base64 (utils/svix.ts); both are Workers
+        // globals declared the same `declare const` way.
+        atob: 'readonly',
+        btoa: 'readonly',
         // Node.js
         __dirname: 'readonly'
       }

@@ -10,6 +10,7 @@ import { env, SELF, fetchMock } from 'cloudflare:test'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { addToWhitelist } from '../../storage'
 import { EMAIL_CONFIG } from '../../constants'
+import { postSigned, postWebhook, svixSign, TEST_WEBHOOK_SECRET } from './webhook-helpers'
 
 /** A mailbox deliberately NOT in PUBLIC_RECIPIENTS, so the whitelist gate applies. */
 const NON_PUBLIC_RECIPIENT = 'support@hadoku.me'
@@ -36,19 +37,6 @@ function mockRetrieve(emailId: string, body: Record<string, unknown>, status = 2
     .get('https://api.resend.com')
     .intercept({ path: `/emails/receiving/${emailId}`, method: 'GET' })
     .reply(status, JSON.stringify(body))
-}
-
-async function postWebhook(data: {
-  email_id: string
-  from: string
-  to: string[]
-  subject: string
-}) {
-  return SELF.fetch('https://test.com/contact/api/inbound', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ type: 'email.received', created_at: new Date().toISOString(), data })
-  })
 }
 
 async function rowFor(emailId: string): Promise<SubmissionRow | null> {
@@ -226,11 +214,116 @@ describe('POST /contact/api/inbound', () => {
   })
 
   it('rejects a payload with no email_id', async () => {
+    const response = await postSigned(JSON.stringify({ type: 'email.received', data: {} }))
+    expect(response.status).toBe(400)
+  })
+})
+
+describe('POST /contact/api/inbound — Svix signature', () => {
+  const delivery = JSON.stringify({
+    type: 'email.received',
+    created_at: new Date().toISOString(),
+    data: {
+      email_id: 'em_forged',
+      from: 'a@example.com',
+      to: ['matthaeus@hadoku.me'],
+      subject: 'x'
+    }
+  })
+
+  beforeEach(async () => {
+    await env.DB.prepare('DELETE FROM contact_submissions').run()
+    await env.DB.prepare('DELETE FROM inbound_email_ledger').run()
+    fetchMock.activate()
+    // No interceptors: a refused delivery must never reach Resend at all.
+    fetchMock.disableNetConnect()
+  })
+
+  afterEach(() => {
+    fetchMock.deactivate()
+  })
+
+  async function nothingStored() {
+    const row = await env.DB.prepare('SELECT COUNT(*) AS n FROM contact_submissions').first<{
+      n: number
+    }>()
+    expect(row?.n).toBe(0)
+  }
+
+  it('the test signer reproduces the Svix reference vector', async () => {
+    expect(
+      await svixSign(
+        'whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw',
+        'msg_p5jXN8AQM9LWM0D4loKWxJek',
+        '1614265330',
+        '{"test": 2432232314}'
+      )
+    ).toBe('v1,g0hM9SsE+OTPJTGt/tmIKtSyZlE3uFJELVlNIOLJ1OE=')
+  })
+
+  it('401s a delivery with no signature header', async () => {
+    expect((await postSigned(delivery, { signature: null })).status).toBe(401)
+    await nothingStored()
+  })
+
+  it('401s a delivery signed with another secret', async () => {
+    const other = `whsec_${btoa('a-different-secret-24byt')}`
+    expect((await postSigned(delivery, { secret: other })).status).toBe(401)
+    await nothingStored()
+  })
+
+  it('401s a correctly signed delivery older than the tolerance (replay)', async () => {
+    const old = String(Math.floor(Date.now() / 1000) - 10 * 60)
+    expect((await postSigned(delivery, { timestamp: old })).status).toBe(401)
+    await nothingStored()
+  })
+
+  it('401s a body altered after signing', async () => {
+    const id = 'msg_tamper'
+    const timestamp = String(Math.floor(Date.now() / 1000))
+    const signature = await svixSign(TEST_WEBHOOK_SECRET, id, timestamp, delivery)
     const response = await SELF.fetch('https://test.com/contact/api/inbound', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'email.received', data: {} })
+      headers: {
+        'Content-Type': 'application/json',
+        'svix-id': id,
+        'svix-timestamp': timestamp,
+        'svix-signature': signature
+      },
+      body: delivery.replace('em_forged', 'em_other')
     })
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(401)
+  })
+
+  it('accepts a valid signature among several (secret rotation on the Svix side)', async () => {
+    const id = 'msg_multi'
+    const timestamp = String(Math.floor(Date.now() / 1000))
+    const body = JSON.stringify({ type: 'hadoku.secret-probe', data: {} })
+    const good = await svixSign(TEST_WEBHOOK_SECRET, id, timestamp, body)
+    const response = await SELF.fetch('https://test.com/contact/api/inbound', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'svix-id': id,
+        'svix-timestamp': timestamp,
+        'svix-signature': `v1,AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= ${good}`
+      },
+      body
+    })
+    expect(response.status).toBe(200)
+  })
+
+  it('answers the credential probe event 200 and does nothing else', async () => {
+    const response = await postSigned(
+      JSON.stringify({
+        type: 'hadoku.secret-probe',
+        created_at: new Date().toISOString(),
+        data: {}
+      })
+    )
+    expect(response.status).toBe(200)
+    const body = await response.json<{ data: { ignored: string } }>()
+    expect(body.data.ignored).toBe('hadoku.secret-probe')
+    await nothingStored()
   })
 })

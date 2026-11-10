@@ -15,10 +15,11 @@ import { Hono } from 'hono'
 import { ok, badRequest } from '../utils/responses'
 import { getLedgerEntry } from '../storage'
 import { ingestInboundEmail, extractAddress } from '../services/inbound-ingest'
+import { verifySvixSignature } from '../utils/svix'
 import type { AppContext } from '../types'
 
 interface ResendWebhookEvent {
-  type: 'email.received'
+  type: string
   created_at: string
   data: {
     email_id: string
@@ -42,19 +43,41 @@ export function createInboundRoutes() {
   const app = new Hono<AppContext>()
 
   app.post('/inbound', async c => {
-    const request = c.req.raw
+    // Verified BEFORE anything is parsed or fetched, and fail-closed: with no
+    // secret configured every delivery is refused. This route is public, so
+    // the signature is the only thing that makes a POST here Resend's. A
+    // refused delivery loses nothing — the reconciliation sweep reads Resend's
+    // received list on its own schedule and ingests whatever the webhook did
+    // not. Resend retries non-2xx, which is harmless for the same reason.
+    const webhookSecret = c.env.RESEND_WEBHOOK_SECRET
+    if (!webhookSecret) {
+      console.error('RESEND_WEBHOOK_SECRET not configured — refusing webhook')
+      return c.json({ error: 'Webhook verification not configured' }, 503)
+    }
+    const rawBody = await c.req.text()
+    const verdict = await verifySvixSignature(
+      webhookSecret,
+      {
+        id: c.req.header('svix-id') ?? null,
+        timestamp: c.req.header('svix-timestamp') ?? null,
+        signature: c.req.header('svix-signature') ?? null
+      },
+      rawBody
+    )
+    if (verdict !== 'ok') {
+      console.warn(`Inbound webhook refused: ${verdict}`)
+      return c.json({ error: 'Invalid webhook signature' }, 401)
+    }
 
     try {
-      const webhookSecret = c.env.RESEND_WEBHOOK_SECRET
-      if (webhookSecret) {
-        const signature = request.headers.get('svix-signature')
-        if (!signature) {
-          console.warn('Missing webhook signature')
-          return badRequest(c, 'Missing webhook signature')
-        }
+      const event = JSON.parse(rawBody) as ResendWebhookEvent
+      // Any other event type is acknowledged and ignored. That includes the
+      // daily credential probe (hadoku_site's `resend-webhook` prober), which
+      // signs a `hadoku.secret-probe` event with the vault's copy of the
+      // secret: a 200 here is its proof that vault and worker agree.
+      if (event.type !== 'email.received') {
+        return ok(c, { success: true, ignored: event.type ?? null })
       }
-
-      const event = await c.req.json<ResendWebhookEvent>()
       const emailId = event.data?.email_id
       if (!emailId) {
         console.warn('Inbound webhook missing email_id')
