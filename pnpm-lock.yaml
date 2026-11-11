@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@wolffm/logger':
-        specifier: ^1.4.3
-        version: 1.4.3
+        specifier: ^1.4.4
+        version: 1.4.4
       '@wolffm/prefs-client':
         specifier: ^1.1.25
         version: 1.1.25(react@19.2.0)(zod@4.1.12)
@@ -1601,8 +1601,8 @@ packages:
     resolution: {integrity: sha512-Gn3opkqmke2K1i+MkErtqTtBDsOMFvcYIVOQwPnkA01hzdDhjC/ubqHyGhUgDVBNUmfHXotvPsuKryDZa65ESQ==, tarball: https://npm.pkg.github.com/download/@wolffm/catalogue/1.0.13/c4a5c017c5c27094bcffeba7a94af2a96f4ea354}
     engines: {node: '>=18'}
 
-  '@wolffm/logger@1.4.3':
-    resolution: {integrity: sha512-Slc+zFMo1PODZ0+YuhmbdISNl/UPnB7//M+VMTN8ZbR1YMMDKnkFMR2I8gvt7invaYMno5N0iOW3iJkeCC5lUw==, tarball: https://npm.pkg.github.com/download/@wolffm/logger/1.4.3/b567775fac1a91f83fe006c9be7fa778fe76e073}
+  '@wolffm/logger@1.4.4':
+    resolution: {integrity: sha512-mHtb1uTXY9U/xTvO3wh6ofy0MnZOxLVkWld0EP4hWZqxbl/crQQ/Bj5Z2PzI/Yjo9Dc+/u3x+J4YH6uJrQyrDQ==, tarball: https://npm.pkg.github.com/download/@wolffm/logger/1.4.4/6fe2bd34648eec3e0b9a817fc56cd907687363a8}
     engines: {node: '>=18'}
 
   '@wolffm/prefs-client@1.1.25':
@@ -4431,7 +4431,7 @@ snapshots:
 
   '@wolffm/catalogue@1.0.13': {}
 
-  '@wolffm/logger@1.4.3': {}
+  '@wolffm/logger@1.4.4': {}
 
   '@wolffm/prefs-client@1.1.25(react@19.2.0)(zod@4.1.12)':
     dependencies:
