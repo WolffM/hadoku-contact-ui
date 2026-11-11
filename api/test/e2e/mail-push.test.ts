@@ -22,6 +22,7 @@ import {
 } from '../../push/mail-push'
 import { postWebhook } from './webhook-helpers'
 import { addToBlocklist } from '../../storage'
+import { TIER_RANK } from '../../utils/auth'
 
 const EDGE = { 'X-Edge-Auth': 'test-edge-secret' }
 const ADMIN = { ...EDGE, 'X-Hadoku-Tier': 'admin' }
@@ -154,7 +155,11 @@ describe('mail push', () => {
       expect((await mintTicket({ ...ADMIN })).status).toBe(403)
     })
 
-    it.each(['friend', 'service', 'wife'])('is refused to the %s tier', async tier => {
+    // Every rung below admin, read from the ladder so a tier added later is
+    // tested here too. A hand list had left member out.
+    const BELOW_ADMIN = Object.keys(TIER_RANK).filter(t => TIER_RANK[t] < TIER_RANK.admin)
+
+    it.each(BELOW_ADMIN)('is refused to the %s tier', async tier => {
       const res = await mintTicket({ ...EDGE, 'X-Hadoku-Tier': tier, Origin: MAIL_PUSH_ORIGIN })
       expect(res.status).toBe(403)
     })
