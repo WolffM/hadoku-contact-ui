@@ -77,6 +77,8 @@ export function createBlocklistRoutes() {
       }
 
       const auth = c.get('authContext')
+      // identity-model-disable-next-line G8: TRACKED: WolffM/hadoku-contact-ui#24. Same defect as
+      // templates.ts: the raw credential written to email_blocklist.blocked_by. REMOVE with the fix.
       const blockedBy = auth?.credential ?? 'admin'
 
       await addToBlocklist(c.env.DB, {
@@ -169,6 +171,7 @@ export function createBlocklistRoutes() {
       }
 
       const auth = c.get('authContext')
+      // identity-model-disable-next-line G8: same reason as the waiver above
       const blockedBy = auth?.credential ?? 'admin'
 
       await addToBlocklist(c.env.DB, {

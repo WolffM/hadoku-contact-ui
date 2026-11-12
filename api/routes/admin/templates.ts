@@ -73,6 +73,10 @@ export function createTemplateRoutes() {
       }
 
       const auth = c.get('authContext')
+      // identity-model-disable-next-line G8: TRACKED: WolffM/hadoku-contact-ui#24. `auth?.credential`
+      // (the raw X-User-Key) lands in email_templates.created_by and template_versions.changed_by.
+      // Provenance only — no read uses it as an ownership predicate — so this is R7, not R3: nobody loses
+      // access on rotation, the audit trail simply stops identifying anyone. REMOVE with the fix.
       const changedBy = auth?.credential ?? 'admin'
 
       const name = body.name
@@ -122,6 +126,7 @@ export function createTemplateRoutes() {
       }
 
       const auth = c.get('authContext')
+      // identity-model-disable-next-line G8: same reason as the waiver above
       const changedBy = auth?.credential ?? 'admin'
 
       if (!body.name || typeof body.name !== 'string') {
