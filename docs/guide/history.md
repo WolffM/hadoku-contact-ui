@@ -12,9 +12,10 @@ behind a mock API switched on by an environment flag.
 
 Four months later, one commit replaced the simulation with a real one: a
 Cloudflare D1-backed API, exported as a second entry point of the same
-package (`api/index.ts`, alongside the UI's `src/entry.tsx`), with contact
-submissions and appointments as actual stored rows, a rate limiter, email
-confirmations, and meeting links on Jitsi and Discord (`f65ec64`). The mock
+package (`api/index.ts`, alongside the UI's `src/entry.tsx`). It stored
+contact submissions and appointments as actual rows, and added a rate
+limiter, email confirmations, and meeting links on Jitsi and Discord
+(`f65ec64`). The mock
 API stayed in the tree as the UI's offline/dev stand-in, mirroring the same
 defaults the real backend's own migration sets.
 
@@ -47,21 +48,20 @@ webhook delivered" into a mailbox that could be trusted:
   own record directly and ingests whatever the webhook missed, sharing the
   same ingest logic the webhook now only adapts into (`16c4209`).
 - **Blocklist and spam.** A sender or a whole domain can be blocked, filing
-  its mail to a 90-day Spam folder instead of the inbox — and a submission
-  from a blocked sender is never auto-whitelisted, so a block cannot be
-  silently undone by the sender simply using the form instead of email
-  (`a55de99`).
+  its mail to a 90-day Spam folder instead of the inbox. A submission from a
+  blocked sender is never auto-whitelisted, so a block cannot be silently
+  undone by the sender simply using the form instead of email (`a55de99`).
 - **A scoped read feed.** A third, narrower surface (`/mailfeed`) let one
   named caller read mail from one sender domain only, for a service that
-  needed independent proof a message had actually arrived — gated by tier
-  _and_ a per-caller grant, since the service tier alone is held by every
-  worker key on the platform (`b3aac46`).
+  needed independent proof a message had actually arrived. It is gated by
+  tier _and_ a per-caller grant, since the service tier alone is held by
+  every worker key on the platform (`b3aac46`).
 
 The booking window was also corrected in this window: it had rejected an
 entire day the moment its earliest slot fell inside the minimum-notice
-window, even when the rest of the day was clear, so asking for tomorrow in
-the afternoon could lose hours that were never actually blocked. The check
-now runs per slot (`9b75429`).
+window, even when the rest of the day was clear. Asking for tomorrow in the
+afternoon, for example, could lose hours that were never actually blocked.
+The check now runs per slot (`9b75429`).
 
 ## Meetings that actually end (September 2026)
 

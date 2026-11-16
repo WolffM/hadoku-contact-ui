@@ -61,7 +61,7 @@ check meant to admit it (`61ed96a`).
 
 The admin and service surfaces are separate URL prefixes rather than one
 prefix with exceptions, because the edge in front of this app matches a
-prefix exactly and cannot express a narrower rule inside it — see "Admin and
+prefix exactly and cannot express a narrower rule inside it. See "Admin and
 service surfaces" in `AGENTS.md` for the reasoning in full, including why
 `/mailfeed` needed a third prefix rather than living under `/service`.
 
@@ -94,7 +94,7 @@ request. `pnpm format:check` is the formatting gate.
 
 A push to `main` publishes `@wolffm/contact-ui` to GitHub Packages and
 notifies the parent site, which bumps its own lockfile and rebuilds the UI
-bundle it serves; a Worker that depends on this package always pulls the
+bundle it serves. A Worker that depends on this package always pulls the
 latest version at its own deploy, independent of that notification. The
 version itself is set by CI from the registry's current latest plus one
 patch — nobody edits it by hand, and no hook needs to bump it for a docs-only

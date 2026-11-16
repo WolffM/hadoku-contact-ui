@@ -2,9 +2,9 @@
 title: Contact & Booking
 summary: >-
   The contact form and appointment scheduler at
-  [hadoku.me/contact](https://hadoku.me/contact): send a message, or book a
-  slot with a meeting link on Discord, Jitsi or Google Meet. Anyone can use
-  it; a small set of admin screens manage what comes in.
+  [hadoku.me/contact](https://hadoku.me/contact), open to anyone for sending
+  a message or booking a meeting with a Discord, Jitsi or Google Meet link,
+  with admin screens that need an account to manage what comes in.
 features:
   - name: Contact form
     summary: 'Name, email and a message, with a hidden honeypot field and a same-site referrer check.'
@@ -43,6 +43,8 @@ trivia:
 Send a message, or book time, at [hadoku.me/contact](https://hadoku.me/contact).
 No sign-in is needed: the form is open to anyone, and a booking gets a
 confirmation email with a meeting link on whichever platform you picked.
+
+![The contact form beside the booking calendar: a date picked, a duration and a meeting platform chosen, and the day's open times listed](images/contact-form.webp)
 
 The same package also ships the admin side: an inbox for the messages and
 bookings that come in, a blocklist for mail nobody wants to see again, and a

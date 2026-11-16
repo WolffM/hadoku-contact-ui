@@ -6,7 +6,7 @@ Each fact names the commit it comes from.
 
 - **Four months of talking to nobody.** The appointment calendar shipped and
   was declared "full UI complete" in November 2025 (`5285adc`) with no real
-  backend behind it at all — every slot, conflict and rate limit was
+  backend behind it at all. Every slot, conflict and rate limit was
   simulated in the browser until the real API arrived the following March
   (`f65ec64`).
 - **A rank, not a name.** A gate written as `userType !== 'admin' && userType

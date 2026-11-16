@@ -22,9 +22,9 @@ history of your own past messages.
 
 **What it does.** The same form can also book a slot: pick a duration (15,
 30 or 60 minutes), then a date and a time. The calendar only ever shows a
-date if at least one slot on it is still free — a day inside the minimum
+date if at least one slot on it is still free. A day inside the minimum
 notice window, past the far booking horizon, outside the operator's working
-days, or booked solid does not appear as an option at all, rather than being
+days, or booked solid does not appear as an option at all — it is never
 clickable and then refused.
 
 **How to use it.** Open the date picker in the form, choose a duration, a
@@ -61,11 +61,11 @@ confirmation still sends, just without a link.
 **What it does.** Every message and every booking lands in one admin inbox,
 with a booking's time and platform shown alongside its message rather than
 as a separate record. Messages can be marked read, trashed and restored.
-Trashing a message that booked a meeting cancels the meeting too — freeing
-the slot, revoking the Discord invite and dropping the task-calendar entry —
+Trashing a message that booked a meeting cancels the meeting too: it frees
+the slot, revokes the Discord invite and drops the task-calendar entry,
 because that is what clearing a message off the inbox means to the person
-doing it; restoring the message afterward brings the mail back but leaves the
-meeting cancelled, since an expired invite and a torn-down Discord space
+doing it. Restoring the message afterward brings the mail back, but leaves
+the meeting cancelled — an expired invite and a torn-down Discord space
 cannot be un-revoked.
 
 **How to use it.** The operator's admin screen elsewhere on the platform
@@ -76,9 +76,10 @@ calls this app's admin API; there is no separate login here.
 ## Blocklist and spam
 
 **What it does.** An address or a whole domain can be blocked, either from
-the list editor or with one click on a message already in the inbox (which
-derives the right pattern from that message rather than asking anyone to
-type an email pattern by hand). Blocked mail is filed to a Spam folder and
+the list editor or with one click on a message already in the inbox.
+Clicking from a message derives the right pattern automatically, rather
+than asking anyone to type an email pattern by hand. Blocked mail is filed
+to a Spam folder and
 purged automatically after 90 days; unblocking a sender does not restore
 mail that was already filed there.
 
@@ -106,10 +107,11 @@ came in.
 
 ## Scoped mail feed
 
-**What it does.** A read-only feed another part of the platform can poll to
-confirm mail from one sender domain really arrived — built for a service that
-needs independent proof a message from a specific kind of sender reached
-this mailbox, without being able to read anyone else's mail. Each caller is
+**What it does.** A read-only feed another part of the platform can poll, to
+confirm mail from one sender domain really arrived. It is built for a
+service that needs independent proof a message from a specific kind of
+sender reached this mailbox, without being able to read anyone else's mail.
+Each caller is
 individually named and limited to a list of sender domains chosen by the
 operator; a caller with no grant gets the same refusal as someone with no
 access at all.
