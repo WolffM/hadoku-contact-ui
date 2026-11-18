@@ -455,7 +455,7 @@ describe('Appointment Slots Integration', () => {
 
     it('should reject dates too far in the future', async () => {
       const farFuture = new Date()
-      farFuture.setDate(farFuture.getDate() + 60)
+      farFuture.setUTCDate(farFuture.getUTCDate() + 60)
       const date = farFuture.toISOString().split('T')[0]
 
       const response = await fetchSlots(date, 30)

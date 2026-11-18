@@ -11,10 +11,10 @@
 import { env, SELF, fetchMock } from 'cloudflare:test'
 import { describe, it, expect, beforeEach } from 'vitest'
 
-/** Get a date N days from now, formatted as YYYY-MM-DD */
+/** Get a date N days from now, formatted as YYYY-MM-DD (UTC, like the format) */
 function futureDate(days: number): string {
   const d = new Date()
-  d.setDate(d.getDate() + days)
+  d.setUTCDate(d.getUTCDate() + days)
   return d.toISOString().split('T')[0]
 }
 

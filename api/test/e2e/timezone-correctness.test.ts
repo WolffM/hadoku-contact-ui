@@ -25,11 +25,17 @@ interface SlotsResponse {
   slots: Slot[]
 }
 
+/**
+ * A weekday N days out, in UTC throughout. The weekday test and the formatting
+ * must use the same calendar: checking `getDay()` (host-local) but printing
+ * `toISOString()` (UTC) returned a Saturday whenever the host's local date
+ * still lagged UTC's — every Wednesday night on a Pacific-time runner (#26).
+ */
 function nextWeekday(daysFromNow: number): string {
   const d = new Date()
-  d.setDate(d.getDate() + daysFromNow)
-  if (d.getDay() === 0) d.setDate(d.getDate() + 1)
-  if (d.getDay() === 6) d.setDate(d.getDate() + 2)
+  d.setUTCDate(d.getUTCDate() + daysFromNow)
+  if (d.getUTCDay() === 0) d.setUTCDate(d.getUTCDate() + 1)
+  else if (d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() + 2)
   return d.toISOString().split('T')[0]
 }
 
@@ -146,7 +152,7 @@ describe('Timezone Correctness', () => {
           timeZone: 'Australia/Sydney'
         }).format(d)
         if (sydWeekday === 'Sat') break
-        d.setDate(d.getDate() + 1)
+        d.setUTCDate(d.getUTCDate() + 1)
         date = d.toISOString().split('T')[0]
       }
 
