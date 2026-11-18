@@ -33,16 +33,19 @@ import type { HadokuAuthContext } from '../types'
  * anonymous view with no 401, no 403 and no log line. `member` (added
  * 2026-11-06) was the same gap: every route here floors at `service` or
  * `admin`, so a member was refused either way, but it was refused as a
- * mislabeled `public` caller rather than as the member it actually is. Keep it
- * complete.
+ * mislabeled `public` caller rather than as the member it actually is.
+ * `guest` (added 2026-11-18, an account a visitor made themselves that the
+ * operator has not verified) sits between public and member for the same
+ * reason. Keep it complete.
  */
 export const TIER_RANK: Record<string, number> = {
   public: 0,
-  member: 1,
-  friend: 2,
-  service: 3,
-  wife: 4,
-  admin: 5
+  guest: 1,
+  member: 2,
+  friend: 3,
+  service: 4,
+  wife: 5,
+  admin: 6
 }
 
 const TIERS = new Set(Object.keys(TIER_RANK))

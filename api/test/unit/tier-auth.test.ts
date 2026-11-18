@@ -34,14 +34,15 @@ async function whoami(tier: string | undefined, { trusted = true } = {}) {
 }
 
 describe('the ladder', () => {
-  it('is the platform ladder, member between public and friend', () => {
+  it('is the platform ladder, guest then member between public and friend', () => {
     expect(TIER_RANK).toEqual({
       public: 0,
-      member: 1,
-      friend: 2,
-      service: 3,
-      wife: 4,
-      admin: 5
+      guest: 1,
+      member: 2,
+      friend: 3,
+      service: 4,
+      wife: 5,
+      admin: 6
     })
   })
 })
@@ -52,12 +53,18 @@ describe('createEdgeAuth', () => {
     expect(auth.userType).toBe('member')
   })
 
+  it('passes a provenance-trusted guest through as guest, not public', async () => {
+    expect((await whoami('guest')).userType).toBe('guest')
+  })
+
   it('still passes every other known tier through unchanged', async () => {
     // Derived from the ladder rather than hand-typed, so a tier added to it
-    // is covered here with no edit to this test. public and member are
+    // is covered here with no edit to this test. public, member and guest are
     // asserted on their own above, since public isn't passed-through-as-is
-    // (there's nothing to compare it to) and member is the new case.
-    for (const tier of Object.keys(TIER_RANK).filter(t => t !== 'public' && t !== 'member')) {
+    // (there's nothing to compare it to) and member and guest are the new cases.
+    for (const tier of Object.keys(TIER_RANK).filter(
+      t => !['public', 'member', 'guest'].includes(t)
+    )) {
       expect((await whoami(tier)).userType).toBe(tier)
     }
   })
@@ -69,6 +76,7 @@ describe('createEdgeAuth', () => {
   it('still rewrites ANY tier to public without edge provenance', async () => {
     expect((await whoami('admin', { trusted: false })).userType).toBe('public')
     expect((await whoami('member', { trusted: false })).userType).toBe('public')
+    expect((await whoami('guest', { trusted: false })).userType).toBe('public')
   })
 
   it('defaults to public with no X-Hadoku-Tier header at all', async () => {
@@ -90,6 +98,18 @@ describe('tierAtLeast', () => {
   it('a member is refused at the service and admin floors, exactly like before', () => {
     expect(tierAtLeast({ userType: 'member' }, 'service')).toBe(false)
     expect(tierAtLeast({ userType: 'member' }, 'admin')).toBe(false)
+  })
+
+  it('a guest is refused at the service and admin floors, exactly like a member', () => {
+    expect(tierAtLeast({ userType: 'guest' }, 'service')).toBe(false)
+    expect(tierAtLeast({ userType: 'guest' }, 'admin')).toBe(false)
+  })
+
+  it('guest outranks public and is outranked by member', () => {
+    expect(tierAtLeast({ userType: 'guest' }, 'public')).toBe(true)
+    expect(tierAtLeast({ userType: 'guest' }, 'guest')).toBe(true)
+    expect(tierAtLeast({ userType: 'guest' }, 'member')).toBe(false)
+    expect(tierAtLeast({ userType: 'member' }, 'guest')).toBe(true)
   })
 
   it('member outranks public and is outranked by friend', () => {
