@@ -94,12 +94,13 @@ point here; they must not restate it.** Two files enforce it and they live in
 different repos, so a rule written down twice is a rule that will disagree with
 itself.
 
-| Prefix                  | Tier                        | Holds                                                      |
-| ----------------------- | --------------------------- | ---------------------------------------------------------- |
-| `/contact/api/...`      | public                      | submit, appointments, slots, availability, inbound, health |
-| `/contact/api/admin`    | **admin**                   | submissions, email, blocklist, templates, appointment CRUD |
-| `/contact/api/service`  | service                     | `PATCH /appointments/:id/status` — and nothing else, yet   |
-| `/contact/api/mailfeed` | service **+ a named scope** | the scoped mail feed — see below                           |
+| Prefix                  | Tier                                             | Holds                                                      |
+| ----------------------- | ------------------------------------------------ | ---------------------------------------------------------- |
+| `/contact/api/...`      | public                                           | submit, appointments, slots, availability, inbound, health |
+| `/contact/api/admin`    | **admin**                                        | submissions, email, blocklist, templates, appointment CRUD |
+| `/contact/api/service`  | service                                          | `PATCH /appointments/:id/status` — and nothing else, yet   |
+| `/contact/api/mailfeed` | service **+ a named scope**                      | the scoped mail feed — see below                           |
+| `/contact/api/internal` | service **+ the edge's `contact-internal` list** | `run-daily`, `sync-inbound`, and `GET /export` — see below |
 
 **The admission rule for `/service`: a route there may ACT, it may not DISCLOSE.**
 `PATCH /appointments/:id/status` qualifies because it takes an id and a status
@@ -124,6 +125,20 @@ The worker is the BACKSTOP, not the gate. A 403 shaped
 reached this code; the worker's own denial is
 `{"success":false,"error":"Forbidden","message":"... access required"}`. Telling
 them apart is how you know which repo to fix.
+
+### `/internal` — mgmt-api's cron surface, and it discloses
+
+`/internal/run-daily` and `/internal/sync-inbound` act. `/internal/export` is
+the whole mailbox, every state, both tables (see "The mailbox export"). It sits
+here because its one caller, hadoku_site's `contact-api:mail-mirror` job, runs
+as mgmt-api's cron key, and that key is service tier.
+
+What pays for a disclosing route at service tier is the edge: the
+`/contact/api/internal` rule names the access list `contact-internal`, whose
+only member is that cron key. The worker's own check is the tier alone, so
+**that list is the grant for the entire mailbox. Adding a member to
+`contact-internal` hands them every message.** A second consumer that needs
+some of the mail gets a `/mailfeed` scope, never a seat on this list.
 
 ### `/mailfeed` — the one disclosing read, and what pays for it
 
@@ -395,8 +410,9 @@ capped at D1's 100 bound parameters. Pinned by
 ## The mailbox export
 
 `GET /admin/export` pages the WHOLE mailbox oldest-first, for a consumer that
-keeps a second copy (hadoku_site's `contact-api:mail-mirror` job copies it into
-the fleet data store). It reads `contact_submissions` and
+keeps a second copy. hadoku_site's `contact-api:mail-mirror` job copies it into
+the fleet data store through the same handler at `/internal/export`, the mount
+its service-tier cron key can reach. It reads `contact_submissions` and
 `contact_submissions_archive` together and filters nothing: trashed,
 quarantined, spam and outbound rows are all in the answer, each with `source`
 (`live` or `archive`) and, on an archive row, `archived_at` and NULL for the

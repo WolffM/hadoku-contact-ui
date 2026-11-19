@@ -157,7 +157,22 @@ describe('GET /admin/export', () => {
     expect((await exportPage('?limit=201')).status).toBe(400)
   })
 
-  it('is admin only', async () => {
+  it('answers the cron key at /internal/export, and nobody below service tier', async () => {
+    const at = (tier: string) =>
+      SELF.fetch('https://test.com/contact/api/internal/export?limit=2', {
+        headers: { 'X-Edge-Auth': 'test-edge-secret', 'X-Hadoku-Tier': tier }
+      })
+
+    const cron = await at('service')
+    expect(cron.status).toBe(200)
+    const body = (await cron.json()) as ExportBody
+    expect(body.data.rows.map(r => r.id)).toEqual(['old-archived', 'inbox'])
+    expect(body.data.nextCursor).not.toBeNull()
+
+    expect((await at('friend')).status).toBe(403)
+  })
+
+  it('the admin mount is admin only', async () => {
     const { status } = await exportPage('', {
       'X-Edge-Auth': 'test-edge-secret',
       'X-Hadoku-Tier': 'service'

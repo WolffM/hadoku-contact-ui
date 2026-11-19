@@ -14,6 +14,7 @@ import { createSubmitRoutes } from './routes/submit'
 import { createAdminRoutes, createServiceRoutes } from './routes/admin'
 import { createInboundRoutes } from './routes/inbound'
 import { createMailfeedRoutes } from './routes/mailfeed'
+import { createExportRoutes } from './routes/admin/export'
 import { createAppointmentsRoutes } from './routes/appointments'
 import {
   archiveOldSubmissions,
@@ -229,6 +230,21 @@ export function createContactHandler(basePath = '/contact/api', options?: Contac
       return c.json({ success: false, error: msg, duration_ms: Date.now() - startTime }, 500)
     }
   })
+
+  // Internal endpoint: the mailbox export, for mgmt-api's mail mirror.
+  //
+  // The same handler as /admin/export. It is here as well because the mirror
+  // runs as mgmt-api's cron key, which is service tier and cannot reach /admin.
+  // This route DISCLOSES, so its grant is the edge's `contact-internal` list
+  // (that one key), not the tier check below: see "Admin and service surfaces"
+  // in AGENTS.md before adding a member to that list.
+  app.use('/internal/export', async (c, next) => {
+    if (!tierAtLeast(c.get('authContext'), 'service')) {
+      return c.json({ error: 'Unauthorized' }, 403)
+    }
+    await next()
+  })
+  app.route('/internal', createExportRoutes())
 
   const { notFoundHandler, errorHandler } = createErrorHandlers()
   app.notFound(notFoundHandler)

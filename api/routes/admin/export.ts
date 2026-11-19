@@ -1,8 +1,10 @@
 /**
- * `GET /admin/export` — the whole mailbox, oldest first, a page at a time.
+ * `GET /export` — the whole mailbox, oldest first, a page at a time.
  *
  * For a consumer that keeps a second copy of the mail. What it returns and why
- * nothing is filtered out is in storage/export.ts.
+ * nothing is filtered out is in storage/export.ts. Mounted twice, each mount
+ * with its own gate: /admin/export, and /internal/export for mgmt-api's cron
+ * key (handler.ts).
  */
 
 import { Hono } from 'hono'
