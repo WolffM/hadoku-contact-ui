@@ -27,6 +27,14 @@ export {
 } from './submissions'
 
 export {
+  type ExportedSubmission,
+  type ExportPage,
+  type ExportQuery,
+  BadExportCursor,
+  exportSubmissions
+} from './export'
+
+export {
   type BlockKind,
   type BlocklistEntry,
   domainOf,

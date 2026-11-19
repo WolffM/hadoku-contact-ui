@@ -30,6 +30,10 @@ features:
     summary: 'Another hadoku service can read the mail from one sender domain it is explicitly granted, and nothing else.'
     anchor: scoped-mail-feed
     tier: service
+  - name: Mailbox export
+    summary: 'Every stored message, oldest first, so a second copy of the mail can be kept outside this database.'
+    anchor: mailbox-export
+    tier: admin
 trivia:
   - 'The calendar faked its backend for four months: a slot booked at launch in November 2025 saved nowhere until the real API arrived the following March (`5285adc`, `f65ec64`).'
   - "A tier added above this app's own service tier, between it and admin, would have been silently refused by a gate written as an exact-match list rather than a rank check (`61ed96a`)."

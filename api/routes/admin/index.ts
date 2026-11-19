@@ -11,6 +11,7 @@ import { Hono, type Context, type Next } from 'hono'
 // this tree.
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { createSubmissionRoutes } from './submissions'
+import { createExportRoutes } from './export'
 import { createEmailRoutes } from './email'
 import { createBlocklistRoutes } from './blocklist'
 import { createAppointmentAdminRoutes, createAppointmentStatusRoutes } from './appointments'
@@ -64,6 +65,7 @@ export function createAdminRoutes() {
   const adminApp = new Hono<AppContext>()
   adminApp.use('*', requireTier('admin', 'Admin'))
   adminApp.route('/', createSubmissionRoutes())
+  adminApp.route('/', createExportRoutes())
   adminApp.route('/', createEmailRoutes())
   adminApp.route('/', createBlocklistRoutes())
   adminApp.route('/', createAppointmentAdminRoutes())

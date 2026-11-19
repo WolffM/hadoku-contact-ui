@@ -392,6 +392,29 @@ The appointment lookup behind the list is chunked, so `limit` is no longer
 capped at D1's 100 bound parameters. Pinned by
 `api/test/e2e/submission-filters.test.ts`.
 
+## The mailbox export
+
+`GET /admin/export` pages the WHOLE mailbox oldest-first, for a consumer that
+keeps a second copy (hadoku_site's `contact-api:mail-mirror` job copies it into
+the fleet data store). It reads `contact_submissions` and
+`contact_submissions_archive` together and filters nothing: trashed,
+quarantined, spam and outbound rows are all in the answer, each with `source`
+(`live` or `archive`) and, on an archive row, `archived_at` and NULL for the
+four columns the archive does not have.
+
+| Param    | Meaning                                                    |
+| -------- | ---------------------------------------------------------- |
+| `since`  | epoch millis, inclusive floor on `created_at`              |
+| `cursor` | the `nextCursor` of the previous page                      |
+| `limit`  | 1 to 200, default 100; anything else is a 400, not a clamp |
+
+It exists because the retention sweeps destroy or thin rows (trash after 7 days,
+spam after 90, the archive's dropped columns after 30) and this database had no
+copy of its own. `created_at` is this database's clock at insert, so the
+`(created_at, id)` order is insertion order and a consumer that re-reads a short
+overlap behind its last cursor misses nothing. Pinned by
+`api/test/e2e/export.test.ts`.
+
 ## External dependencies
 
 - **Parent repo:** `../hadoku_site/` — mounts both UI and API exports, owns the Cloudflare Worker deployment

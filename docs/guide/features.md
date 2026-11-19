@@ -127,6 +127,19 @@ the operator and polls the feed with its own credential.
 wrote), blocked mail, or deleted mail — only inbound messages from a granted
 sender that are still live in the inbox.
 
+## Mailbox export
+
+**What it does.** An admin-only read of every stored message, oldest first, a
+page at a time: inbox, sent, trash, spam, quarantined and archived alike. It is
+there so a second copy of the mail can be kept outside this database, where the
+retention sweeps cannot reach it.
+
+**How to use it.** Not user-facing: the platform's mail mirror job walks it
+every few minutes and stores each message it has not seen.
+
+**What it does not do.** It does not restore anything, and it cannot return a
+message the sweeps had already destroyed before the first copy was taken.
+
 ## Trivia
 
 The scoped mail feed admits no wildcard sender: every grant names real
