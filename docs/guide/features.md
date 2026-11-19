@@ -68,6 +68,10 @@ doing it. Restoring the message afterward brings the mail back, but leaves
 the meeting cancelled — an expired invite and a torn-down Discord space
 cannot be un-revoked.
 
+The list can be read one mailbox at a time, or with chosen mailboxes left
+out, so an address that collects automated notifications does not push
+everything else off the first page.
+
 **How to use it.** The operator's admin screen elsewhere on the platform
 calls this app's admin API; there is no separate login here.
 

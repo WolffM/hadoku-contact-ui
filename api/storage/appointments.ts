@@ -324,6 +324,9 @@ export function overlapsBooked(startMs: number, endMs: number, booked: BookedInt
   return booked.some(iv => startMs < iv.endMs && endMs > iv.startMs)
 }
 
+/** Ids per `IN (...)`: under D1's 100-parameter ceiling. */
+const SUBMISSION_ID_CHUNK = 90
+
 export async function getAppointmentsBySubmissionIds(
   db: D1Database,
   submissionIds: string[]
@@ -331,21 +334,28 @@ export async function getAppointmentsBySubmissionIds(
   const bySubmission = new Map<string, StoredAppointment>()
   if (submissionIds.length === 0) return bySubmission
 
-  const placeholders = submissionIds.map(() => '?').join(', ')
-  const result = await db
-    .prepare(
-      `SELECT * FROM appointments
-			 WHERE submission_id IN (${placeholders})
-			 ORDER BY created_at ASC`
-    )
-    .bind(...submissionIds)
-    .all<StoredAppointment>()
+  // Chunked: one bound parameter per id, and D1 binds at most 100 per
+  // statement. Unchunked, the 101st submission turned the whole mail list into
+  // an HTTP 400 (code 7500, "too many SQL variables" — measured on the live
+  // database 2026-11-16), which is what capped every list read at 100 rows.
+  for (let start = 0; start < submissionIds.length; start += SUBMISSION_ID_CHUNK) {
+    const chunk = submissionIds.slice(start, start + SUBMISSION_ID_CHUNK)
+    const placeholders = chunk.map(() => '?').join(', ')
+    const result = await db
+      .prepare(
+        `SELECT * FROM appointments
+				 WHERE submission_id IN (${placeholders})
+				 ORDER BY created_at ASC`
+      )
+      .bind(...chunk)
+      .all<StoredAppointment>()
 
-  for (const appointment of result.results ?? []) {
-    // A submission books at most one meeting, but the column carries no UNIQUE
-    // constraint — keep the first so repeated calls agree with each other.
-    if (appointment.submission_id && !bySubmission.has(appointment.submission_id)) {
-      bySubmission.set(appointment.submission_id, appointment)
+    for (const appointment of result.results ?? []) {
+      // A submission books at most one meeting, but the column carries no UNIQUE
+      // constraint — keep the first so repeated calls agree with each other.
+      if (appointment.submission_id && !bySubmission.has(appointment.submission_id)) {
+        bySubmission.set(appointment.submission_id, appointment)
+      }
     }
   }
 

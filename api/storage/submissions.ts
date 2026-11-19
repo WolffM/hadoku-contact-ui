@@ -214,22 +214,118 @@ export async function adoptSubmissionForResendId(
   return (updated.meta?.changes ?? 0) > 0 ? candidate.id : null
 }
 
+/**
+ * Which slice of the mailbox a list read wants.
+ *
+ * The filters exist so a folder can be paged ON ITS OWN. The list used to be
+ * one newest-first walk over every live row, with the caller sorting rows into
+ * folders afterwards — which works until one mailbox outnumbers the rest. On
+ * 2026-11-19 the live table held 1,044 rows and 927 of them were npm publish
+ * notifications to a single alias, arriving at ~200 a day: a page of 100 was
+ * under half a day of that one mailbox, and the mail a person actually wanted
+ * was ten pages down.
+ */
+export interface SubmissionFilter {
+  /** Only rows addressed to one of these. Empty or absent: no restriction. */
+  mailboxes?: readonly string[]
+  /**
+   * Rows addressed to none of these. A row with NO recipient is kept: it is
+   * not addressed to an excluded mailbox, and SQL's `NOT IN` would otherwise
+   * drop it (NULL NOT IN (...) is unknown, not true).
+   */
+  excludeMailboxes?: readonly string[]
+  /**
+   * `live` (the default) is everything not in the trash, `only` is the trash
+   * and nothing else, `include` is both.
+   */
+  deleted?: 'live' | 'only' | 'include'
+}
+
+/**
+ * How many mailbox addresses one filter may name. Each is a bound parameter
+ * and D1 binds at most 100 per statement; this leaves room for both lists plus
+ * LIMIT and OFFSET with a wide margin, and is far past any real folder rail.
+ */
+export const MAX_FILTER_MAILBOXES = 40
+
+function submissionWhere(filter: SubmissionFilter): { sql: string; binds: string[] } {
+  const clauses: string[] = []
+  const binds: string[] = []
+
+  const deleted = filter.deleted ?? 'live'
+  if (deleted === 'live') clauses.push(`status != 'deleted'`)
+  if (deleted === 'only') clauses.push(`status = 'deleted'`)
+
+  const mailboxes = filter.mailboxes ?? []
+  if (mailboxes.length > 0) {
+    clauses.push(`recipient IN (${mailboxes.map(() => '?').join(', ')})`)
+    binds.push(...mailboxes)
+  }
+
+  const excluded = filter.excludeMailboxes ?? []
+  if (excluded.length > 0) {
+    clauses.push(`(recipient IS NULL OR recipient NOT IN (${excluded.map(() => '?').join(', ')}))`)
+    binds.push(...excluded)
+  }
+
+  return { sql: clauses.length > 0 ? `WHERE ${clauses.join(' AND ')}` : '', binds }
+}
+
+/** One page of the mailbox, newest first, narrowed by `filter`. */
+export async function listSubmissions(
+  db: D1Database,
+  limit: number = PAGINATION_DEFAULTS.LIMIT,
+  offset: number = PAGINATION_DEFAULTS.OFFSET,
+  filter: SubmissionFilter = {}
+): Promise<StoredSubmission[]> {
+  const where = submissionWhere(filter)
+  const result = await db
+    .prepare(
+      `SELECT * FROM contact_submissions
+			${where.sql}
+			ORDER BY created_at DESC
+			LIMIT ? OFFSET ?`
+    )
+    .bind(...where.binds, limit, offset)
+    .all<StoredSubmission>()
+
+  return result.results ?? []
+}
+
 export async function getAllSubmissions(
   db: D1Database,
   limit: number = PAGINATION_DEFAULTS.LIMIT,
   offset: number = PAGINATION_DEFAULTS.OFFSET,
   includeDeleted = false
 ): Promise<StoredSubmission[]> {
-  const whereClause = includeDeleted ? '' : `WHERE status != 'deleted'`
+  return listSubmissions(db, limit, offset, { deleted: includeDeleted ? 'include' : 'live' })
+}
+
+/** One mailbox and how much mail is in its folder. */
+export interface MailboxCount {
+  recipient: string
+  total: number
+}
+
+/**
+ * Every mailbox that holds mail, with its folder's size.
+ *
+ * Counts what a per-mailbox folder SHOWS: received, live, not quarantined. It
+ * is what lets a client draw the folder rail without having every row in hand
+ * — a mailbox it has deliberately not downloaded still gets its folder.
+ */
+export async function getMailboxCounts(db: D1Database): Promise<MailboxCount[]> {
   const result = await db
     .prepare(
-      `SELECT * FROM contact_submissions
-			${whereClause}
-			ORDER BY created_at DESC
-			LIMIT ? OFFSET ?`
+      `SELECT recipient, COUNT(*) AS total FROM contact_submissions
+			WHERE recipient IS NOT NULL
+				AND status != 'deleted'
+				AND direction != 'outbound'
+				AND filtered_reason IS NULL
+			GROUP BY recipient
+			ORDER BY total DESC`
     )
-    .bind(limit, offset)
-    .all<StoredSubmission>()
+    .all<MailboxCount>()
 
   return result.results ?? []
 }

@@ -7,7 +7,9 @@
 import { Hono } from 'hono'
 import { badRequest, notFound, serverError } from '../../utils/responses'
 import {
-  getAllSubmissions,
+  listSubmissions,
+  getMailboxCounts,
+  MAX_FILTER_MAILBOXES,
   getSubmissionById,
   updateSubmissionStatus,
   deleteSubmission,
@@ -18,6 +20,7 @@ import {
   archiveOldSubmissions,
   getAppointmentsBySubmissionIds,
   type StoredAppointment,
+  type SubmissionFilter,
   type StoredSubmission
 } from '../../storage'
 import { cancelAppointmentForSubmission } from '../../services/appointment-cleanup'
@@ -55,23 +58,60 @@ async function withAppointments(
   }))
 }
 
+/** `a@x, b@x` → the addresses, lower-cased as ingest stores them, without blanks or repeats. */
+function parseMailboxList(raw: string | undefined): string[] {
+  if (!raw) return []
+  return [...new Set(raw.split(',').map(part => part.trim().toLowerCase()))].filter(Boolean)
+}
+
 export function createSubmissionRoutes() {
   const app = new Hono<AppContext>()
 
+  /**
+   * The mail list, newest first.
+   *
+   *   limit, offset      the page
+   *   mailbox            comma-separated addresses: only mail addressed to them
+   *   exclude_mailbox    comma-separated addresses: mail addressed to none of them
+   *   deleted=only       the trash instead of the live mailbox
+   *
+   * With no filter this is the whole live mailbox, as it always was. `mailboxes`
+   * in the answer lists every mailbox holding mail, whatever the filter, so a
+   * caller that left one out still knows it is there.
+   */
   app.get('/submissions', async c => {
     try {
       const limit = Number(c.req.query('limit')) || 100
       const offset = Number(c.req.query('offset')) || 0
 
+      const mailboxes = parseMailboxList(c.req.query('mailbox'))
+      const excludeMailboxes = parseMailboxList(c.req.query('exclude_mailbox'))
+      if (mailboxes.length + excludeMailboxes.length > MAX_FILTER_MAILBOXES) {
+        return badRequest(c, `At most ${MAX_FILTER_MAILBOXES} mailboxes may be named in a filter`)
+      }
+
+      const deleted = c.req.query('deleted')
+      if (deleted !== undefined && deleted !== 'only') {
+        return badRequest(c, 'deleted must be: only')
+      }
+
+      const filter: SubmissionFilter = {
+        mailboxes,
+        excludeMailboxes,
+        deleted: deleted === 'only' ? 'only' : 'live'
+      }
+
       const submissions = await withAppointments(
         c.env.DB,
-        await getAllSubmissions(c.env.DB, limit, offset)
+        await listSubmissions(c.env.DB, limit, offset, filter)
       )
       const stats = await getSubmissionStats(c.env.DB)
+      const mailboxCounts = await getMailboxCounts(c.env.DB)
 
       return adminOk(c, {
         submissions,
         stats,
+        mailboxes: mailboxCounts,
         pagination: {
           limit,
           offset,

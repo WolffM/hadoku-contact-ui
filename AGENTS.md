@@ -368,6 +368,30 @@ The join is done in JS, not SQL: the two tables share `id`, `name`, `email`,
 `message`, `status` and `created_at`, so a `SELECT *` join silently overwrites
 the submission's columns with the appointment's.
 
+## The mail list is filtered on the server
+
+`GET /admin/submissions` pages newest-first over a slice the caller names:
+
+| Param             | Slice                                                      |
+| ----------------- | ---------------------------------------------------------- |
+| `mailbox`         | comma-separated addresses — only mail addressed to them    |
+| `exclude_mailbox` | comma-separated addresses — mail addressed to none of them |
+| `deleted=only`    | the trash; without it the trash is never in the answer     |
+
+No filter is the whole live mailbox. The filters exist because sorting rows
+into folders AFTER downloading them stops working when one mailbox outnumbers
+the rest: on 2026-11-19 npm's publish notifications were 927 of 1,044 live rows
+and arrived at ~200 a day, so a page of 100 was half a day of one alias.
+
+`exclude_mailbox` keeps mail with no recipient (web-form rows); a bare SQL
+`NOT IN` would drop it. Every answer carries `mailboxes` — each mailbox holding
+mail and its folder's size, whatever the filter — so a client that left a
+mailbox out of its read can still draw its folder.
+
+The appointment lookup behind the list is chunked, so `limit` is no longer
+capped at D1's 100 bound parameters. Pinned by
+`api/test/e2e/submission-filters.test.ts`.
+
 ## External dependencies
 
 - **Parent repo:** `../hadoku_site/` — mounts both UI and API exports, owns the Cloudflare Worker deployment
