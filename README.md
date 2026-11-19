@@ -1,5 +1,7 @@
 # @wolffm/contact-ui
 
+**Guide:** [overview](docs/guide/index.md) · [features](docs/guide/features.md) · [contributing](docs/guide/contributing.md) · [history](docs/guide/history.md) · [trivia](docs/guide/trivia.md)
+
 Contact form micro-frontend for hadoku.me
 
 ## Overview
