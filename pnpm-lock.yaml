@@ -52,8 +52,8 @@ importers:
         specifier: ^5.1.1
         version: 5.1.1(vite@7.2.4)
       '@wolffm/catalogue':
-        specifier: ^1.0.17
-        version: 1.0.17
+        specifier: ^1.0.18
+        version: 1.0.18
       '@wolffm/task-ui-components':
         specifier: 4.23.42
         version: 4.23.42(@wolffm/themes@5.14.11(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -1597,8 +1597,8 @@ packages:
   '@wojtekmaj/date-utils@2.0.2':
     resolution: {integrity: sha512-Do66mSlSNifFFuo3l9gNKfRMSFi26CRuQMsDJuuKO/ekrDWuTTtE4ZQxoFCUOG+NgxnpSeBq/k5TY8ZseEzLpA==}
 
-  '@wolffm/catalogue@1.0.17':
-    resolution: {integrity: sha512-9yxMMjOtmyudc2PfVGk2hCgmquouvurdVt5z7RH/bIbFJjYswYBPL/qsMbPI+pQIdCNLsRqTCPfD9/dINfPfXg==, tarball: https://npm.pkg.github.com/download/@wolffm/catalogue/1.0.17/2ba53f9e3f91b87393b7f4d68f99bf619a33f828}
+  '@wolffm/catalogue@1.0.18':
+    resolution: {integrity: sha512-ZnW1nQ9AkF7SiFWXM0Up+BnR7IuYnMZiTvJmiw8eZZ67h3UcUx2Ks4Zf8QxRpiAp6IMP85wTTLLK0HnGK0cMwQ==, tarball: https://npm.pkg.github.com/download/@wolffm/catalogue/1.0.18/a5d75f88b8a3a2e01c2be28c4788fe17d738113d}
     engines: {node: '>=18'}
 
   '@wolffm/logger@1.4.4':
@@ -4429,7 +4429,7 @@ snapshots:
 
   '@wojtekmaj/date-utils@2.0.2': {}
 
-  '@wolffm/catalogue@1.0.17': {}
+  '@wolffm/catalogue@1.0.18': {}
 
   '@wolffm/logger@1.4.4': {}
 
