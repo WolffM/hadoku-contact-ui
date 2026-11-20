@@ -18,7 +18,6 @@ describe('Smoke test - real D1 + KV', () => {
     const config = await env.DB.prepare('SELECT * FROM appointment_config WHERE id = 1').first()
     expect(config).not.toBeNull()
     expect(config!.timezone).toBe('America/Los_Angeles')
-    expect(config!.business_hours_start).toBe('09:00')
   })
 
   // Migration 0010 fills the grid from the range it replaces, so the slots
