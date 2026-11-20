@@ -6,13 +6,13 @@ import { Hono } from 'hono'
 import { validateSlotFetchRequest } from '../validation'
 import {
   getAppointmentConfig,
-  getAppointmentsByDate,
   getBookedIntervalsInRange,
   overlapsBooked,
   parseIntList,
   toBookingWindow
 } from '../storage'
 import {
+  addDays,
   advanceBounds,
   datesBetween,
   rejectDate,
@@ -20,10 +20,21 @@ import {
   slotStarts,
   type BookingWindow
 } from '../utils/booking-window'
+import { isTimeZone, localDateOf } from '../utils/timezone'
 
 /** Guards the range so one request cannot ask the calendar to scan a decade. */
 const MAX_AVAILABILITY_DAYS = 62
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * The zone the caller's dates are calendar days in: `?tz=`, the visitor's own
+ * IANA zone, so the day they click is their day. Absent means the operator's
+ * zone. Undefined when `tz` is present but not a zone.
+ */
+function zoneOf(tz: string | undefined, operatorZone: string): string | undefined {
+  if (tz === undefined) return operatorZone
+  return isTimeZone(tz) ? tz : undefined
+}
 
 interface Env {
   DB: D1Database
@@ -88,10 +99,13 @@ export function createAppointmentsRoutes() {
       // their bookable slots, filtered below. `rejectDate` is the same function
       // the contact form's calendar greys dates out with, so a date the user can
       // still click is a date this endpoint will answer with times.
+      const zone = zoneOf(c.req.query('tz'), config.timezone)
+      if (!zone) return c.json({ message: 'tz must be an IANA time zone' }, 400)
+
       const now = new Date()
       const { earliest: minAllowedTime, latest: maxAllowedTime } = advanceBounds(bookingWindow, now)
 
-      switch (rejectDate(requestDate, requestDuration, bookingWindow, now)) {
+      switch (rejectDate(requestDate, requestDuration, bookingWindow, now, zone)) {
         case 'too_soon':
           return c.json(
             {
@@ -115,7 +129,13 @@ export function createAppointmentsRoutes() {
           )
       }
 
-      const allSlots = await generateTimeSlots(db, requestDate, requestDuration, bookingWindow)
+      const allSlots = await generateTimeSlots(
+        db,
+        requestDate,
+        requestDuration,
+        bookingWindow,
+        zone
+      )
 
       // Drop the individual slots outside the window. Dropped rather than marked
       // unavailable: `available: false` means "someone already booked this", and
@@ -129,6 +149,7 @@ export function createAppointmentsRoutes() {
         date: requestDate,
         duration: requestDuration,
         timezone: config.timezone,
+        zone,
         slots
       })
     } catch (error) {
@@ -203,6 +224,9 @@ export function createAppointmentsRoutes() {
         return c.json({ message: `Duration ${c.req.query('duration')} not available` }, 400)
       }
 
+      const zone = zoneOf(c.req.query('tz'), config.timezone)
+      if (!zone) return c.json({ message: 'tz must be an IANA time zone' }, 400)
+
       const dateList = datesBetween(from, to)
       if (dateList.length > MAX_AVAILABILITY_DAYS) {
         return c.json(
@@ -214,15 +238,17 @@ export function createAppointmentsRoutes() {
       const bookingWindow = toBookingWindow(config)
       const now = new Date()
       const { earliest, latest } = advanceBounds(bookingWindow, now)
-      const booked = await getBookedIntervalsInRange(db, from, to)
+      // `appointments.date` is the operator's date; a visitor's day can reach
+      // into the operator's day either side of it.
+      const booked = await getBookedIntervalsInRange(db, addDays(from, -1), addDays(to, 1))
 
       const dates: Record<string, number> = {}
       for (const date of dateList) {
-        if (rejectDate(date, duration, bookingWindow, now)) continue
+        if (rejectDate(date, duration, bookingWindow, now, zone)) continue
 
         // Overlap, not id equality — a longer slot straddling a shorter
         // booking must not be counted free. See isRangeAvailable.
-        const free = slotStarts(date, duration, bookingWindow).filter(
+        const free = slotStarts(date, duration, bookingWindow, zone).filter(
           start =>
             start >= earliest &&
             start <= latest &&
@@ -232,7 +258,7 @@ export function createAppointmentsRoutes() {
         if (free > 0) dates[date] = free
       }
 
-      return c.json({ duration, from, to, timezone: config.timezone, dates })
+      return c.json({ duration, from, to, timezone: config.timezone, zone, dates })
     } catch (error) {
       console.error('Error fetching appointment availability:', error)
       return c.json({ message: 'Failed to fetch availability' }, 500)
@@ -254,23 +280,21 @@ async function generateTimeSlots(
   db: D1Database,
   date: string,
   duration: number,
-  window: BookingWindow
+  window: BookingWindow,
+  zone: string
 ): Promise<{ id: string; startTime: string; endTime: string; available: boolean }[]> {
-  const existingAppointments = await getAppointmentsByDate(db, date)
   // Intervals, not slot ids. A 15-minute booking at 21:45 shares no id with the
   // 30- and 60-minute slots that straddle it, so matching ids offered both.
-  const booked = existingAppointments
-    .filter(apt => apt.status === 'confirmed')
-    .map(apt => ({ startMs: Date.parse(apt.start_time), endMs: Date.parse(apt.end_time) }))
-    .filter(iv => Number.isFinite(iv.startMs) && Number.isFinite(iv.endMs))
+  const booked = await getBookedIntervalsInRange(db, addDays(date, -1), addDays(date, 1))
   const now = new Date()
 
-  return slotStarts(date, duration, window)
+  return slotStarts(date, duration, window, zone)
     .filter(start => start > now)
     .map(start => {
       const endMs = start.getTime() + duration * 60 * 1000
       return {
-        id: slotId(date, start),
+        // Keyed on the operator's date, so a slot has one id whoever looks at it.
+        id: slotId(localDateOf(start, window.timezone), start),
         startTime: start.toISOString(),
         endTime: new Date(endMs).toISOString(),
         available: !overlapsBooked(start.getTime(), endMs, booked)

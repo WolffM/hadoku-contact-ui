@@ -52,10 +52,27 @@ it released.
 
 A date is offerable only if some slot on it clears three bounds: the minimum
 notice (`min_advance_hours`), the far bound (`max_advance_days`), and the
-operator's working days (`available_days`).
+operator's painted hours (`weekly_hours`).
 
-All three live in **one** function — `rejectDate` in `api/utils/booking-window.ts`
-— which the `/appointments/slots` route enforces and the contact form imports.
+`weekly_hours` is 168 characters of `0`/`1`, one per hour of the week, index
+`day * 24 + hour` (0 = Sunday), wall-clock in the config's `timezone`. A slot is
+offered only when every hour it touches is painted, so a day can hold separate
+blocks. Command-station's Availability painter writes it whole.
+
+**Dates are the visitor's.** The form sends `?tz=<IANA zone>` on `/slots` and
+`/availability`, so the day a visitor clicks is a calendar day in their zone and
+holds the slots that land on it there (in Tokyo, mostly the operator's previous
+day). Times render in the browser's zone with its label beside them. Without
+`tz` a date is the operator's. `appointments.date` is always the operator's date
+of the start, derived on submit, never the date the visitor's calendar sent, and
+`slot_id` is keyed on it too, so a slot has one id whoever looks at it.
+
+Submit books only a start the window offers right now (`isOfferedStart`): on
+the grid, every hour painted, inside the notice window, and exactly one duration
+long. The visitor's confirmation email reads in the zone the form sent.
+
+All of it lives in **one** module — `api/utils/booking-window.ts` — which the
+`/appointments/slots` route enforces and the contact form imports.
 That module is the reason `src/` imports from `api/`, and it is deliberate. The
 calendar used to carry its own hardcoded version of the rule ("tomorrow at the
 browser's local midnight, weekends included"), so it offered dates the server
@@ -85,7 +102,8 @@ calendar predicate and the endpoint agree on every one — that equivalence is t
 invariant, not either half on its own.
 
 Widening what a user can book is a config change, not a code change:
-`PUT /admin/appointments/config` moves `advance_notice_hours`.
+`PUT /admin/appointments/config` moves `advance_notice_hours` and `weekly_hours`
+(refused unless it is exactly 168 `0`/`1` characters).
 
 ## Admin and service surfaces
 
@@ -324,8 +342,8 @@ the symptom is a successful booking whose guest silently gets no space at all.
 
 The provision call also passes `startsAt` and a `title`. ArchiveBot uses them to
 post an intro in the space's chat carrying a Discord `<t:SECONDS:R>` tag and to
-ping five minutes before — both render in the GUEST's timezone, which the
-confirmation email cannot do. `title` is shown inside the space and so may name
+ping five minutes before — both render in the GUEST's timezone, as the
+confirmation email does when the form sent one. `title` is shown inside the space and so may name
 the meeting; `label` is operator-only and carries the email address.
 
 **A meeting link never fails a booking.** `generateMeetingLink` returning

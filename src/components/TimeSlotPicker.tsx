@@ -1,5 +1,6 @@
 import { format } from 'date-fns'
 import type { AppointmentSlot } from '../types'
+import { viewerZoneLabel } from '../api/appointments'
 
 interface TimeSlotPickerProps {
   slots: AppointmentSlot[]
@@ -53,7 +54,12 @@ export default function TimeSlotPicker({
 
   return (
     <div className="time-slot-picker">
-      <div className="time-slot-picker__label">Available Times</div>
+      <div className="time-slot-picker__label">
+        Available Times{' '}
+        <span className="time-slot-picker__zone">
+          ({viewerZoneLabel(new Date(slots[0].startTime))})
+        </span>
+      </div>
       <div className="time-slot-grid">
         {slots.map(slot => (
           <button

@@ -8,6 +8,8 @@ import {
   fetchAvailability,
   fetchAvailableSlots,
   fetchBookingWindow,
+  viewerZone,
+  viewerZoneLabel,
   AppointmentAPIError
 } from '../api/appointments'
 import { isDateBookable } from '../../api/utils/booking-window'
@@ -214,7 +216,7 @@ const AppointmentPicker = forwardRef<AppointmentPickerRef, AppointmentPickerProp
         availability?.key === availabilityKey(selectedDate, duration) ? availability.dates : null
       const stillOffered = current
         ? current[key] !== undefined
-        : !bookingWindow || isDateBookable(key, duration, bookingWindow)
+        : !bookingWindow || isDateBookable(key, duration, bookingWindow, new Date(), viewerZone())
       if (!stillOffered) {
         setSelectedDate(null)
         setSelectedSlot(null)
@@ -473,7 +475,8 @@ const AppointmentPicker = forwardRef<AppointmentPickerRef, AppointmentPickerProp
           <div className="appointment-picker__summary">
             <div className="appointment-picker__summary-text">
               <strong>Selected:</strong> {format(selectedDate!, 'EEEE, MMMM d, yyyy')} at{' '}
-              {format(new Date(selectedSlot.startTime), 'h:mm a')} ({duration} minutes) via{' '}
+              {format(new Date(selectedSlot.startTime), 'h:mm a')}{' '}
+              {viewerZoneLabel(new Date(selectedSlot.startTime))} ({duration} minutes) via{' '}
               {meetingPlatform.charAt(0).toUpperCase() + meetingPlatform.slice(1)}
             </div>
             <button

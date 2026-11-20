@@ -10,20 +10,28 @@ import { describe, it, expect } from 'vitest'
 import {
   advanceBounds,
   isDateBookable,
+  isOfferedStart,
   rejectDate,
-  slotStartRange,
+  slotStarts,
+  weeklyHoursFrom,
   type BookingWindow
 } from '../../utils/booking-window'
 
-/** The D1 defaults from migration 0004. */
+/** The D1 defaults from migration 0004: 09:00-17:00, Monday to Friday. */
 const WINDOW: BookingWindow = {
   timezone: 'America/Los_Angeles',
-  businessHoursStart: '09:00',
-  businessHoursEnd: '17:00',
-  availableDays: [1, 2, 3, 4, 5],
+  weeklyHours: weeklyHoursFrom([1, 2, 3, 4, 5], 9, 17),
   minAdvanceHours: 24,
   maxAdvanceDays: 30
 }
+
+/** `grid` with one hour of one day switched to `on`. */
+function paint(grid: string, day: number, hour: number, on: boolean): string {
+  const i = day * 24 + hour
+  return grid.slice(0, i) + (on ? '1' : '0') + grid.slice(i + 1)
+}
+
+const iso = (dates: Date[]) => dates.map(d => d.toISOString())
 
 // Monday 2026-08-24, 16:59 PDT — the moment in the bug report.
 const MONDAY_EVENING = new Date('2026-08-24T23:59:00.000Z')
@@ -35,16 +43,70 @@ const TUESDAY = '2026-08-25'
 const WEDNESDAY = '2026-08-26'
 const SATURDAY = '2026-08-29'
 
-describe('slotStartRange', () => {
+describe('slotStarts', () => {
   it('ends the day one duration before business close', () => {
-    const { first, last } = slotStartRange(TUESDAY, 30, WINDOW)
+    const starts = slotStarts(TUESDAY, 30, WINDOW)
     // 09:00 PDT = 16:00Z; 17:00 PDT = 00:00Z next day, minus 30 min.
-    expect(first.toISOString()).toBe('2026-08-25T16:00:00.000Z')
-    expect(last.toISOString()).toBe('2026-08-25T23:30:00.000Z')
+    expect(starts[0].toISOString()).toBe('2026-08-25T16:00:00.000Z')
+    expect(starts[starts.length - 1].toISOString()).toBe('2026-08-25T23:30:00.000Z')
+    expect(starts).toHaveLength(16)
   })
 
   it('moves the last start earlier for a longer meeting', () => {
-    expect(slotStartRange(TUESDAY, 60, WINDOW).last.toISOString()).toBe('2026-08-25T23:00:00.000Z')
+    const starts = slotStarts(TUESDAY, 60, WINDOW)
+    expect(starts[starts.length - 1].toISOString()).toBe('2026-08-25T23:00:00.000Z')
+  })
+
+  it('offers one painted hour on its own, and nothing either side of it', () => {
+    const grid = paint('0'.repeat(168), 6, 14, true) // Saturday 2pm only
+    const window = { ...WINDOW, weeklyHours: grid }
+    expect(iso(slotStarts(SATURDAY, 30, window))).toEqual([
+      '2026-08-29T21:00:00.000Z',
+      '2026-08-29T21:30:00.000Z'
+    ])
+    expect(slotStarts(TUESDAY, 30, window)).toEqual([])
+  })
+
+  it('never offers a slot across an unpainted hour', () => {
+    const window = { ...WINDOW, weeklyHours: paint(WINDOW.weeklyHours, 2, 12, false) } // Tue noon off
+    const starts = iso(slotStarts(TUESDAY, 60, window))
+    expect(starts).toContain('2026-08-25T18:00:00.000Z') // 11:00 PDT
+    expect(starts).not.toContain('2026-08-25T19:00:00.000Z') // 12:00 PDT
+    expect(starts).toContain('2026-08-25T20:00:00.000Z') // 13:00 PDT
+    expect(starts).toHaveLength(7)
+  })
+
+  /**
+   * The visitor's day, not the operator's. A Tokyo visitor's Wednesday 26th
+   * starts at 15:00Z on the 25th, so it holds the back half of the operator's
+   * Tuesday (01:00-09:00 JST) and nothing of their Wednesday morning.
+   */
+  it("answers a date in the visitor's zone with the slots that land on it there", () => {
+    const tokyo = slotStarts(WEDNESDAY, 60, WINDOW, 'Asia/Tokyo')
+    expect(iso(tokyo)).toEqual(iso(slotStarts(TUESDAY, 60, WINDOW)))
+    // The operator's Saturday is off, but Tokyo's Saturday holds their Friday.
+    expect(slotStarts(SATURDAY, 60, WINDOW, 'Asia/Tokyo')).toHaveLength(8)
+    expect(slotStarts('2026-08-30', 60, WINDOW, 'Asia/Tokyo')).toEqual([])
+  })
+})
+
+describe('isOfferedStart', () => {
+  it('accepts a start on the grid and refuses one off it or outside the hours', () => {
+    expect(isOfferedStart(new Date('2026-08-26T16:30:00.000Z'), 30, WINDOW, MONDAY_EVENING)).toBe(
+      true
+    )
+    expect(isOfferedStart(new Date('2026-08-26T16:10:00.000Z'), 30, WINDOW, MONDAY_EVENING)).toBe(
+      false
+    )
+    expect(isOfferedStart(new Date('2026-08-26T03:00:00.000Z'), 30, WINDOW, MONDAY_EVENING)).toBe(
+      false
+    )
+  })
+
+  it('refuses a start inside the notice window', () => {
+    expect(isOfferedStart(new Date('2026-08-25T16:00:00.000Z'), 30, WINDOW, MONDAY_EVENING)).toBe(
+      false
+    )
   })
 })
 
@@ -80,7 +142,7 @@ describe('rejectDate', () => {
    */
   it('keeps a day whose late slots clear the cutoff but whose early ones do not', () => {
     expect(rejectDate(TUESDAY, 30, WINDOW, MONDAY_MORNING)).toBeNull()
-    const { first } = slotStartRange(TUESDAY, 30, WINDOW)
+    const [first] = slotStarts(TUESDAY, 30, WINDOW)
     const { earliest } = advanceBounds(WINDOW, MONDAY_MORNING)
     expect(first.getTime()).toBeLessThan(earliest.getTime())
   })

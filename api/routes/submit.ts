@@ -19,8 +19,11 @@ import {
   isRangeAvailable,
   getAppointmentsByDate,
   getAppointmentConfig,
-  getEmailTemplate
+  getEmailTemplate,
+  toBookingWindow
 } from '../storage'
+import { isOfferedStart } from '../utils/booking-window'
+import { localDateOf } from '../utils/timezone'
 import { checkRateLimit, recordSubmission } from '../rate-limit'
 import { generateMeetingLink } from '../services/meeting-links'
 import { isSpaceId } from '../services/meeting-space'
@@ -32,7 +35,7 @@ import {
   renderTemplate,
   prepareAppointmentTemplateData
 } from '../email/templates'
-import { EMAIL_CONFIG, APPOINTMENT_CONFIG, RATE_LIMIT_CONFIG } from '../constants'
+import { EMAIL_CONFIG, RATE_LIMIT_CONFIG } from '../constants'
 import type { HadokuAuthContext } from '../types'
 import { tierAtLeast } from '../utils/auth'
 import {
@@ -221,8 +224,8 @@ export function createSubmitRoutes(rateLimitOverrides?: {
           )
         }
 
-        const appointmentData = appointmentValidation.sanitized
-        if (!appointmentData) {
+        const validated = appointmentValidation.sanitized
+        if (!validated) {
           return c.json(
             {
               success: false,
@@ -232,6 +235,34 @@ export function createSubmitRoutes(rateLimitOverrides?: {
             400
           )
         }
+
+        const config = await getAppointmentConfig(db)
+        if (!config) {
+          return c.json({ success: false, message: 'Appointment system not configured' }, 500)
+        }
+        const timezone = config.timezone
+
+        // Only a start the calendar offers can be booked: on the grid, every
+        // hour painted, inside the notice window, and exactly one duration long.
+        const start = new Date(validated.startTime)
+        const end = new Date(validated.endTime)
+        if (
+          end.getTime() - start.getTime() !== validated.duration * 60 * 1000 ||
+          !isOfferedStart(start, validated.duration, toBookingWindow(config))
+        ) {
+          return c.json(
+            {
+              success: false,
+              error: 'Appointment validation failed',
+              errors: [{ path: ['appointment', 'startTime'], message: 'That time is not offered' }]
+            },
+            400
+          )
+        }
+
+        // `appointments.date` is the operator's calendar date of the start,
+        // whatever day the visitor's calendar showed it on.
+        const appointmentData = { ...validated, date: localDateOf(start, timezone) }
 
         // Overlap check, not slot-id equality: a 60-minute booking and a
         // 15-minute one inside it have different ids, so the id form let a
@@ -297,9 +328,6 @@ export function createSubmitRoutes(rateLimitOverrides?: {
           )
         }
 
-        const config = await getAppointmentConfig(db)
-        const timezone = config?.timezone ?? APPOINTMENT_CONFIG.DEFAULT_TIMEZONE
-
         const appointment = await createAppointment(db, {
           submission_id: submission.id,
           name: sanitized.name,
@@ -331,7 +359,8 @@ export function createSubmitRoutes(rateLimitOverrides?: {
             appointmentData.date,
             appointmentData.startTime,
             appointmentData.endTime,
-            timezone
+            // The visitor reads their confirmation in their own zone.
+            appointmentData.timezone ?? timezone
           )
 
           const templateData = prepareAppointmentTemplateData({

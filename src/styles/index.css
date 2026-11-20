@@ -925,6 +925,11 @@ body {
   color: var(--color-text);
 }
 
+.time-slot-picker__zone {
+  font-weight: normal;
+  color: var(--color-text-secondary);
+}
+
 .time-slot-picker__loading,
 .time-slot-picker__error,
 .time-slot-picker__empty {

@@ -160,8 +160,7 @@ export const RATE_LIMIT_CONFIG = {
 export const APPOINTMENT_CONFIG = {
   VALID_DURATIONS: [15, 30, 60] as const,
   VALID_PLATFORMS: ['discord', 'jitsi', 'google'] as const,
-  STORED_PLATFORMS: ['discord', 'jitsi', 'google', 'teams'] as const,
-  DEFAULT_TIMEZONE: 'America/Los_Angeles'
+  STORED_PLATFORMS: ['discord', 'jitsi', 'google', 'teams'] as const
 } as const
 
 // Template configuration

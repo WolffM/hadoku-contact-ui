@@ -2,7 +2,7 @@
  * Timezone Correctness Tests
  *
  * Documents the actual behavior of slot generation versus the configured
- * `business_hours_start`/`business_hours_end` and `timezone` fields.
+ * `weekly_hours` grid and `timezone`.
  *
  * Background: api/routes/appointments.ts uses `setUTCHours(startHour, ...)` to
  * place slots, even though the config stores an IANA timezone like
@@ -11,6 +11,7 @@
  */
 import { env, SELF } from 'cloudflare:test'
 import { describe, it, expect, beforeEach } from 'vitest'
+import { weeklyHoursFrom } from '../../utils/booking-window'
 
 interface Slot {
   id: string
@@ -68,9 +69,7 @@ describe('Timezone Correctness', () => {
     it('America/New_York 09:00–17:00 should produce slots at 09:00–17:00 New York time', async () => {
       await setConfig({
         timezone: 'America/New_York',
-        business_hours_start: '09:00',
-        business_hours_end: '17:00',
-        available_days: '0,1,2,3,4,5,6',
+        weekly_hours: weeklyHoursFrom([0, 1, 2, 3, 4, 5, 6], 9, 17),
         slot_duration_options: '60',
         min_advance_hours: 24,
         max_advance_days: 30
@@ -99,9 +98,7 @@ describe('Timezone Correctness', () => {
     it('America/Los_Angeles 09:00–17:00 should produce slots at 09:00–17:00 LA time', async () => {
       await setConfig({
         timezone: 'America/Los_Angeles',
-        business_hours_start: '09:00',
-        business_hours_end: '17:00',
-        available_days: '0,1,2,3,4,5,6',
+        weekly_hours: weeklyHoursFrom([0, 1, 2, 3, 4, 5, 6], 9, 17),
         slot_duration_options: '60',
         min_advance_hours: 24,
         max_advance_days: 30
@@ -126,9 +123,7 @@ describe('Timezone Correctness', () => {
       // produce slots; the API currently checks UTC day instead.
       await setConfig({
         timezone: 'Australia/Sydney',
-        business_hours_start: '09:00',
-        business_hours_end: '17:00',
-        available_days: '6', // Saturday only
+        weekly_hours: weeklyHoursFrom([6], 9, 17), // Saturday only
         slot_duration_options: '60',
         min_advance_hours: 24,
         max_advance_days: 30
@@ -177,9 +172,7 @@ describe('Timezone Correctness', () => {
     it('the same ISO startTime must render to the same wall-clock time as configured', async () => {
       await setConfig({
         timezone: 'America/New_York',
-        business_hours_start: '14:00',
-        business_hours_end: '15:00',
-        available_days: '0,1,2,3,4,5,6',
+        weekly_hours: weeklyHoursFrom([0, 1, 2, 3, 4, 5, 6], 14, 15),
         slot_duration_options: '60'
       })
 
@@ -197,6 +190,66 @@ describe('Timezone Correctness', () => {
 
       // Should render as 14:00 New York
       expect(renderInNY).toBe('14:00')
+    })
+  })
+
+  /**
+   * The visitor's calendar day. A Tokyo visitor who clicks a date gets the
+   * slots that land on that date in Tokyo — not the operator's date of the same
+   * name, which in Tokyo runs from the night before into that date's evening.
+   */
+  describe("?tz= reads the date in the visitor's zone", () => {
+    const tokyoDateOf = (iso: string) =>
+      new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo' }).format(new Date(iso))
+
+    beforeEach(async () => {
+      await setConfig({
+        timezone: 'America/Los_Angeles',
+        weekly_hours: weeklyHoursFrom([0, 1, 2, 3, 4, 5, 6], 8, 22),
+        slot_duration_options: '60',
+        min_advance_hours: 24,
+        max_advance_days: 30
+      })
+    })
+
+    it('every slot for a Tokyo date starts on that date in Tokyo', async () => {
+      const date = nextWeekday(5)
+      const r = await SELF.fetch(
+        `https://test.com/contact/api/appointments/slots?date=${date}&duration=60&tz=Asia/Tokyo`
+      )
+      expect(r.status).toBe(200)
+      const body = (await r.json()) as SlotsResponse & { zone: string }
+      expect(body.zone).toBe('Asia/Tokyo')
+      // 08:00-22:00 LA every day is 14 slots a day; a Tokyo day straddles two LA days
+      // and still holds exactly 14 of them.
+      expect(body.slots).toHaveLength(14)
+      for (const slot of body.slots) expect(tokyoDateOf(slot.startTime)).toBe(date)
+    })
+
+    it('availability counts each Tokyo date by the slots that land on it there', async () => {
+      const from = nextWeekday(5)
+      const to = nextWeekday(8)
+      const r = await SELF.fetch(
+        `https://test.com/contact/api/appointments/availability?duration=60&from=${from}&to=${to}&tz=Asia/Tokyo`
+      )
+      expect(r.status).toBe(200)
+      const body = (await r.json()) as { zone: string; dates: Record<string, number> }
+      expect(body.zone).toBe('Asia/Tokyo')
+      for (const [date, free] of Object.entries(body.dates)) {
+        expect(date >= from && date <= to).toBe(true)
+        const slots = await SELF.fetch(
+          `https://test.com/contact/api/appointments/slots?date=${date}&duration=60&tz=Asia/Tokyo`
+        )
+        const { slots: list } = (await slots.json()) as SlotsResponse
+        expect(list.filter(s => s.available)).toHaveLength(free)
+      }
+    })
+
+    it('refuses a tz that is not a zone', async () => {
+      const r = await SELF.fetch(
+        `https://test.com/contact/api/appointments/slots?date=${nextWeekday(5)}&duration=60&tz=Mars/Olympus`
+      )
+      expect(r.status).toBe(400)
     })
   })
 })

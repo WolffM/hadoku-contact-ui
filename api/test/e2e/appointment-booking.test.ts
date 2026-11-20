@@ -10,6 +10,7 @@
  */
 import { env, SELF, fetchMock } from 'cloudflare:test'
 import { describe, it, expect, beforeEach } from 'vitest'
+import { weeklyHoursFrom } from '../../utils/booking-window'
 
 /** Get a date N days from now, formatted as YYYY-MM-DD (UTC, like the format) */
 function futureDate(days: number): string {
@@ -17,6 +18,12 @@ function futureDate(days: number): string {
   d.setUTCDate(d.getUTCDate() + days)
   return d.toISOString().split('T')[0]
 }
+
+/**
+ * Every hour of the week open, so these tests are about booking mechanics and
+ * not about which hours are painted; the painted-hours rule has its own tests.
+ */
+const ALL_HOURS = '1'.repeat(168)
 
 /** Build an appointment submission request */
 async function bookAppointment(opts: {
@@ -74,9 +81,7 @@ describe('Appointment Booking Integration', () => {
     await env.DB.prepare(
       `UPDATE appointment_config SET
 				timezone = 'America/New_York',
-				business_hours_start = '09:00',
-				business_hours_end = '17:00',
-				available_days = '1,2,3,4,5',
+				weekly_hours = '${ALL_HOURS}',
 				slot_duration_options = '15,30,60',
 				max_advance_days = 30,
 				min_advance_hours = 24,
@@ -92,6 +97,68 @@ describe('Appointment Booking Integration', () => {
   })
 
   describe('POST /contact/api/submit - Appointment Booking', () => {
+    it('refuses a start outside the painted hours', async () => {
+      await env.DB.prepare('UPDATE appointment_config SET weekly_hours = ? WHERE id = 1')
+        .bind(weeklyHoursFrom([0, 1, 2, 3, 4, 5, 6], 9, 17))
+        .run()
+      // 03:00Z is 22:00 or 23:00 the night before in New York.
+      const response = await bookAppointment({
+        name: 'Night Owl',
+        email: 'owl@example.com',
+        date: futureDate(3),
+        startHour: 3
+      })
+      expect(response.status).toBe(400)
+      const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM appointments').first()
+      expect(count!.n).toBe(0)
+    })
+
+    it('refuses an end that is not one duration after the start', async () => {
+      const date = futureDate(3)
+      const startTime = new Date(`${date}T15:00:00.000Z`)
+      const response = await SELF.fetch('https://test.com/contact/api/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Forwarded-For': '203.0.113.9',
+          Referer: 'https://hadoku.me/contact'
+        },
+        body: JSON.stringify({
+          name: 'Long Meeting',
+          email: 'long@example.com',
+          message: 'Two hours please',
+          recipient: 'matthaeus@hadoku.me',
+          appointment: {
+            slotId: `slot-${date}-${startTime.toISOString()}`,
+            date,
+            startTime: startTime.toISOString(),
+            endTime: new Date(startTime.getTime() + 120 * 60 * 1000).toISOString(),
+            duration: 30,
+            platform: 'discord'
+          }
+        })
+      })
+      expect(response.status).toBe(400)
+    })
+
+    it("stores the operator's date of the start, whatever date the visitor's calendar sent", async () => {
+      const date = futureDate(3)
+      // 02:00Z is the previous evening in New York.
+      const response = await bookAppointment({
+        name: 'Tokyo Visitor',
+        email: 'tokyo@example.com',
+        date,
+        startHour: 2
+      })
+      expect(response.status).toBe(201)
+      const row = await env.DB.prepare('SELECT date FROM appointments').first()
+      expect(row!.date).toBe(
+        new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York' }).format(
+          new Date(`${date}T02:00:00.000Z`)
+        )
+      )
+    })
+
     it('should create appointment in D1 with valid data', async () => {
       const date = futureDate(3)
       const response = await bookAppointment({

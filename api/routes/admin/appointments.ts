@@ -26,6 +26,8 @@ import { mirrorInBackground, pushAppointmentToCalendar } from '../../services/ta
 import { operatorLinkFor } from '../../services/meeting-space'
 import { retractMeetingArtifacts } from '../../services/appointment-cleanup'
 import type { AppContext } from '../../types'
+import { isWeeklyHours, WEEK_HOURS } from '../../utils/booking-window'
+import { isTimeZone } from '../../utils/timezone'
 
 interface AdminCreateAppointmentBody {
   name?: unknown
@@ -106,11 +108,7 @@ export function createAppointmentAdminRoutes() {
         return notFound(c, 'Appointment configuration not found')
       }
 
-      const startHour = parseInt(config.business_hours_start.split(':')[0], 10)
-      const endHour = parseInt(config.business_hours_end.split(':')[0], 10)
-
       const platforms = config.meeting_platforms.split(',').map(p => p.trim())
-      const availableDays = config.available_days.split(',').map(d => parseInt(d.trim()))
       const slotDurationOptions = config.slot_duration_options
         .split(',')
         .map(d => parseInt(d.trim()))
@@ -118,9 +116,7 @@ export function createAppointmentAdminRoutes() {
       return adminOk(c, {
         config: {
           timezone: config.timezone,
-          start_hour: startHour,
-          end_hour: endHour,
-          available_days: availableDays,
+          weekly_hours: config.weekly_hours,
           platforms,
           advance_notice_hours: config.min_advance_hours,
           slot_duration_options: slotDurationOptions,
@@ -139,31 +135,23 @@ export function createAppointmentAdminRoutes() {
 
       const updates: Record<string, unknown> = {}
 
-      if (body.timezone !== undefined) updates.timezone = body.timezone
+      if (body.timezone !== undefined) {
+        if (!isTimeZone(body.timezone)) return badRequest(c, 'timezone must be an IANA time zone')
+        updates.timezone = body.timezone
+      }
       if (body.max_advance_days !== undefined) updates.max_advance_days = body.max_advance_days
 
-      if (body.start_hour !== undefined) {
-        const hour = parseInt(body.start_hour, 10)
-        updates.business_hours_start = `${hour.toString().padStart(2, '0')}:00`
-      } else if (body.business_hours_start !== undefined) {
-        updates.business_hours_start = body.business_hours_start
-      }
-
-      if (body.end_hour !== undefined) {
-        const hour = parseInt(body.end_hour, 10)
-        updates.business_hours_end = `${hour.toString().padStart(2, '0')}:00`
-      } else if (body.business_hours_end !== undefined) {
-        updates.business_hours_end = body.business_hours_end
+      if (body.weekly_hours !== undefined) {
+        if (!isWeeklyHours(body.weekly_hours)) {
+          return badRequest(c, `weekly_hours must be ${WEEK_HOURS} characters of 0 and 1`)
+        }
+        updates.weekly_hours = body.weekly_hours
       }
 
       if (body.advance_notice_hours !== undefined) {
         updates.min_advance_hours = body.advance_notice_hours
       } else if (body.min_advance_hours !== undefined) {
         updates.min_advance_hours = body.min_advance_hours
-      }
-
-      if (Array.isArray(body.available_days)) {
-        updates.available_days = body.available_days.join(',')
       }
 
       if (Array.isArray(body.slot_duration_options)) {

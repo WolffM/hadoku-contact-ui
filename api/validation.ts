@@ -8,6 +8,7 @@ import {
   SITE_CONFIG,
   type AppointmentPlatform
 } from './constants'
+import { isTimeZone } from './utils/timezone'
 
 export interface ContactSubmission {
   name: string
@@ -210,6 +211,8 @@ export interface AppointmentData {
   endTime: string
   duration: number
   platform: AppointmentPlatform
+  /** The visitor's IANA zone, when the form sent one: their confirmation reads in it. */
+  timezone?: string
 }
 
 export interface AppointmentValidationResult {
@@ -309,6 +312,13 @@ export function validateAppointment(data: unknown): AppointmentValidationResult 
     errors.push({ path: ['appointment'], message: 'Invalid time format' })
   }
 
+  if (appointment.timezone !== undefined && !isTimeZone(appointment.timezone)) {
+    errors.push({
+      path: ['appointment', 'timezone'],
+      message: 'Timezone must be an IANA time zone'
+    })
+  }
+
   if (errors.length > 0) {
     return { valid: false, errors }
   }
@@ -317,6 +327,7 @@ export function validateAppointment(data: unknown): AppointmentValidationResult 
     valid: true,
     errors: [],
     sanitized: {
+      ...(isTimeZone(appointment.timezone) ? { timezone: appointment.timezone } : {}),
       slotId: (appointment.slotId as string).trim(),
       date: appointment.date as string,
       startTime: appointment.startTime as string,

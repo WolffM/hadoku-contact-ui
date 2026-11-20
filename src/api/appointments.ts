@@ -17,6 +17,23 @@ import {
 
 const API_BASE_URL = '/contact/api'
 
+/**
+ * The visitor's IANA zone. Every date the form sends is a calendar day in it,
+ * and every time it shows is formatted in it, so both say the same thing.
+ */
+export function viewerZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone
+}
+
+/** The visitor's zone as people read it at `at`: "PST", "GMT+9". */
+export function viewerZoneLabel(at: Date = new Date()): string {
+  return (
+    new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' })
+      .formatToParts(at)
+      .find(p => p.type === 'timeZoneName')?.value ?? viewerZone()
+  )
+}
+
 export class AppointmentAPIError extends Error {
   constructor(
     public type: AppointmentError['type'],
@@ -75,7 +92,12 @@ export async function fetchAvailability(
     return mockFetchAvailability(duration, from, to)
   }
 
-  const params = new URLSearchParams({ duration: duration.toString(), from, to })
+  const params = new URLSearchParams({
+    duration: duration.toString(),
+    from,
+    to,
+    tz: viewerZone()
+  })
   const response = await fetch(`${API_BASE_URL}/appointments/availability?${params}`, {
     method: 'GET',
     headers: {
@@ -109,7 +131,8 @@ export async function fetchAvailableSlots(
   try {
     const params = new URLSearchParams({
       date,
-      duration: duration.toString()
+      duration: duration.toString(),
+      tz: viewerZone()
     })
 
     const response = await fetch(`${API_BASE_URL}/appointments/slots?${params}`, {

@@ -21,11 +21,13 @@ history of your own past messages.
 ## Booking a meeting
 
 **What it does.** The same form can also book a slot: pick a duration (15,
-30 or 60 minutes), then a date and a time. The calendar only ever shows a
-date if at least one slot on it is still free. A day inside the minimum
-notice window, past the far booking horizon, outside the operator's working
-days, or booked solid does not appear as an option at all — it is never
-clickable and then refused.
+30 or 60 minutes), then a date and a time. Dates and times are your own:
+the day you click is that day where you are, and every time is shown in your
+time zone with its name beside it, as is the confirmation email. The calendar
+only ever shows a date if at least one slot on it is still free. A day inside
+the minimum notice window, past the far booking horizon, outside the hours the
+operator has painted, or booked solid does not appear as an option at all — it
+is never clickable and then refused.
 
 **How to use it.** Open the date picker in the form, choose a duration, a
 day, a time and a video platform, then submit alongside your message. A slot

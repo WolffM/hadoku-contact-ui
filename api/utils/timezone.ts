@@ -62,3 +62,25 @@ export function dayOfWeekInZone(date: string, timeZone: string): number {
   }).format(noonUtc)
   return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(weekday)
 }
+
+/** `instant` as a YYYY-MM-DD calendar date in `timeZone`. */
+export function localDateOf(instant: Date, timeZone: string): string {
+  // en-CA formats as YYYY-MM-DD.
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).format(instant)
+}
+
+/** True when `zone` is an IANA zone this runtime knows. */
+export function isTimeZone(zone: unknown): zone is string {
+  if (typeof zone !== 'string' || zone.length === 0 || zone.length > 64) return false
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: zone })
+    return true
+  } catch {
+    return false
+  }
+}

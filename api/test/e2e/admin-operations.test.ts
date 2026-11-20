@@ -11,6 +11,7 @@
  */
 import { env, SELF, fetchMock } from 'cloudflare:test'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { weeklyHoursFrom } from '../../utils/booking-window'
 
 const ADMIN_HEADERS = {
   'Content-Type': 'application/json',
@@ -595,9 +596,7 @@ describe('Admin Operations Integration', () => {
       const data = unwrapData<{ config: Record<string, unknown> }>(result)
 
       expect(data.config.timezone).toBe('America/Los_Angeles')
-      expect(data.config.start_hour).toBe(9)
-      expect(data.config.end_hour).toBe(17)
-      expect(data.config.available_days).toEqual([1, 2, 3, 4, 5])
+      expect(data.config.weekly_hours).toBe(weeklyHoursFrom([1, 2, 3, 4, 5], 9, 17))
       expect(data.config.platforms).toEqual(['discord', 'google', 'teams', 'jitsi'])
       expect(data.config.advance_notice_hours).toBe(24)
       expect(data.config.slot_duration_options).toEqual([15, 30, 60])
@@ -609,9 +608,7 @@ describe('Admin Operations Integration', () => {
         method: 'PUT',
         body: JSON.stringify({
           timezone: 'America/Los_Angeles',
-          start_hour: 8,
-          end_hour: 18,
-          available_days: [1, 2, 3, 4, 5, 6],
+          weekly_hours: weeklyHoursFrom([1, 2, 3, 4, 5, 6], 8, 18),
           platforms: ['discord', 'google', 'teams'],
           advance_notice_hours: 48
         })
@@ -622,21 +619,34 @@ describe('Admin Operations Integration', () => {
       // Verify real D1 has database field names
       const row = await env.DB.prepare('SELECT * FROM appointment_config WHERE id = 1').first()
       expect(row!.timezone).toBe('America/Los_Angeles')
-      expect(row!.business_hours_start).toBe('08:00')
-      expect(row!.business_hours_end).toBe('18:00')
-      expect(row!.available_days).toBe('1,2,3,4,5,6')
+      expect(row!.weekly_hours).toBe(weeklyHoursFrom([1, 2, 3, 4, 5, 6], 8, 18))
       expect(row!.meeting_platforms).toBe('discord,google,teams')
       expect(row!.min_advance_hours).toBe(48)
     })
 
+    it('PUT config refuses a grid that is not 168 hours of 0 and 1', async () => {
+      for (const weekly_hours of ['1'.repeat(167), '2'.repeat(168), 42]) {
+        const response = await adminRequest('/contact/api/admin/appointments/config', {
+          method: 'PUT',
+          body: JSON.stringify({ weekly_hours })
+        })
+        expect(response.status).toBe(400)
+      }
+      const row = await env.DB.prepare('SELECT weekly_hours FROM appointment_config').first()
+      expect(row!.weekly_hours).toBe(weeklyHoursFrom([1, 2, 3, 4, 5], 9, 17))
+    })
+
     it('PUT + GET config round-trip should preserve values', async () => {
+      // Not one range: Monday morning, and a single hour on Saturday.
+      const SATURDAY_3PM = 6 * 24 + 15
+      const GRID = [...weeklyHoursFrom([1], 9, 12)]
+        .map((bit, i) => (i === SATURDAY_3PM ? '1' : bit))
+        .join('')
       await adminRequest('/contact/api/admin/appointments/config', {
         method: 'PUT',
         body: JSON.stringify({
           timezone: 'Europe/London',
-          start_hour: 10,
-          end_hour: 16,
-          available_days: [1, 2, 3],
+          weekly_hours: GRID,
           platforms: ['discord', 'jitsi'],
           advance_notice_hours: 12
         })
@@ -648,9 +658,7 @@ describe('Admin Operations Integration', () => {
       const data = unwrapData<{ config: Record<string, unknown> }>(result)
 
       expect(data.config.timezone).toBe('Europe/London')
-      expect(data.config.start_hour).toBe(10)
-      expect(data.config.end_hour).toBe(16)
-      expect(data.config.available_days).toEqual([1, 2, 3])
+      expect(data.config.weekly_hours).toBe(GRID)
       expect(data.config.platforms).toEqual(['discord', 'jitsi'])
       expect(data.config.advance_notice_hours).toBe(12)
     })

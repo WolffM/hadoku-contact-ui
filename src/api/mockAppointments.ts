@@ -1,5 +1,10 @@
 import { logger } from '@wolffm/logger/client'
-import { datesBetween, rejectDate, slotStarts } from '../../api/utils/booking-window'
+import {
+  datesBetween,
+  rejectDate,
+  slotStarts,
+  weeklyHoursFrom
+} from '../../api/utils/booking-window'
 import type {
   AvailabilityResponse,
   BookingWindowConfig,
@@ -33,9 +38,7 @@ export async function mockFetchBookingWindow(): Promise<BookingWindowConfig> {
 
   return {
     timezone: 'America/Los_Angeles',
-    businessHoursStart: `${String(BUSINESS_START_HOUR).padStart(2, '0')}:00`,
-    businessHoursEnd: `${String(BUSINESS_END_HOUR).padStart(2, '0')}:00`,
-    availableDays: [1, 2, 3, 4, 5],
+    weeklyHours: weeklyHoursFrom([1, 2, 3, 4, 5], BUSINESS_START_HOUR, BUSINESS_END_HOUR),
     minAdvanceHours: 24,
     maxAdvanceDays: 30,
     slotDurations: [15, 30, 60],
@@ -68,7 +71,7 @@ export async function mockFetchAvailability(
     dates[date] = slotStarts(date, duration, window).length
   }
 
-  return { duration, from, to, timezone: window.timezone, dates }
+  return { duration, from, to, timezone: window.timezone, zone: window.timezone, dates }
 }
 
 /**
@@ -121,7 +124,8 @@ export async function mockFetchAvailableSlots(
     date,
     duration,
     slots,
-    timezone: 'America/Los_Angeles' // PST/PDT
+    timezone: 'America/Los_Angeles', // PST/PDT
+    zone: 'America/Los_Angeles'
   }
 
   logger.apiResponse('GET', '/appointments/slots', 200, { slotsCount: slots.length })

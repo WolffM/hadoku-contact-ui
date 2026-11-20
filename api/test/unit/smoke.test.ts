@@ -1,5 +1,6 @@
 import { env, SELF } from 'cloudflare:test'
 import { describe, it, expect } from 'vitest'
+import { weeklyHoursFrom } from '../../utils/booking-window'
 
 describe('Smoke test - real D1 + KV', () => {
   it('should have D1 tables from migrations', async () => {
@@ -18,6 +19,13 @@ describe('Smoke test - real D1 + KV', () => {
     expect(config).not.toBeNull()
     expect(config!.timezone).toBe('America/Los_Angeles')
     expect(config!.business_hours_start).toBe('09:00')
+  })
+
+  // Migration 0010 fills the grid from the range it replaces, so the slots
+  // offered do not move the moment it lands.
+  it('backfills weekly_hours from the seeded 09:00-17:00 Monday-Friday range', async () => {
+    const config = await env.DB.prepare('SELECT weekly_hours FROM appointment_config').first()
+    expect(config!.weekly_hours).toBe(weeklyHoursFrom([1, 2, 3, 4, 5], 9, 17))
   })
 
   it('should respond to health check via SELF', async () => {

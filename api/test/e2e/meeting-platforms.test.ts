@@ -59,6 +59,10 @@ describe('Meeting Platform Integration', () => {
   beforeEach(async () => {
     await env.DB.prepare('DELETE FROM appointments').run()
     await env.DB.prepare('DELETE FROM contact_submissions').run()
+    // Every hour open: these pin the platforms, not which hours are offered.
+    await env.DB.prepare('UPDATE appointment_config SET weekly_hours = ? WHERE id = 1')
+      .bind('1'.repeat(168))
+      .run()
     const keys = await env.RATE_LIMIT_KV.list()
     for (const key of keys.keys) await env.RATE_LIMIT_KV.delete(key.name)
   })

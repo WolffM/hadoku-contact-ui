@@ -55,9 +55,7 @@ export interface AppointmentSelection {
  */
 export interface BookingWindowConfig {
   timezone: string
-  businessHoursStart: string
-  businessHoursEnd: string
-  availableDays: number[]
+  weeklyHours: string
   minAdvanceHours: number
   maxAdvanceDays: number
   slotDurations: number[]
@@ -73,7 +71,10 @@ export interface FetchSlotsResponse {
   date: string
   duration: TimeSlotDuration
   slots: AppointmentSlot[]
+  /** The operator's zone. */
   timezone: string
+  /** The zone `date` is a calendar day in: the visitor's, as sent. */
+  zone: string
 }
 
 /**
@@ -89,6 +90,7 @@ export interface AvailabilityResponse {
   from: string
   to: string
   timezone: string
+  zone: string
   dates: Record<string, number>
 }
 
@@ -104,6 +106,8 @@ export interface SubmitContactRequest {
     endTime: string // ISO 8601
     duration: TimeSlotDuration
     platform: MeetingPlatform
+    /** The visitor's IANA zone: their confirmation email reads in it. */
+    timezone: string
   }
 }
 

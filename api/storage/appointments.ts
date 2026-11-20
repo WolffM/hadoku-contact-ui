@@ -12,9 +12,8 @@ import type { BookingWindow } from '../utils/booking-window'
 export interface AppointmentConfig {
   id: number
   timezone: string
-  business_hours_start: string
-  business_hours_end: string
-  available_days: string
+  /** 168 '0'/'1' hours of the week; see BookingWindow.weeklyHours. */
+  weekly_hours: string
   slot_duration_options: string
   max_advance_days: number
   min_advance_hours: number
@@ -23,16 +22,13 @@ export interface AppointmentConfig {
 }
 
 /**
- * The stored config narrowed to the booking window, with its comma-separated
- * columns parsed once. Both the slots endpoint and the public config endpoint
- * read the window through here so neither re-parses `available_days` its own way.
+ * The stored config narrowed to the booking window. Both the slots endpoint and
+ * the public config endpoint read the window through here.
  */
 export function toBookingWindow(config: AppointmentConfig): BookingWindow {
   return {
     timezone: config.timezone,
-    businessHoursStart: config.business_hours_start,
-    businessHoursEnd: config.business_hours_end,
-    availableDays: parseIntList(config.available_days),
+    weeklyHours: config.weekly_hours,
     minAdvanceHours: config.min_advance_hours,
     maxAdvanceDays: config.max_advance_days
   }

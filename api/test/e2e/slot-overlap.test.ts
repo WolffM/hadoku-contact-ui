@@ -17,6 +17,7 @@
  */
 import { env, SELF } from 'cloudflare:test'
 import { describe, it, expect, beforeEach } from 'vitest'
+import { weeklyHoursFrom } from '../../utils/booking-window'
 
 interface Slot {
   id: string
@@ -86,9 +87,7 @@ describe('a booking blocks every slot it overlaps', () => {
     await env.DB.prepare(
       `UPDATE appointment_config SET
          timezone = 'America/New_York',
-         business_hours_start = '09:00',
-         business_hours_end = '17:00',
-         available_days = '1,2,3,4,5',
+         weekly_hours = '${weeklyHoursFrom([1, 2, 3, 4, 5], 9, 17)}',
          slot_duration_options = '15,30,60',
          max_advance_days = 30,
          min_advance_hours = 24,

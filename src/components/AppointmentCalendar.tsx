@@ -6,6 +6,7 @@ import 'react-calendar/dist/Calendar.css'
 // this calendar used to carry its own "tomorrow at local midnight" version and
 // offered dates the server then refused with a 400 the user could not act on.
 import { isDateBookable } from '../../api/utils/booking-window'
+import { viewerZone } from '../api/appointments'
 import type { AvailabilityResponse, BookingWindowConfig, TimeSlotDuration } from '../types'
 
 interface AppointmentCalendarProps {
@@ -66,7 +67,8 @@ export default function AppointmentCalendar({
     if (view !== 'month') return false
     const key = format(date, 'yyyy-MM-dd')
     if (availability) return availability[key] === undefined
-    if (bookingWindow) return !isDateBookable(key, duration, bookingWindow)
+    if (bookingWindow)
+      return !isDateBookable(key, duration, bookingWindow, new Date(), viewerZone())
     return date < dayFromToday(1)
   }
 

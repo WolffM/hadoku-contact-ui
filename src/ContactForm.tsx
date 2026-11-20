@@ -2,7 +2,12 @@ import { useState, FormEvent, ChangeEvent, useRef } from 'react'
 import { format } from 'date-fns'
 import { logger } from '@wolffm/logger/client'
 import AppointmentPicker, { type AppointmentPickerRef } from './components/AppointmentPicker'
-import { submitContactWithAppointment, AppointmentAPIError } from './api/appointments'
+import {
+  submitContactWithAppointment,
+  AppointmentAPIError,
+  viewerZone,
+  viewerZoneLabel
+} from './api/appointments'
 import type { FormData, FormErrors, SubmitStatus, AppointmentSelection } from './types'
 
 export default function ContactForm() {
@@ -115,7 +120,8 @@ export default function ContactForm() {
               startTime: appointmentSelection.selectedSlot.startTime,
               endTime: appointmentSelection.selectedSlot.endTime,
               duration: appointmentSelection.duration,
-              platform: appointmentSelection.meetingPlatform
+              platform: appointmentSelection.meetingPlatform,
+              timezone: viewerZone()
             }
           : undefined
 
@@ -249,7 +255,8 @@ export default function ContactForm() {
                   and your meeting has been scheduled for{' '}
                   <strong>
                     {format(bookedAppointment.date, 'EEEE, MMMM d, yyyy')} at{' '}
-                    {format(new Date(bookedAppointment.startTime), 'h:mm a')} (
+                    {format(new Date(bookedAppointment.startTime), 'h:mm a')}{' '}
+                    {viewerZoneLabel(new Date(bookedAppointment.startTime))} (
                     {bookedAppointment.duration} minutes) via{' '}
                     {bookedAppointment.platform.charAt(0).toUpperCase() +
                       bookedAppointment.platform.slice(1)}
