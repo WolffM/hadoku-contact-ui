@@ -224,3 +224,25 @@ export function formatAppointmentDateTime(
 
   return { date, startTime, endTime, timezoneLabel: tzLabel }
 }
+
+/**
+ * The Inbox subject of a contact-form message that booked a meeting:
+ * `Meeting: Recruiting · Sun, Nov 22, 8:00 AM PST`.
+ *
+ * Read by the operator, so it is in the OPERATOR's zone, not the guest's.
+ */
+export function bookingSubject(title: string, isoStartTime: string, timezone: string): string {
+  const { startTime, timezoneLabel } = formatAppointmentDateTime(
+    isoStartTime,
+    isoStartTime,
+    isoStartTime,
+    timezone
+  )
+  const date = new Date(isoStartTime).toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    timeZone: timezone
+  })
+  return `Meeting: ${title} · ${date}, ${startTime} ${timezoneLabel}`
+}

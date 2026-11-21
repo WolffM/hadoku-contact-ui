@@ -45,13 +45,20 @@ the form — ask the operator. No recurring bookings.
 - **Discord** opens a private space (its own category and channels) that
   exists only around the meeting and expires afterward.
 - **Jitsi** builds a room from a random token, never from anything about the
-  booking itself, so the link cannot be guessed from public information.
+  booking itself, so the link cannot be guessed from public information. The
+  room is titled after your message when it is short ("Recruiting"), or
+  "Meeting with <your name>" otherwise. The first person in has to sign in to
+  meet.jit.si (Google or GitHub) to start the meeting; guests need no account
+  and wait in a lobby until then.
 - **Google Meet** creates a calendar event with a Meet link attached.
 
 **How to use it.** Pick a platform when booking; the link is in your
 confirmation email and, for Discord and Jitsi, needs nothing further from
 you. Google Meet needs the operator's calendar connected on their end — if it
 is not, the booking still goes through and the operator follows up by hand.
+
+A message that booked a meeting reaches the operator's Inbox with the subject
+`Meeting: <title> · <date>, <start>`, in the operator's timezone.
 
 **What it does not do.** Microsoft Teams is not offered (it needs a paid
 account the operator does not run). A meeting link never blocks a booking:

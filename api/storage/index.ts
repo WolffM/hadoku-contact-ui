@@ -17,6 +17,7 @@ export {
   getMailboxCounts,
   getSubmissionById,
   updateSubmissionStatus,
+  setSubmissionSubject,
   deleteSubmission,
   restoreSubmission,
   purgeOldDeletedSubmissions,

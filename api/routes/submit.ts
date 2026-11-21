@@ -20,18 +20,20 @@ import {
   getAppointmentsByDate,
   getAppointmentConfig,
   getEmailTemplate,
+  setSubmissionSubject,
   toBookingWindow
 } from '../storage'
 import { isOfferedStart } from '../utils/booking-window'
 import { localDateOf } from '../utils/timezone'
 import { checkRateLimit, recordSubmission } from '../rate-limit'
-import { generateMeetingLink } from '../services/meeting-links'
+import { generateMeetingLink, meetingTitle } from '../services/meeting-links'
 import { isSpaceId } from '../services/meeting-space'
 import { mirrorInBackground, pushAppointmentToCalendar } from '../services/task-calendar'
 import { createEmailProvider } from '../email'
 import {
   formatAppointmentConfirmation,
   formatAppointmentDateTime,
+  bookingSubject,
   renderTemplate,
   prepareAppointmentTemplateData
 } from '../email/templates'
@@ -345,6 +347,19 @@ export function createSubmitRoutes(rateLimitOverrides?: {
           ip_address: ipAddress ?? undefined,
           user_agent: userAgent ?? undefined
         })
+
+        // Stamped only now that the booking has landed: the row was written
+        // before the appointment was validated, and a subject promising a
+        // meeting on mail whose booking was refused would be a lie.
+        await setSubmissionSubject(
+          db,
+          submission.id,
+          bookingSubject(
+            meetingTitle({ name: sanitized.name, message: sanitized.message }),
+            appointmentData.startTime,
+            timezone
+          )
+        )
 
         // Mirror the booking into the owner's task calendar (best-effort, once).
         // Never blocks or fails the booking — handed to waitUntil; the push

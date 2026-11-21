@@ -94,8 +94,10 @@ describe('Meeting Platform Integration', () => {
         .bind(slotId)
         .first<{ meeting_link: string; meeting_id: string }>()
 
-      expect(apt!.meeting_link).toMatch(/^https:\/\/meet\.jit\.si\/hadoku-[0-9a-z]+$/)
-      expect(apt!.meeting_id).toBe(apt!.meeting_link.split('/').pop())
+      expect(apt!.meeting_link).toMatch(
+        /^https:\/\/meet\.jit\.si\/hadoku-[0-9a-z]+#config\.subject=[^#]+$/
+      )
+      expect(apt!.meeting_id).toBe(apt!.meeting_link.split('/').pop()!.split('#')[0])
     })
 
     // The room is the whole access control on meet.jit.si, and slot ids are
@@ -129,7 +131,9 @@ describe('Meeting Platform Integration', () => {
         .bind(second.slotId)
         .first<{ meeting_link: string }>()
 
-      expect(apt!.meeting_link).toMatch(/^https:\/\/meet\.jit\.si\/hadoku-[0-9a-z]+$/)
+      expect(apt!.meeting_link).toMatch(
+        /^https:\/\/meet\.jit\.si\/hadoku-[0-9a-z]+#config\.subject=[^#]+$/
+      )
       expect(apt!.meeting_link).not.toBe(
         (await first.response.clone().json<{ meetingLink?: string }>()).meetingLink
       )

@@ -44,7 +44,7 @@ export async function generateMeetingLink(
     case 'discord':
       return generateDiscordLink(appointment, env)
     case 'jitsi':
-      return generateJitsiLink(env)
+      return generateJitsiLink(appointment, env)
     case 'google':
       return createGoogleMeetEvent(appointment, env)
     default:
@@ -157,13 +157,37 @@ function jitsiRoomToken(): string {
   return Array.from(bytes, b => b.toString(36).padStart(2, '0')).join('')
 }
 
-function generateJitsiLink(env: ContactEnv): MeetingLinkResult {
+/**
+ * What a booking is called: the Jitsi room's title and the Inbox subject.
+ *
+ * The guest's own message, when it is short enough to read as a title
+ * ("Recruiting"), is what they called the meeting; anything longer is a letter,
+ * not a title, and a letter cut mid-sentence reads worse than
+ * "Meeting with <name>".
+ */
+export const MEETING_TITLE_MAX = 60
+
+export function meetingTitle(appointment: Pick<AppointmentDetails, 'name' | 'message'>): string {
+  const message = (appointment.message ?? '').trim()
+  if (message && !/[\r\n]/.test(message) && message.length <= MEETING_TITLE_MAX) return message
+  return `Meeting with ${appointment.name.trim()}`
+}
+
+/**
+ * Jitsi titles a room after its name, and our names are 128 random bits, so an
+ * untitled room greets both people as "Hadoku 2u5k290o…". The title rides in
+ * the URL FRAGMENT as `config.subject`, which meet.jit.si applies on load. A fragment never reaches a server in the request, and it
+ * changes nothing about the room: the path is still exactly the random token,
+ * so `meetingId` and the access control are what they were.
+ */
+function generateJitsiLink(appointment: AppointmentDetails, env: ContactEnv): MeetingLinkResult {
   const roomName = `hadoku-${jitsiRoomToken()}`
   const jitsiDomain = env.JITSI_DOMAIN ?? 'meet.jit.si'
+  const subject = encodeURIComponent(JSON.stringify(meetingTitle(appointment)))
 
   return {
     success: true,
-    meetingLink: `https://${jitsiDomain}/${roomName}`,
+    meetingLink: `https://${jitsiDomain}/${roomName}#config.subject=${subject}`,
     meetingId: roomName
   }
 }

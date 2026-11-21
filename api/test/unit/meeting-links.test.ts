@@ -8,7 +8,7 @@
  * against the bindings in wrangler.test.toml, not against a mutated `env`.
  */
 import { describe, it, expect } from 'vitest'
-import { generateMeetingLink } from '../../services/meeting-links'
+import { generateMeetingLink, meetingTitle, MEETING_TITLE_MAX } from '../../services/meeting-links'
 import type { ContactEnv } from '../../types'
 
 const APPOINTMENT = {
@@ -61,8 +61,10 @@ describe('generateMeetingLink — jitsi', () => {
     const result = await generateMeetingLink('jitsi', APPOINTMENT, envWith({}))
 
     expect(result.success).toBe(true)
-    expect(result.meetingLink).toMatch(/^https:\/\/meet\.jit\.si\/hadoku-[0-9a-z]+$/)
-    expect(result.meetingId).toBe(result.meetingLink!.split('/').pop())
+    expect(result.meetingLink).toMatch(
+      /^https:\/\/meet\.jit\.si\/hadoku-[0-9a-z]+#config\.subject=[^#]+$/
+    )
+    expect(result.meetingId).toBe(result.meetingLink!.split('/').pop()!.split('#')[0])
   })
 
   it('honours a self-hosted JITSI_DOMAIN', async () => {
@@ -72,7 +74,9 @@ describe('generateMeetingLink — jitsi', () => {
       envWith({ JITSI_DOMAIN: 'meet.hadoku.me' })
     )
 
-    expect(result.meetingLink).toMatch(/^https:\/\/meet\.hadoku\.me\/hadoku-[0-9a-z]+$/)
+    expect(result.meetingLink).toMatch(
+      /^https:\/\/meet\.hadoku\.me\/hadoku-[0-9a-z]+#config\.subject=[^#]+$/
+    )
   })
 
   // The room name IS the access control on a public Jitsi deployment, and slot
@@ -102,6 +106,47 @@ describe('generateMeetingLink — jitsi', () => {
     const result = await generateMeetingLink('jitsi', APPOINTMENT, envWith({}))
 
     expect(encodeURIComponent(result.meetingId!)).toBe(result.meetingId)
+  })
+})
+
+describe('generateMeetingLink — jitsi title', () => {
+  // An untitled room greets both people with its 128-bit token.
+  it("titles the room with the guest's message, in the fragment only", async () => {
+    const result = await generateMeetingLink(
+      'jitsi',
+      { ...APPOINTMENT, message: 'Recruiting' },
+      envWith({})
+    )
+    const url = new URL(result.meetingLink!)
+
+    expect(url.hash).toBe(`#config.subject=${encodeURIComponent('"Recruiting"')}`)
+    // The path, which is the whole access control, is still only the token.
+    expect(url.pathname).toBe(`/${result.meetingId}`)
+  })
+
+  it('keeps a title with quotes and symbols intact through the fragment', async () => {
+    const message = 'Chat re: "Q4" & 100% #roadmap'
+    const result = await generateMeetingLink('jitsi', { ...APPOINTMENT, message }, envWith({}))
+    const encoded = new URL(result.meetingLink!).hash.slice('#config.subject='.length)
+
+    expect(JSON.parse(decodeURIComponent(encoded))).toBe(message)
+  })
+})
+
+describe('meetingTitle', () => {
+  it('uses a short one-line message as the title', () => {
+    expect(meetingTitle({ name: 'Ruben', message: '  Recruiting  ' })).toBe('Recruiting')
+  })
+
+  it('falls back to the name for no message, a multi-line one, or a long one', () => {
+    expect(meetingTitle({ name: 'Ruben' })).toBe('Meeting with Ruben')
+    expect(meetingTitle({ name: 'Ruben', message: 'Hi\nlet us talk' })).toBe('Meeting with Ruben')
+    expect(meetingTitle({ name: 'Ruben', message: 'x'.repeat(MEETING_TITLE_MAX + 1) })).toBe(
+      'Meeting with Ruben'
+    )
+    expect(meetingTitle({ name: 'Ruben', message: 'x'.repeat(MEETING_TITLE_MAX) })).toBe(
+      'x'.repeat(MEETING_TITLE_MAX)
+    )
   })
 })
 

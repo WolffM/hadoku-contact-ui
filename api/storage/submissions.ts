@@ -342,6 +342,30 @@ export async function getSubmissionById(
   return result
 }
 
+/**
+ * Give a web-form row a subject. There is no subject column; the Inbox reads
+ * one from the `Subject: X\n\n<body>` envelope inbound mail is stored in, so a
+ * row given that envelope displays exactly like a real email's.
+ *
+ * Refuses a row that already has one, so a retry cannot stack two envelopes.
+ */
+export async function setSubmissionSubject(
+  db: D1Database,
+  id: string,
+  subject: string
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE contact_submissions
+			SET message = 'Subject: ' || ? || char(10, 10) || message
+			WHERE id = ? AND substr(message, 1, 9) != 'Subject: '`
+    )
+    .bind(subject, id)
+    .run()
+
+  return (result.meta?.changes ?? 0) > 0
+}
+
 export async function updateSubmissionStatus(
   db: D1Database,
   id: string,
