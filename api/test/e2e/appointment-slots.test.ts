@@ -377,6 +377,11 @@ describe('Appointment Slots Integration', () => {
     it('should reject dates within advance notice window', async () => {
       // Use today's UTC date — its 9 AM NY (= 13:00 or 14:00 UTC) is at most ~24h
       // out and may already be in the past, so the 24h advance check rejects it.
+      // Paint every day: a day with no hours answers day_off before the notice
+      // window is consulted, so a Mon-Fri grid would fail this on weekends.
+      await env.DB.prepare('UPDATE appointment_config SET weekly_hours = ? WHERE id = 1')
+        .bind(weeklyHoursFrom([0, 1, 2, 3, 4, 5, 6], 9, 17))
+        .run()
       const today = new Date().toISOString().split('T')[0]
 
       const response = await fetchSlots(today, 30)
@@ -464,6 +469,20 @@ describe('Appointment Slots Integration', () => {
     it('should reject unavailable day of week (weekend)', async () => {
       // Pick the next Sunday at least 5 days out using UTC math (avoids local-TZ flake).
       const date = nextUtcWeekday(0, 5)
+
+      const response = await fetchSlots(date, 30)
+      expect(response.status).toBe(400)
+      const data = (await response.json()) as { message: string }
+      expect(data.message).toContain('day of the week')
+    })
+
+    it('answers day_off, not too_soon, for an unpainted day inside the notice window', async () => {
+      // A notice window wider than a week puts the next Sunday inside it; the
+      // Mon-Fri grid leaves that Sunday unpainted. The day-of-week answer wins.
+      await env.DB.prepare('UPDATE appointment_config SET min_advance_hours = ? WHERE id = 1')
+        .bind(24 * 9)
+        .run()
+      const date = nextUtcWeekday(0, 1)
 
       const response = await fetchSlots(date, 30)
       expect(response.status).toBe(400)
