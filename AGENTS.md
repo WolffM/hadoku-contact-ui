@@ -355,9 +355,8 @@ and produced nothing at all until 2026-08-27 without anyone noticing.
 
 Two things now make it visible:
 
-- `logMeetingLinkFailed` on every failed generation. Note this only reaches
-  Workers Logs — `logEvent` writes to `console`, it does **not** write to
-  Analytics Engine despite taking an `env`. Findable, not alerting.
+- `logMeetingLinkFailed` on every failed generation, a `service_events` row
+  (see "Telemetry and the booking email" below). Findable, not alerting.
 - **The canary in `handleScheduled`** — `checkCalendarCredential` exchanges the
   refresh token daily. It is the alerting half, and it works by THROWING: a
   thrown step makes `/internal/run-daily` return 500, mgmt-api records the
@@ -388,6 +387,40 @@ Full procedure: `../hadoku_site/docs/operations/google-meet-setup.md`.
 Pinned by `api/test/e2e/credential-canary.test.ts` (dead credential fails the
 job; retention still ran) and `api/test/unit/credential-check.test.ts` (the
 configuration branching, which the e2e tests cannot reach).
+
+## Telemetry and the booking email
+
+**Every `log*` call in `telemetry.ts` is a `service_events` row**, posted to
+`/health/api/telemetry` as this worker's `HADOKU_SERVICE_KEY` with
+`context.service: "contact"` and `event=contact.<type>`, deferred with
+`waitUntil`. Build the sink per request with `telemetryFor(c)`. Until
+2026-11-22 these went to `console` only, which no session can read, so whether
+a booking's confirmation went out had no answer.
+
+**Every subrequest to `https://hadoku.me` goes through `edgeFetch`**
+(`utils/edge-fetch.ts`) and the consuming worker's `EDGE_ROUTER` service
+binding. From inside the zone a plain `fetch()` skips edge-router and lands on
+the DNS origin, a 522 since hadoku_site#530; the task-calendar mirror died that
+way and nothing said so. A new call to hadoku.me that uses `fetch()` repeats it.
+
+**The email domain is checked on submit** (`services/email-domain.ts`). An
+address whose domain is NXDOMAIN, or has only a null MX, or no MX/A/AAAA at
+all, is refused with a 400 naming `field: "email"`, before anything is stored
+or whitelisted. The case is 2026-11-21's `ruben@foreet-ai.org` for
+`forest-ai.org`: a well-formed address that booked a meeting and mailed its
+link nowhere. A failed lookup lets the submission through (fail open) and
+logs `email_domain_unverified`; a whitelisted sender is not looked up.
+`EMAIL_DOMAIN_CHECK=off` disables it, and only the test config sets that, since
+its fixtures use `example.com` (a null MX). `email-domain-check.test.ts` drives
+the route with it on.
+
+**A confirmation is tracked to its last delivery webhook.** Resend's id is
+stored as `appointments.confirmation_email_id` when the send is accepted
+(`confirmation_status = 'sent'`), and `routes/inbound.ts` applies each
+`email.{sent,delivery_delayed,delivered,bounced,complained,failed}` webhook for
+that id. Webhooks arrive out of order, so a status only replaces one it
+outranks, and bounced, complained and failed are final. A delivery event for
+any other mail (the operator's own sends) is acknowledged and changes nothing.
 
 ## Mail carries its booking
 

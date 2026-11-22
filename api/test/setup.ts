@@ -37,6 +37,8 @@ import migration0009 from '../migrations/0009_platform_optional.sql'
 import migration0010 from '../migrations/0010_weekly_hours.sql'
 // @ts-expect-error — .sql imports handled by vite plugin
 import migration0011 from '../migrations/0011_drop_shared_hours.sql'
+// @ts-expect-error — .sql imports handled by vite plugin
+import migration0012 from '../migrations/0012_confirmation_delivery.sql'
 
 /**
  * Split SQL into individual statements, stripping comments.
@@ -70,7 +72,8 @@ const migrations = [
   migration0008,
   migration0009,
   migration0010,
-  migration0011
+  migration0011,
+  migration0012
 ]
 const migrationStatements = migrations.flatMap(splitStatements)
 

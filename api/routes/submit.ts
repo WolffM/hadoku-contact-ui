@@ -21,14 +21,17 @@ import {
   getAppointmentConfig,
   getEmailTemplate,
   setSubmissionSubject,
-  toBookingWindow
+  toBookingWindow,
+  recordConfirmationSent
 } from '../storage'
 import { isOfferedStart } from '../utils/booking-window'
 import { localDateOf } from '../utils/timezone'
 import { checkRateLimit, recordSubmission } from '../rate-limit'
 import { generateMeetingLink, meetingTitle } from '../services/meeting-links'
 import { isSpaceId } from '../services/meeting-space'
-import { mirrorInBackground, pushAppointmentToCalendar } from '../services/task-calendar'
+import { pushAppointmentToCalendar } from '../services/task-calendar'
+import { checkEmailDomain } from '../services/email-domain'
+import { runInBackground } from '../utils/background'
 import { createEmailProvider } from '../email'
 import {
   formatAppointmentConfirmation,
@@ -41,6 +44,9 @@ import { EMAIL_CONFIG, RATE_LIMIT_CONFIG } from '../constants'
 import type { HadokuAuthContext } from '../types'
 import { tierAtLeast } from '../utils/auth'
 import {
+  telemetryFor,
+  logEmailDomainRejected,
+  logEmailDomainUnverified,
   logRateLimitHit,
   logRateLimitWarning,
   logEmailSent,
@@ -72,11 +78,16 @@ interface Env {
   DB: D1Database
   RATE_LIMIT_KV: KVNamespace
   TEMPLATES_KV: KVNamespace
-  ANALYTICS_ENGINE?: AnalyticsEngineDataset
   EMAIL_PROVIDER?: string
   RESEND_API_KEY?: string
-  // task-calendar bridge — see services/task-calendar.ts
+  // task-calendar bridge — see services/task-calendar.ts. The same key posts
+  // telemetry (telemetry.ts); both reach hadoku.me through EDGE_ROUTER.
   HADOKU_SERVICE_KEY?: string
+  EDGE_ROUTER?: Fetcher
+  // `off` skips the email-domain DNS check (services/email-domain.ts). Only the
+  // test config sets it: its fixtures use example.com, which publishes a null
+  // MX and is correctly refused. Anything else, including unset, enforces it.
+  EMAIL_DOMAIN_CHECK?: string
   TASK_CALENDAR_BOARD?: string
   TASK_API_URL?: string
 }
@@ -91,6 +102,7 @@ export function createSubmitRoutes(rateLimitOverrides?: {
     const db = c.env.DB
     const kv = c.env.RATE_LIMIT_KV
     const request = c.req.raw
+    const t = telemetryFor(c)
 
     try {
       let body: Record<string, unknown>
@@ -132,7 +144,7 @@ export function createSubmitRoutes(rateLimitOverrides?: {
         ? { allowed: true, remaining: 999, resetAt: 0 }
         : await checkRateLimit(kv, ipAddress, rateLimitOverrides)
       if (!rateLimitResult.allowed) {
-        logRateLimitHit(c.env, hashIP(ipAddress), rateLimitResult.remaining, '/submit')
+        logRateLimitHit(t, hashIP(ipAddress), rateLimitResult.remaining, '/submit')
 
         return c.json(
           {
@@ -154,7 +166,7 @@ export function createSubmitRoutes(rateLimitOverrides?: {
       }
 
       if (rateLimitResult.remaining <= 1) {
-        logRateLimitWarning(c.env, hashIP(ipAddress), rateLimitResult.remaining, '/submit')
+        logRateLimitWarning(t, hashIP(ipAddress), rateLimitResult.remaining, '/submit')
       }
 
       const validation = validateContactSubmission(body)
@@ -172,6 +184,32 @@ export function createSubmitRoutes(rateLimitOverrides?: {
       const sanitized = validation.sanitized
       if (!sanitized) {
         return c.json({ success: false, message: 'Validation failed' }, 400)
+      }
+
+      // A well-formed address on a domain that cannot receive mail: a typo
+      // (`foreet-ai.org` for `forest-ai.org`, 2026-11-21) that would otherwise
+      // book a meeting whose confirmation goes nowhere. A whitelisted sender has
+      // already been replied to, so its domain is known to work.
+      if (c.env.EMAIL_DOMAIN_CHECK !== 'off' && !isWhitelisted) {
+        const domain = await checkEmailDomain(sanitized.email)
+        if (domain.status === 'nonexistent' || domain.status === 'no_mail') {
+          logEmailDomainRejected(t, domain.domain, domain.status)
+          return c.json(
+            {
+              success: false,
+              error: 'Validation failed',
+              field: 'email',
+              message:
+                domain.status === 'nonexistent'
+                  ? `${domain.domain} does not exist. Check the spelling of your email.`
+                  : `${domain.domain} does not accept email. Check the spelling of your email.`
+            },
+            400
+          )
+        }
+        if (domain.status === 'unknown') {
+          logEmailDomainUnverified(t, domain.domain, domain.error)
+        }
       }
 
       const userAgent = request.headers.get('User-Agent')
@@ -197,7 +235,7 @@ export function createSubmitRoutes(rateLimitOverrides?: {
         await recordSubmission(kv, ipAddress, rateLimitOverrides)
       }
 
-      logSubmissionCreated(c.env, sanitized.recipient || 'default')
+      logSubmissionCreated(t, sanitized.recipient || 'default')
 
       // A blocked sender must never be auto-whitelisted. The whitelist entry
       // would survive the block being lifted and silently re-admit them, and
@@ -276,7 +314,7 @@ export function createSubmitRoutes(rateLimitOverrides?: {
         )
 
         if (!slotAvailable) {
-          logAppointmentConflict(c.env, appointmentData.slotId)
+          logAppointmentConflict(t, appointmentData.slotId)
 
           const updatedSlots = await getAppointmentsByDate(db, appointmentData.date)
 
@@ -324,7 +362,7 @@ export function createSubmitRoutes(rateLimitOverrides?: {
             meetingLinkResult.error
           )
           logMeetingLinkFailed(
-            c.env,
+            t,
             appointmentData.platform,
             meetingLinkResult.error ?? 'Unknown error'
           )
@@ -364,7 +402,7 @@ export function createSubmitRoutes(rateLimitOverrides?: {
         // Mirror the booking into the owner's task calendar (best-effort, once).
         // Never blocks or fails the booking — handed to waitUntil; the push
         // itself swallows all errors.
-        mirrorInBackground(c, pushAppointmentToCalendar(appointment, c.env))
+        runInBackground(c, pushAppointmentToCalendar(appointment, c.env))
 
         try {
           const providerName = c.env.EMAIL_PROVIDER ?? 'resend'
@@ -434,24 +472,29 @@ export function createSubmitRoutes(rateLimitOverrides?: {
 
           if (!emailResult.success) {
             console.error('Failed to send appointment confirmation email:', emailResult.error)
-            logEmailFailed(c.env, 'appointment_confirmation', emailResult.error || 'Unknown error')
+            logEmailFailed(t, 'appointment_confirmation', emailResult.error || 'Unknown error')
           } else {
             console.log(
               `Appointment confirmation email sent to ${sanitized.email} (${emailResult.messageId})`
             )
             const recipientDomain = sanitized.email.split('@')[1] || 'unknown'
-            logEmailSent(c.env, 'appointment_confirmation', recipientDomain)
+            logEmailSent(t, 'appointment_confirmation', recipientDomain)
+            // The id is what Resend's delivery webhooks carry, so this is what
+            // lets a later bounce land on this booking (routes/inbound.ts).
+            if (emailResult.messageId) {
+              await recordConfirmationSent(db, appointment.id, emailResult.messageId)
+            }
           }
         } catch (emailError) {
           console.error('Error sending appointment confirmation email:', emailError)
           logEmailFailed(
-            c.env,
+            t,
             'appointment_confirmation',
             emailError instanceof Error ? emailError.message : 'Unknown error'
           )
         }
 
-        logAppointmentBooked(c.env, appointmentData.platform, appointmentData.duration)
+        logAppointmentBooked(t, appointmentData.platform, appointmentData.duration)
 
         return c.json(
           {

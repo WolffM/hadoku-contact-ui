@@ -116,6 +116,9 @@ export interface SubmitContactResponse {
   message?: string
   error?: string
   errors?: string[]
+  // The form field a 400 is about, when it is about one: `email` when the
+  // address's domain cannot receive mail. The form shows `message` under it.
+  field?: 'email'
   // The join URL, when the submission booked a slot AND the platform produced
   // one. Absent for a message with no booking, and absent when link generation
   // failed — a Google Meet booking made while OAuth is unconfigured still

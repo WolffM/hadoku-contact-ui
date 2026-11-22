@@ -32,11 +32,13 @@ import {
   logArchive,
   logTrashPurge,
   logSpamPurge,
-  logMeetingLinkFailed
+  logMeetingLinkFailed,
+  telemetryFor,
+  type Telemetry
 } from './telemetry'
 import type { AppContext, ContactEnv, ContactHandlerOptions } from './types'
 
-async function handleScheduled(env: ContactEnv): Promise<void> {
+async function handleScheduled(env: ContactEnv, t: Telemetry): Promise<void> {
   console.log('Running scheduled tasks...')
 
   // Steps throw on failure — the /internal/run-daily route's catch turns that
@@ -49,13 +51,13 @@ async function handleScheduled(env: ContactEnv): Promise<void> {
   console.log(
     `Archived ${archivedCount} submission(s) older than ${RETENTION_CONFIG.ARCHIVE_AFTER_DAYS} days`
   )
-  logArchive(env, archivedCount, RETENTION_CONFIG.ARCHIVE_AFTER_DAYS)
+  logArchive(t, archivedCount, RETENTION_CONFIG.ARCHIVE_AFTER_DAYS)
 
   const purgedCount = await purgeOldDeletedSubmissions(env.DB)
   console.log(
     `Purged ${purgedCount} deleted submission(s) older than ${RETENTION_CONFIG.TRASH_RETENTION_DAYS} days`
   )
-  logTrashPurge(env, purgedCount, RETENTION_CONFIG.TRASH_RETENTION_DAYS)
+  logTrashPurge(t, purgedCount, RETENTION_CONFIG.TRASH_RETENTION_DAYS)
 
   // Spam's own clock. It runs after the archive step by necessity rather than
   // taste: archiveOldSubmissions skips `spammed_at IS NOT NULL` rows entirely, so
@@ -65,7 +67,7 @@ async function handleScheduled(env: ContactEnv): Promise<void> {
   console.log(
     `Purged ${spamPurgedCount} spam submission(s) blocked more than ${RETENTION_CONFIG.SPAM_RETENTION_DAYS} days ago`
   )
-  logSpamPurge(env, spamPurgedCount, RETENTION_CONFIG.SPAM_RETENTION_DAYS)
+  logSpamPurge(t, spamPurgedCount, RETENTION_CONFIG.SPAM_RETENTION_DAYS)
 
   // Policy convergence, not retention. With the whitelist tier switched off
   // nothing produces `not_whitelisted` any more, so a row still carrying it is
@@ -99,7 +101,7 @@ async function handleScheduled(env: ContactEnv): Promise<void> {
     console.log(
       `Database capacity: ${dbSize.percentUsed.toFixed(1)}% (${(dbSize.sizeBytes / 1024 / 1024).toFixed(2)} MB)`
     )
-    logDbCapacity(env, dbSize.percentUsed, dbSize.sizeBytes)
+    logDbCapacity(t, dbSize.percentUsed, dbSize.sizeBytes)
 
     if (dbSize.warning) {
       console.warn('WARNING: Database capacity threshold exceeded!')
@@ -112,15 +114,15 @@ async function handleScheduled(env: ContactEnv): Promise<void> {
   // dead meeting credential never costs a night of archiving or purging.
   //
   // It throws rather than logging because throwing is the only thing here that
-  // reaches a human. logEvent() writes to console, and console goes to Workers
-  // Logs, which nobody is watching at 3am; a failed job, by contrast, is posted
+  // reaches a human. logEvent() writes a service_events row, which nothing pages
+  // on; a failed job, by contrast, is posted
   // to /health/api/jobs and monitoring-api's job-alerts pages Discord off the
   // `failed` state with no per-job wiring. The message therefore has to say
   // plainly that this is the meeting credential and not the purge, because the
   // alert it produces is titled with the job, not the step.
   const credential = await checkCalendarCredential(env)
   if (credential.configured && !credential.alive) {
-    logMeetingLinkFailed(env, 'google', credential.error)
+    logMeetingLinkFailed(t, 'google', credential.error)
     throw new Error(
       `Google Calendar credential is dead — retention steps all succeeded, this is ONLY the meeting-link credential. ` +
         `Google Meet bookings are still succeeding but storing meeting_link = null. ` +
@@ -199,7 +201,7 @@ export function createContactHandler(basePath = '/contact/api', options?: Contac
 
     const startTime = Date.now()
     try {
-      await handleScheduled(c.env)
+      await handleScheduled(c.env, telemetryFor(c))
       return c.json({ success: true, duration_ms: Date.now() - startTime })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)

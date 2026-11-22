@@ -83,8 +83,10 @@ export {
   getAllAppointments,
   getAppointmentById,
   updateAppointmentStatus,
-  markConfirmationSent,
-  markReminderSent
+  recordConfirmationSent,
+  applyConfirmationStatus,
+  CONFIRMATION_STATUSES,
+  type ConfirmationStatus
 } from './appointments'
 
 export {

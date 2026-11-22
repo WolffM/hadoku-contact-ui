@@ -6,7 +6,7 @@ summary: >-
   with admin screens that need an account to manage what comes in.
 features:
   - name: Contact form
-    summary: 'Name, email and a message, with a hidden honeypot field and a same-site referrer check.'
+    summary: 'Name, email and a message, with a honeypot field, a same-site referrer check and a refusal of email domains that cannot receive mail.'
     anchor: contact-form
   - name: Booking a meeting
     summary: 'Pick a duration and a free slot; the calendar greys out anything the booking window or an existing booking already rules out.'

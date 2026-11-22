@@ -15,6 +15,10 @@ automated spam out before it is even validated.
 "message submitted" response; there is no reply inside the app — the operator
 answers by email.
 
+An email address on a domain that does not exist, or that accepts no mail, is
+refused at submit with the reason shown under the email field, so a typo such
+as `foreet-ai.org` for `forest-ai.org` is caught before anything is sent.
+
 **What it does not do.** No attachments, no subject line, no account or
 history of your own past messages.
 
@@ -34,6 +38,9 @@ day, a time and a video platform, then submit alongside your message. A slot
 someone else takes in the few seconds before you submit comes back as a
 conflict with the day's remaining open times, so you can pick again without
 reloading.
+
+The operator can see what happened to your confirmation email: sent,
+delivered, delayed, or bounced.
 
 **What it does not do.** No rescheduling or cancelling your own booking from
 the form — ask the operator. No recurring bookings.

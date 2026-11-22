@@ -39,7 +39,8 @@ export class AppointmentAPIError extends Error {
     public type: AppointmentError['type'],
     message: string,
     public retryable: boolean = false,
-    public updatedSlots?: AppointmentError['updatedSlots']
+    public updatedSlots?: AppointmentError['updatedSlots'],
+    public field?: SubmitContactResponse['field']
   ) {
     super(message)
     this.name = 'AppointmentAPIError'
@@ -228,7 +229,9 @@ export async function submitContactWithAppointment(
       throw new AppointmentAPIError(
         'validation',
         data.message || data.errors?.join(', ') || 'Validation error',
-        false
+        false,
+        undefined,
+        data.field
       )
     }
 

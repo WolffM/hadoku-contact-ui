@@ -49,11 +49,13 @@
  */
 
 import type { StoredAppointment } from '../storage/appointments'
+import { edgeFetch, type EdgeFetchEnv } from '../utils/edge-fetch'
 
-// Production create endpoint, reachable from a Worker subrequest via the edge.
+// Production create endpoint. Reached through edgeFetch: a plain fetch() to
+// hadoku.me from inside the zone goes to the dead DNS origin, not edge-router.
 const DEFAULT_TASK_API_URL = 'https://hadoku.me/task/api'
 
-export interface TaskCalendarEnv {
+export interface TaskCalendarEnv extends EdgeFetchEnv {
   // This worker's OWN service-tier key, sent as X-User-Key. It needs no special
   // tier — only a board_shares grant from the calendar owner. When unset the
   // push is skipped so the originating action still succeeds (calendar
@@ -226,7 +228,7 @@ export async function resolveCalendarBoard(
 
   const base = env.TASK_API_URL || DEFAULT_TASK_API_URL
   try {
-    const res = await fetch(`${base}/boards`, { headers: { 'X-User-Key': key } })
+    const res = await edgeFetch(env, `${base}/boards`, { headers: { 'X-User-Key': key } })
     if (!res.ok) {
       console.error(`[task-calendar] board discovery failed (HTTP ${res.status})`)
       return null
@@ -287,7 +289,7 @@ export async function postTaskToCalendar(
   const id = String(body.id)
 
   try {
-    const res = await fetch(url, {
+    const res = await edgeFetch(env, url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -359,7 +361,7 @@ export async function deleteTaskFromCalendar(
   const url = `${base}/${encodeURIComponent(taskId)}?boardId=${encodeURIComponent(board)}`
 
   try {
-    const res = await fetch(url, { method: 'DELETE', headers: { 'X-User-Key': key } })
+    const res = await edgeFetch(env, url, { method: 'DELETE', headers: { 'X-User-Key': key } })
 
     if (!res.ok) {
       const text = await res.text().catch(() => '')
@@ -378,30 +380,6 @@ export async function deleteTaskFromCalendar(
   } catch (err) {
     console.error(`[task-calendar] delete errored for ${taskId}:`, err)
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
-  }
-}
-
-/**
- * Hand a best-effort mirror to the platform so it outlives the response.
- *
- * `c.executionCtx` THROWS when the request has no execution context (tests, some
- * dispatch paths), so the property access itself has to sit inside the try. The
- * mirror already swallows its own errors, so letting it run unawaited there is
- * safe — the worst case is that it doesn't finish.
- */
-export function mirrorInBackground(
-  ctx: { executionCtx: { waitUntil(promise: Promise<unknown>): void } },
-  // Promise<unknown>, not Promise<CalendarPushResult>: this only fires and
-  // forgets, and the calendar mirror is no longer the sole background job —
-  // revoking a cancelled booking's Discord space rides the same path. Narrowing
-  // it to the calendar's own result type described the first caller rather than
-  // what the function does.
-  mirror: Promise<unknown>
-): void {
-  try {
-    ctx.executionCtx.waitUntil(mirror)
-  } catch {
-    void mirror
   }
 }
 

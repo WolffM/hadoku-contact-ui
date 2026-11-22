@@ -64,8 +64,41 @@ export interface StoredAppointment {
   cancelled_at: number | null
   ip_address: string | null
   user_agent: string | null
-  confirmation_sent: boolean
-  reminder_sent: boolean
+  /** Resend's id for the confirmation email; null until a send is accepted. */
+  confirmation_email_id: string | null
+  /** The latest delivery webhook for that id: see ConfirmationStatus. */
+  confirmation_status: ConfirmationStatus | null
+  confirmation_status_at: number | null
+}
+
+/**
+ * What happened to a booking's confirmation email. `sent` is written when
+ * Resend accepts the send; the rest arrive by webhook (routes/inbound.ts).
+ */
+export const CONFIRMATION_STATUSES = [
+  'sent',
+  'delivery_delayed',
+  'delivered',
+  'bounced',
+  'complained',
+  'failed'
+] as const
+export type ConfirmationStatus = (typeof CONFIRMATION_STATUSES)[number]
+
+/**
+ * Webhooks can arrive out of order, so a status only replaces one it outranks:
+ * `delivered` must not be overwritten by a late `sent`, and a bounce or
+ * complaint is final.
+ */
+// `failed` is Resend refusing the send after accepting it. Like a bounce, the
+// guest never got it.
+const CONFIRMATION_RANK: Record<ConfirmationStatus, number> = {
+  sent: 0,
+  delivery_delayed: 1,
+  delivered: 2,
+  bounced: 3,
+  complained: 3,
+  failed: 3
 }
 
 export interface CreateAppointmentParams {
@@ -157,8 +190,8 @@ export async function createAppointment(
       `INSERT INTO appointments
 			(id, submission_id, name, email, message, slot_id, date, start_time, end_time,
 			 duration, timezone, platform, meeting_link, meeting_id, status,
-			 created_at, updated_at, ip_address, user_agent, confirmation_sent, reminder_sent)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?, ?, 0, 0)`
+			 created_at, updated_at, ip_address, user_agent)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, ?, ?, ?)`
     )
     .bind(
       id,
@@ -203,8 +236,9 @@ export async function createAppointment(
     cancelled_at: null,
     ip_address: params.ip_address ?? null,
     user_agent: params.user_agent ?? null,
-    confirmation_sent: false,
-    reminder_sent: false
+    confirmation_email_id: null,
+    confirmation_status: null,
+    confirmation_status_at: null
   }
 
   return result
@@ -407,20 +441,50 @@ export async function updateAppointmentStatus(
   return result.success
 }
 
-export async function markConfirmationSent(db: D1Database, id: string): Promise<boolean> {
-  const result = await db
-    .prepare(`UPDATE appointments SET confirmation_sent = 1 WHERE id = ?`)
-    .bind(id)
+/** Record that Resend accepted the confirmation, under the id its webhooks will carry. */
+export async function recordConfirmationSent(
+  db: D1Database,
+  id: string,
+  emailId: string
+): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE appointments
+       SET confirmation_email_id = ?, confirmation_status = 'sent', confirmation_status_at = ?
+       WHERE id = ?`
+    )
+    .bind(emailId, Date.now(), id)
     .run()
-
-  return result.success
 }
 
-export async function markReminderSent(db: D1Database, id: string): Promise<boolean> {
-  const result = await db
-    .prepare(`UPDATE appointments SET reminder_sent = 1 WHERE id = ?`)
-    .bind(id)
-    .run()
+/**
+ * Apply a delivery webhook to the appointment whose confirmation it reports.
+ * Returns that appointment (id and email), or null when the email id is not a
+ * booking confirmation. Mail the operator sends from the command station has
+ * the same webhooks and no row here. A status that does not outrank the
+ * stored one still matches, and changes nothing.
+ */
+export async function applyConfirmationStatus(
+  db: D1Database,
+  emailId: string,
+  status: ConfirmationStatus
+): Promise<{ id: string; email: string } | null> {
+  const row = await db
+    .prepare(
+      `SELECT id, email, confirmation_status FROM appointments WHERE confirmation_email_id = ?`
+    )
+    .bind(emailId)
+    .first<{ id: string; email: string; confirmation_status: ConfirmationStatus | null }>()
+  if (!row) return null
 
-  return result.success
+  const current = row.confirmation_status
+  if (current === null || CONFIRMATION_RANK[status] > CONFIRMATION_RANK[current]) {
+    await db
+      .prepare(
+        `UPDATE appointments SET confirmation_status = ?, confirmation_status_at = ? WHERE id = ?`
+      )
+      .bind(status, Date.now(), row.id)
+      .run()
+  }
+  return { id: row.id, email: row.email }
 }

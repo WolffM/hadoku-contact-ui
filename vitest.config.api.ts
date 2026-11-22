@@ -19,6 +19,10 @@ export default defineWorkersConfig({
             // Edge-auth: tests authenticate the way edge-router stamps
             // requests (X-Edge-Auth + X-Hadoku-Tier), not X-User-Key.
             EDGE_AUTH_SECRET: 'test-edge-secret',
+            // The email-domain DNS check is off for the suite: fixtures use
+            // example.com, which publishes a null MX and is correctly refused.
+            // email-domain-check.test.ts drives the route with it ON.
+            EMAIL_DOMAIN_CHECK: 'off',
             RESEND_API_KEY: 'test-resend-key',
             // Svix's published reference secret, so the signer in the webhook
             // tests can be checked against Svix's own vector.

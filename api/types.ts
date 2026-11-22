@@ -9,7 +9,6 @@ export interface ContactEnv {
   DB: D1Database
   RATE_LIMIT_KV: KVNamespace
   TEMPLATES_KV: KVNamespace
-  ANALYTICS_ENGINE?: AnalyticsEngineDataset
   // Edge provenance secret — createEdgeAuth verifies inbound X-Edge-Auth.
   EDGE_AUTH_SECRET?: string
   EMAIL_PROVIDER?: string
@@ -36,6 +35,12 @@ export interface ContactEnv {
   // task-calendar bridge — registered key identifying the calendar owner and an
   // optional endpoint override. See services/task-calendar.ts.
   HADOKU_SERVICE_KEY?: string
+  // edge-router, bound as a service. Every subrequest to https://hadoku.me goes
+  // through it (utils/edge-fetch.ts): from inside the zone a plain fetch() goes
+  // to the dead DNS origin instead. Unbound falls back to fetch().
+  EDGE_ROUTER?: Fetcher
+  // `off` disables the email-domain DNS check on submit (test config only).
+  EMAIL_DOMAIN_CHECK?: string
   TASK_CALENDAR_BOARD?: string
   TASK_API_URL?: string
   // Meeting-link generation (services/meeting-links.ts, services/google-meet.ts).

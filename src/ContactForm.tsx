@@ -164,7 +164,11 @@ export default function ContactForm() {
     } catch (error) {
       setStatus('error')
 
-      if (error instanceof AppointmentAPIError) {
+      if (error instanceof AppointmentAPIError && error.field === 'email') {
+        // Shown under the field it is about, like a client-side check.
+        setStatus('idle')
+        setErrors(prev => ({ ...prev, email: error.message }))
+      } else if (error instanceof AppointmentAPIError) {
         setErrorMessage(error.message)
 
         // Handle slot conflict - auto-refresh slots

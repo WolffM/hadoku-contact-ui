@@ -38,8 +38,9 @@ const SAMPLE: StoredAppointment = {
   cancelled_at: null,
   ip_address: null,
   user_agent: null,
-  confirmation_sent: false,
-  reminder_sent: false
+  confirmation_email_id: null,
+  confirmation_status: null,
+  confirmation_status_at: null
 }
 
 describe('buildTaskFromAppointment', () => {

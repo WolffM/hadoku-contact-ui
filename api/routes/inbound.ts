@@ -13,7 +13,13 @@
 
 import { Hono } from 'hono'
 import { ok, badRequest } from '../utils/responses'
-import { getLedgerEntry } from '../storage'
+import {
+  getLedgerEntry,
+  applyConfirmationStatus,
+  CONFIRMATION_STATUSES,
+  type ConfirmationStatus
+} from '../storage'
+import { telemetryFor, logEmailDelivery } from '../telemetry'
 import { ingestInboundEmail, extractAddress } from '../services/inbound-ingest'
 import { verifySvixSignature } from '../utils/svix'
 import type { AppContext } from '../types'
@@ -27,6 +33,18 @@ interface ResendWebhookEvent {
     to: string[]
     subject: string
   }
+}
+
+/**
+ * `email.delivered` → `delivered`, for the delivery events a booking
+ * confirmation can have. Null for every other type.
+ */
+function deliveryStatusOf(type: string): ConfirmationStatus | null {
+  if (!type.startsWith('email.')) return null
+  const status = type.slice('email.'.length)
+  return (CONFIRMATION_STATUSES as readonly string[]).includes(status)
+    ? (status as ConfirmationStatus)
+    : null
 }
 
 interface ResendEmailDetails {
@@ -71,6 +89,28 @@ export function createInboundRoutes() {
 
     try {
       const event = JSON.parse(rawBody) as ResendWebhookEvent
+      // Delivery events for mail WE sent. One whose id is a booking
+      // confirmation lands on that appointment: this is how a confirmation
+      // that bounced off a mistyped address becomes visible. These were
+      // acknowledged and dropped until 2026-11-22, so the 11-21 booking's
+      // event, one second after it was made, left no trace.
+      const deliveryStatus = deliveryStatusOf(event.type ?? '')
+      if (deliveryStatus) {
+        const emailId = event.data?.email_id
+        const appointment = emailId
+          ? await applyConfirmationStatus(c.env.DB, emailId, deliveryStatus)
+          : null
+        if (appointment) {
+          logEmailDelivery(
+            telemetryFor(c),
+            deliveryStatus,
+            appointment.email.split('@')[1] ?? 'unknown',
+            appointment.id
+          )
+        }
+        return ok(c, { success: true, delivery: deliveryStatus, matched: appointment !== null })
+      }
+
       // Any other event type is acknowledged and ignored. That includes the
       // daily credential probe (hadoku_site's `resend-webhook` prober), which
       // signs a `hadoku.secret-probe` event with the vault's copy of the

@@ -22,7 +22,8 @@ import {
   VALIDATION_CONSTRAINTS,
   type AppointmentPlatform
 } from '../../constants'
-import { mirrorInBackground, pushAppointmentToCalendar } from '../../services/task-calendar'
+import { pushAppointmentToCalendar } from '../../services/task-calendar'
+import { runInBackground } from '../../utils/background'
 import { operatorLinkFor } from '../../services/meeting-space'
 import { retractMeetingArtifacts } from '../../services/appointment-cleanup'
 import type { AppContext } from '../../types'
@@ -224,7 +225,7 @@ export function createAppointmentAdminRoutes() {
 
       // Mirror into the owner's task calendar (best-effort, once). Never blocks
       // or fails the booking — the push swallows its own errors.
-      mirrorInBackground(c, pushAppointmentToCalendar(appointment, c.env))
+      runInBackground(c, pushAppointmentToCalendar(appointment, c.env))
 
       return adminOk(c, { appointment }, 201)
     } catch (error) {
@@ -322,7 +323,7 @@ export function createAppointmentStatusRoutes() {
       // because the command station's delete button must perform exactly the
       // same one. It used to live here, and the delete path did none of it.
       if (body.status === 'cancelled') {
-        mirrorInBackground(c, retractMeetingArtifacts(id, c.env))
+        runInBackground(c, retractMeetingArtifacts(id, c.env))
       }
 
       return adminOk(c, { success: true, message: 'Appointment status updated successfully' })
