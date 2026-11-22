@@ -47,6 +47,7 @@ import {
   telemetryFor,
   logEmailDomainRejected,
   logEmailDomainUnverified,
+  logCalendarMirror,
   logRateLimitHit,
   logRateLimitWarning,
   logEmailSent,
@@ -402,7 +403,12 @@ export function createSubmitRoutes(rateLimitOverrides?: {
         // Mirror the booking into the owner's task calendar (best-effort, once).
         // Never blocks or fails the booking — handed to waitUntil; the push
         // itself swallows all errors.
-        runInBackground(c, pushAppointmentToCalendar(appointment, c.env))
+        runInBackground(
+          c,
+          pushAppointmentToCalendar(appointment, c.env).then(result =>
+            logCalendarMirror(t, result, appointment.id)
+          )
+        )
 
         try {
           const providerName = c.env.EMAIL_PROVIDER ?? 'resend'

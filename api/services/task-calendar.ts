@@ -51,8 +51,7 @@
 import type { StoredAppointment } from '../storage/appointments'
 import { edgeFetch, type EdgeFetchEnv } from '../utils/edge-fetch'
 
-// Production create endpoint. Reached through edgeFetch: a plain fetch() to
-// hadoku.me from inside the zone goes to the dead DNS origin, not edge-router.
+// Production create endpoint, reached through edgeFetch (utils/edge-fetch.ts).
 const DEFAULT_TASK_API_URL = 'https://hadoku.me/task/api'
 
 export interface TaskCalendarEnv extends EdgeFetchEnv {

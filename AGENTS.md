@@ -399,9 +399,11 @@ a booking's confirmation went out had no answer.
 
 **Every subrequest to `https://hadoku.me` goes through `edgeFetch`**
 (`utils/edge-fetch.ts`) and the consuming worker's `EDGE_ROUTER` service
-binding. From inside the zone a plain `fetch()` skips edge-router and lands on
-the DNS origin, a 522 since hadoku_site#530; the task-calendar mirror died that
-way and nothing said so. A new call to hadoku.me that uses `fetch()` repeats it.
+binding, following monitoring-api, which measured a same-zone `fetch()` landing
+on the DNS origin (a 522 since hadoku_site#530). Whether that is what stopped
+the 2026-11-21 booking's calendar mirror is NOT known: jobplatform-api's plain
+`fetch()` to hadoku.me reaches the edge from inside a request. The mirror's
+outcome is a `calendar_mirror` event now, so the next booking says.
 
 **The email domain is checked on submit** (`services/email-domain.ts`). An
 address whose domain is NXDOMAIN, or has only a null MX, or no MX/A/AAAA at

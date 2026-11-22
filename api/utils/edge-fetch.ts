@@ -1,17 +1,20 @@
 /**
  * fetch() that reaches edge-router for any URL on hadoku.me itself.
  *
- * This worker runs inside hadoku.me's zone when edge-router invokes it, and a
- * Worker's global fetch() to its own zone skips every Worker route on it and
- * goes to the zone's DNS origin. Since hadoku_site#530 that origin is
- * `AAAA 100::`, which answers 522, so every subrequest to `https://hadoku.me/…`
- * died before edge-router saw it. The calendar mirror is how that showed up:
- * the 2026-11-21 booking left no `/task/api` row in request_logs at all.
+ * monitoring-api measured that a Worker's global fetch() to its own zone can
+ * skip every Worker route and land on the zone's DNS origin, a 522 since
+ * hadoku_site#530 (its services/edge-fetch.ts). The binding takes that
+ * question off the table for this worker's own calls to hadoku.me.
+ *
+ * It is NOT established that contact-api was hit by it. The 2026-11-21
+ * booking's calendar mirror left no /task/api row, but jobplatform-api's
+ * plain fetch() to /contact/api/mailfeed from inside a request reaches the
+ * edge fine (2026-11-22 18:30). The mirror's outcome is now reported to
+ * telemetry (`calendar_mirror`), which is how the cause gets found.
  *
  * The consuming worker binds edge-router as `EDGE_ROUTER` (a `[[services]]`
- * entry), which reaches it from any context. Unbound — tests, a deployment
- * without the binding — falls back to the global fetch, which is correct
- * wherever the caller is not in the zone. Any other host keeps the global fetch.
+ * entry). Unbound (tests, a deployment without it) falls back to the global
+ * fetch. Any other host keeps the global fetch.
  */
 
 export const EDGE_ORIGIN = 'https://hadoku.me'

@@ -20,6 +20,7 @@
 
 import { edgeFetch, EDGE_ORIGIN, type EdgeFetchEnv } from './utils/edge-fetch'
 import { runInBackground, type BackgroundContext } from './utils/background'
+import type { CalendarPushResult } from './services/task-calendar'
 
 export const EventType = {
   RATE_LIMIT_HIT: 'rate_limit_hit',
@@ -47,7 +48,11 @@ export const EventType = {
   // publishes no mail server. 2026-11-21's `foreet-ai.org` booking is the case.
   EMAIL_DOMAIN_REJECTED: 'email_domain_rejected',
   // The domain lookup itself failed, so the submission went through unchecked.
-  EMAIL_DOMAIN_UNVERIFIED: 'email_domain_unverified'
+  EMAIL_DOMAIN_UNVERIFIED: 'email_domain_unverified',
+  // The outcome of mirroring a booking into the owner's task calendar. The
+  // 2026-11-21 booking's mirror never reached task-api and left no record of
+  // why: no request row, and its console output is unreadable.
+  CALENDAR_MIRROR: 'calendar_mirror'
 } as const
 
 export type EventTypeValue = (typeof EventType)[keyof typeof EventType]
@@ -319,5 +324,23 @@ export function logEmailDomainUnverified(t: Telemetry, domain: string, error: st
     value: 1,
     context: domain.substring(0, 100),
     detail: error.substring(0, 100)
+  })
+}
+
+export function logCalendarMirror(
+  t: Telemetry,
+  result: CalendarPushResult,
+  appointmentId: string
+): void {
+  const outcome = result.ok ? 'ok' : result.skipped ? 'skipped' : 'failed'
+  logEvent(t, {
+    eventType: EventType.CALENDAR_MIRROR,
+    severity: result.ok ? Severity.INFO : result.skipped ? Severity.WARN : Severity.ERROR,
+    value: result.status,
+    context: outcome,
+    detail: [`appointment:${appointmentId}`, result.status && `HTTP ${result.status}`, result.error]
+      .filter(Boolean)
+      .join(' ')
+      .substring(0, 200)
   })
 }

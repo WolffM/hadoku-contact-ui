@@ -24,6 +24,7 @@ import {
 } from '../../constants'
 import { pushAppointmentToCalendar } from '../../services/task-calendar'
 import { runInBackground } from '../../utils/background'
+import { logCalendarMirror, telemetryFor } from '../../telemetry'
 import { operatorLinkFor } from '../../services/meeting-space'
 import { retractMeetingArtifacts } from '../../services/appointment-cleanup'
 import type { AppContext } from '../../types'
@@ -225,7 +226,12 @@ export function createAppointmentAdminRoutes() {
 
       // Mirror into the owner's task calendar (best-effort, once). Never blocks
       // or fails the booking — the push swallows its own errors.
-      runInBackground(c, pushAppointmentToCalendar(appointment, c.env))
+      runInBackground(
+        c,
+        pushAppointmentToCalendar(appointment, c.env).then(result =>
+          logCalendarMirror(telemetryFor(c), result, appointment.id)
+        )
+      )
 
       return adminOk(c, { appointment }, 201)
     } catch (error) {

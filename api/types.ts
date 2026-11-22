@@ -36,8 +36,7 @@ export interface ContactEnv {
   // optional endpoint override. See services/task-calendar.ts.
   HADOKU_SERVICE_KEY?: string
   // edge-router, bound as a service. Every subrequest to https://hadoku.me goes
-  // through it (utils/edge-fetch.ts): from inside the zone a plain fetch() goes
-  // to the dead DNS origin instead. Unbound falls back to fetch().
+  // through it (utils/edge-fetch.ts). Unbound falls back to fetch().
   EDGE_ROUTER?: Fetcher
   // `off` disables the email-domain DNS check on submit (test config only).
   EMAIL_DOMAIN_CHECK?: string
