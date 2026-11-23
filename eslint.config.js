@@ -94,7 +94,7 @@ export default [
 
   // Cloudflare Workers API files — add Workers globals, disable React rules
   {
-    files: ['api/**/*.ts', 'vitest.config.api.ts'],
+    files: ['api/**/*.ts', 'vitest.config.api.ts', 'vitest.config.e2e.ts'],
     languageOptions: {
       globals: {
         // Cloudflare Workers runtime
