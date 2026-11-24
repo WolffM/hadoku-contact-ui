@@ -456,9 +456,9 @@ describe('Appointment Slots Integration', () => {
     })
 
     it('should reject dates too far in the future', async () => {
-      const farFuture = new Date()
-      farFuture.setUTCDate(farFuture.getUTCDate() + 60)
-      const date = farFuture.toISOString().split('T')[0]
+      // A painted weekday: an unpainted day answers day_off before the window is
+      // consulted, so a raw today+60 failed whenever it fell on a weekend (#32).
+      const date = getNextWeekday(60).toISOString().split('T')[0]
 
       const response = await fetchSlots(date, 30)
       expect(response.status).toBe(400)
