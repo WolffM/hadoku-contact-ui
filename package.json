@@ -59,7 +59,7 @@
     "@typescript-eslint/parser": "^8.47.0",
     "@vitejs/plugin-react": "^5.1.1",
     "@wolffm/catalogue": "^1.0.18",
-    "@wolffm/e2e-harness": "^0.2.63",
+    "@wolffm/e2e-harness": "^0.2.66",
     "@wolffm/task-ui-components": "4.23.47",
     "@wolffm/themes": "5.14.16",
     "eslint": "^9.39.1",

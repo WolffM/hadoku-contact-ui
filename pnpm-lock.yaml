@@ -55,8 +55,8 @@ importers:
         specifier: ^1.0.18
         version: 1.0.18
       '@wolffm/e2e-harness':
-        specifier: ^0.2.63
-        version: 0.2.63(@playwright/test@1.65.1)(vitest@3.2.4)
+        specifier: ^0.2.66
+        version: 0.2.66(@playwright/test@1.65.1)(vitest@3.2.4)
       '@wolffm/task-ui-components':
         specifier: 4.23.47
         version: 4.23.47(@wolffm/themes@5.14.16(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -1765,8 +1765,8 @@ packages:
     resolution: {integrity: sha512-ZnW1nQ9AkF7SiFWXM0Up+BnR7IuYnMZiTvJmiw8eZZ67h3UcUx2Ks4Zf8QxRpiAp6IMP85wTTLLK0HnGK0cMwQ==, tarball: https://npm.pkg.github.com/download/@wolffm/catalogue/1.0.18/a5d75f88b8a3a2e01c2be28c4788fe17d738113d}
     engines: {node: '>=18'}
 
-  '@wolffm/e2e-harness@0.2.63':
-    resolution: {integrity: sha512-W4m9s92DFPGOAGWFwlPSY2lT3wz4jVR5ptUhJa0jwBXc9A/ECDBeb2EaT85HVEwpi6FEzNWX2D5ZV0yFQaFD+Q==, tarball: https://npm.pkg.github.com/download/@wolffm/e2e-harness/0.2.63/e291d1cbd72c64a812cf57c67c05631662480144}
+  '@wolffm/e2e-harness@0.2.66':
+    resolution: {integrity: sha512-SnCj4O1xdEVuGKq5cP5shE7cKavKGIDcu7kb7p/dQdKM+Afm3Jrg74huD527pUQzm6O/O+kXUQvCQHac/M5aMQ==, tarball: https://npm.pkg.github.com/download/@wolffm/e2e-harness/0.2.66/c236fec019aa75231626fb2717a9f7a57832b8e1}
     engines: {node: '>=18'}
     peerDependencies:
       '@playwright/test': '>=1.50.0'
@@ -4703,7 +4703,7 @@ snapshots:
 
   '@wolffm/catalogue@1.0.18': {}
 
-  '@wolffm/e2e-harness@0.2.63(@playwright/test@1.65.1)(vitest@3.2.4)':
+  '@wolffm/e2e-harness@0.2.66(@playwright/test@1.65.1)(vitest@3.2.4)':
     dependencies:
       '@playwright/test': 1.65.1
       '@wolffm/shared-vendor': 0.1.4
