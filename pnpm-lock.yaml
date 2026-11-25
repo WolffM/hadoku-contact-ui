@@ -9,11 +9,11 @@ importers:
   .:
     dependencies:
       '@wolffm/logger':
-        specifier: 1.4.4
-        version: 1.4.4
+        specifier: 1.4.5
+        version: 1.4.5
       '@wolffm/prefs-client':
-        specifier: ^1.2.0
-        version: 1.2.0(react@19.2.0)(zod@4.1.12)
+        specifier: ^1.2.1
+        version: 1.2.1(react@19.2.0)(zod@4.1.12)
       date-fns:
         specifier: ^4.1.0
         version: 4.1.0
@@ -55,8 +55,8 @@ importers:
         specifier: ^1.0.18
         version: 1.0.18
       '@wolffm/e2e-harness':
-        specifier: ^0.2.66
-        version: 0.2.66(@playwright/test@1.65.1)(vitest@3.2.4)
+        specifier: ^0.2.67
+        version: 0.2.67(@playwright/test@1.65.1)(vitest@3.2.4)
       '@wolffm/task-ui-components':
         specifier: 4.23.47
         version: 4.23.47(@wolffm/themes@5.14.17(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -1765,26 +1765,26 @@ packages:
     resolution: {integrity: sha512-ZnW1nQ9AkF7SiFWXM0Up+BnR7IuYnMZiTvJmiw8eZZ67h3UcUx2Ks4Zf8QxRpiAp6IMP85wTTLLK0HnGK0cMwQ==, tarball: https://npm.pkg.github.com/download/@wolffm/catalogue/1.0.18/a5d75f88b8a3a2e01c2be28c4788fe17d738113d}
     engines: {node: '>=18'}
 
-  '@wolffm/e2e-harness@0.2.66':
-    resolution: {integrity: sha512-SnCj4O1xdEVuGKq5cP5shE7cKavKGIDcu7kb7p/dQdKM+Afm3Jrg74huD527pUQzm6O/O+kXUQvCQHac/M5aMQ==, tarball: https://npm.pkg.github.com/download/@wolffm/e2e-harness/0.2.66/c236fec019aa75231626fb2717a9f7a57832b8e1}
+  '@wolffm/e2e-harness@0.2.67':
+    resolution: {integrity: sha512-LmuwvtX9Wv1Rh1KYrOh8OIL2X7QQ6ovDAOTsBsdbvjlvVAYXIl+sDfyPR/1GKHzjeExwrXrmMxs8S6Lu1W76tA==, tarball: https://npm.pkg.github.com/download/@wolffm/e2e-harness/0.2.67/826fc77f27b82318a81e6ec5028c73602fc8b2a7}
     engines: {node: '>=18'}
     peerDependencies:
       '@playwright/test': '>=1.50.0'
       vitest: '>=3.1.0'
 
-  '@wolffm/logger@1.4.4':
-    resolution: {integrity: sha512-mHtb1uTXY9U/xTvO3wh6ofy0MnZOxLVkWld0EP4hWZqxbl/crQQ/Bj5Z2PzI/Yjo9Dc+/u3x+J4YH6uJrQyrDQ==, tarball: https://npm.pkg.github.com/download/@wolffm/logger/1.4.4/6fe2bd34648eec3e0b9a817fc56cd907687363a8}
+  '@wolffm/logger@1.4.5':
+    resolution: {integrity: sha512-0st7Zo7DN4g21Fu4+DA0CXZx27HXxejJKnv5bsxMLxtEbzuLUm/Xx/n4TNPn9wTX6uTfhaWQwTWBJ5sx79sIJg==, tarball: https://npm.pkg.github.com/download/@wolffm/logger/1.4.5/5f99e62a77aed1649599a5b144e0338864a348c8}
     engines: {node: '>=18'}
 
-  '@wolffm/prefs-client@1.2.0':
-    resolution: {integrity: sha512-GlNjVutBR5yqlYhjyiz0600UAsA3o+XRjM6HC9FaxiCJo1emwgXBCsBWuZGc8rwJBRXJorNE6LLgvZekwpAz5w==, tarball: https://npm.pkg.github.com/download/@wolffm/prefs-client/1.2.0/6fe3a394f56c11a16c9402f323c4c7ecd72dbffa}
+  '@wolffm/prefs-client@1.2.1':
+    resolution: {integrity: sha512-iEsFWjlq2QREEz3NCmqoL+6u6PQgD3xLnmjPvhEQ5274u7goqev00lF6o+OeI7sLV1/5C/iWWJBFI2OmYH9OpA==, tarball: https://npm.pkg.github.com/download/@wolffm/prefs-client/1.2.1/8dc0fc02fd0b5597f5d5228d1aacb4c51f50e595}
     engines: {node: '>=18'}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       zod: ^4.0.0
 
-  '@wolffm/shared-vendor@0.1.4':
-    resolution: {integrity: sha512-Gr1LhP6SEeY3vKlxwL/D24r7VqkEGdLKU1Bsh7zR8Pc2TxFZMXHdjD20laWjjYjgi9Bz4pciBwV6UmIbqCvkMQ==, tarball: https://npm.pkg.github.com/download/@wolffm/shared-vendor/0.1.4/c5648d41d2bf592c48e823f79bb2e1dabb9ae4cc}
+  '@wolffm/shared-vendor@0.1.5':
+    resolution: {integrity: sha512-ggRlS80lljFNrmLQknOFxh555CvVZzdVV8TkZaOAjTBc6Qd8JbY2cYi//4zyzDgYexaR/bzkdzKIQFa3+YaVKQ==, tarball: https://npm.pkg.github.com/download/@wolffm/shared-vendor/0.1.5/f8b99c3af37953ade556efab2e051520264be4dd}
     engines: {node: '>=20'}
 
   '@wolffm/task-ui-components@4.23.47':
@@ -4703,20 +4703,20 @@ snapshots:
 
   '@wolffm/catalogue@1.0.18': {}
 
-  '@wolffm/e2e-harness@0.2.66(@playwright/test@1.65.1)(vitest@3.2.4)':
+  '@wolffm/e2e-harness@0.2.67(@playwright/test@1.65.1)(vitest@3.2.4)':
     dependencies:
       '@playwright/test': 1.65.1
-      '@wolffm/shared-vendor': 0.1.4
+      '@wolffm/shared-vendor': 0.1.5
       vitest: 3.2.4
 
-  '@wolffm/logger@1.4.4': {}
+  '@wolffm/logger@1.4.5': {}
 
-  '@wolffm/prefs-client@1.2.0(react@19.2.0)(zod@4.1.12)':
+  '@wolffm/prefs-client@1.2.1(react@19.2.0)(zod@4.1.12)':
     dependencies:
       react: 19.2.0
       zod: 4.1.12
 
-  '@wolffm/shared-vendor@0.1.4':
+  '@wolffm/shared-vendor@0.1.5':
     dependencies:
       esbuild: 0.28.2
 
@@ -4728,7 +4728,7 @@ snapshots:
 
   '@wolffm/themes@5.14.17(react@19.2.0)':
     dependencies:
-      '@wolffm/prefs-client': 1.2.0(react@19.2.0)(zod@4.1.12)
+      '@wolffm/prefs-client': 1.2.1(react@19.2.0)(zod@4.1.12)
       react: 19.2.0
       zod: 4.1.12
 

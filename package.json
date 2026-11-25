@@ -59,7 +59,7 @@
     "@typescript-eslint/parser": "^8.47.0",
     "@vitejs/plugin-react": "^5.1.1",
     "@wolffm/catalogue": "^1.0.18",
-    "@wolffm/e2e-harness": "^0.2.66",
+    "@wolffm/e2e-harness": "^0.2.67",
     "@wolffm/task-ui-components": "4.23.47",
     "@wolffm/themes": "5.14.17",
     "eslint": "^9.39.1",
@@ -78,8 +78,8 @@
     "wrangler": "^4.14.4"
   },
   "dependencies": {
-    "@wolffm/logger": "1.4.4",
-    "@wolffm/prefs-client": "^1.2.0",
+    "@wolffm/logger": "1.4.5",
+    "@wolffm/prefs-client": "^1.2.1",
     "date-fns": "^4.1.0",
     "hono": "^4.7.10",
     "react-calendar": "^6.0.0",
