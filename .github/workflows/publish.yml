@@ -165,11 +165,18 @@ jobs:
           # landed on the registry.
           package_name=$(node -p "require('./package.json').name")
           version=$(node -p "require('./package.json').version")
-          if ! npm view "${package_name}@${version}" version --registry=https://npm.pkg.github.com 2>/dev/null | grep -q "$version"; then
-            echo "❌ ERROR: ${package_name}@${version} did not appear on the registry after publish"
-            exit 1
-          fi
-          echo "✓ Verified ${package_name}@${version} on registry"
+          # The registry lists a new version seconds after the publish returns
+          # (hadoku-hopper 45680917722 asked after 1 s and missed one that had
+          # landed): ask until it is listed, up to 90 s.
+          for attempt in $(seq 1 30); do
+            if npm view "${package_name}@${version}" version --registry=https://npm.pkg.github.com 2>/dev/null | grep -qxF "$version"; then
+              echo "Verified ${package_name}@${version} on registry (ask ${attempt})"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "ERROR: ${package_name}@${version} did not appear on the registry within 90 s of publish"
+          exit 1
         env:
           NODE_AUTH_TOKEN: ${{ steps.pnpm.outputs.npm-token }}
 

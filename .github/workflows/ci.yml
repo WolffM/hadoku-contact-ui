@@ -92,6 +92,76 @@ jobs:
         if: steps.scope.outputs.run == 'true'
         run: pnpm run typecheck
 
+  test:
+    name: test
+    # The api suite (vitest in workerd: routes, D1, KV, the mail-push hub) and
+    # the ui suite (plain node). They ran only on a laptop before this job:
+    # e2e.yml runs the separate e2e config against a deployed worker. Same
+    # runner selection as the jobs around it.
+    runs-on: ${{ fromJSON((github.event_name == 'pull_request' && !contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association) && '["ubuntu-latest"]') || vars.CI_RUNNER) }}
+    timeout-minutes: 15
+    steps:
+      - name: Mark the start, so the reported duration is real
+        run: echo "JOB_STARTED_AT=$(date -u +%s)" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Does this diff need tests?
+        id: scope
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          changed="$(git diff --name-only \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}")"
+          echo "changed files:"; echo "$changed" | sed 's/^/  /'
+          if echo "$changed" | grep -qE '(^src/|^api/|^scripts/|package\.json|pnpm-lock\.yaml|tsconfig|vitest\.config|\.github/workflows/ci\.yml)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "→ nothing testable touched."
+          fi
+
+      - uses: WolffM/hadoku-actions/setup-pnpm@v1
+        id: pnpm
+        if: steps.scope.outputs.run == 'true'
+        with:
+          npm-token: ${{ secrets.HADOKU_NPM_READ_TOKEN }}
+          vault-key: ${{ secrets.KEY_SERVICE_CONTACT_UI }}
+
+      - name: Install
+        if: steps.scope.outputs.run == 'true'
+        run: pnpm --config.store-dir=${{ runner.tool_cache }}/pnpm-store install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ steps.pnpm.outputs.npm-token }}
+
+      - name: Tests (api, ui)
+        id: tests
+        if: steps.scope.outputs.run == 'true'
+        run: pnpm test
+
+      # Every test into the fleet test store, red runs too. Advisory.
+      - name: Report the tests
+        if: always() && steps.tests.outcome != 'skipped'
+        uses: WolffM/hadoku-actions/report-tests@v1
+        with:
+          suite: unit
+          reports: |
+            vitest reports/vitest-api.json
+            vitest reports/vitest-ui.json
+          key: ${{ secrets.KEY_SERVICE_CONTACT_UI }}
+
+      - name: Report the outcome so a silent failure can't hide
+        if: always()
+        uses: WolffM/hadoku-actions/report-job@v1
+        with:
+          job-name: contact-ui:test
+          service-key: ${{ secrets.KEY_SERVICE_CONTACT_UI }}
+          started-at: ${{ env.JOB_STARTED_AT }}
+
   lint:
     name: lint
     # Runner SELECTION, not a job-level `if:`. Skipping the job would make a

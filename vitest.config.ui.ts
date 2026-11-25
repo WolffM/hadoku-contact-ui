@@ -7,6 +7,9 @@ import { defineConfig } from 'vitest/config'
  */
 export default defineConfig({
   test: {
+    // The json file is what CI's report-tests step reads (ci.yml).
+    reporters: ['default', 'json'],
+    outputFile: { json: 'reports/vitest-ui.json' },
     include: ['src/test/**/*.test.ts'],
     globals: true,
     environment: 'node'

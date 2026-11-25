@@ -2,6 +2,9 @@ import { defineWorkersConfig } from '@cloudflare/vitest-pool-workers/config'
 
 export default defineWorkersConfig({
   test: {
+    // The json file is what CI's report-tests step reads (ci.yml).
+    reporters: ['default', 'json'],
+    outputFile: { json: 'reports/vitest-api.json' },
     include: ['api/test/unit/**/*.test.ts', 'api/test/e2e/**/*.test.ts'],
     setupFiles: ['api/test/setup.ts'],
     globals: true,

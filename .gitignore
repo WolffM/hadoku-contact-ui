@@ -51,3 +51,4 @@ coverage/
 # 50 repos here already ignore it; the handful that tracked it reported
 # "uncommitted changes" on every nightly repo sync, forever.
 .claude/settings.local.json
+reports/
