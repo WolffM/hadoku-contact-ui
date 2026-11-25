@@ -52,6 +52,19 @@ jobs:
           nightly-run-id: ${{ inputs.nightly_run_id }}
           key: ${{ secrets.KEY_SERVICE_CONTACT_UI }}
 
+      # The same report into the fleet test store (hadoku_site
+      # docs/planning/unified-test-reporting-2026-11-23.md), red runs too.
+      # report-e2e above keeps the e2e evidence; this is the per-test record
+      # every suite in the fleet shares. Advisory: it never fails the job.
+      - name: Report the tests
+        if: always()
+        uses: WolffM/hadoku-actions/report-tests@v1
+        with:
+          suite: e2e
+          kind: e2e
+          reports: vitest e2e-report.json
+          key: ${{ secrets.KEY_SERVICE_CONTACT_UI }}
+
       - name: Report the outcome so a silent failure can't hide
         if: always()
         uses: WolffM/hadoku-actions/report-job@v1

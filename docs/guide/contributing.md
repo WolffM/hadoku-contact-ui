@@ -87,8 +87,15 @@ working Discord invite (`4133991`).
 ## Checks a change must pass
 
 `pnpm typecheck`, `pnpm lint`, `pnpm lint:css` and `pnpm test` (unit, e2e
-against the Workers pool, and the UI suite); CI runs all four on every pull
-request. `pnpm format:check` is the formatting gate.
+against the Workers pool, and the UI suite). CI (`ci.yml`) runs typecheck and
+the two lints on every push and pull request; `pnpm test` is run locally.
+`pnpm format:check` is the formatting gate.
+
+The e2e suite runs nightly in `e2e.yml`, dispatched by hadoku_site's fleet
+e2e run. Its `e2e-report.json` goes to the fleet e2e store through
+`report-e2e` and, red runs too, to the fleet test store through
+`WolffM/hadoku-actions/report-tests` (suite `e2e`; advisory, it never fails
+the job).
 
 ## Deploying
 
