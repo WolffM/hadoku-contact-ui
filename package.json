@@ -61,7 +61,7 @@
     "@wolffm/catalogue": "^1.0.18",
     "@wolffm/e2e-harness": "^0.2.66",
     "@wolffm/task-ui-components": "4.23.47",
-    "@wolffm/themes": "5.14.16",
+    "@wolffm/themes": "5.14.17",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.37.5",
